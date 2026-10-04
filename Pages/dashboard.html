@@ -1,24 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
-    (function () {
-      var raw = null;
-      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
-      if (!raw) { window.location.replace('login.html'); return; }
-      try {
-        var u = JSON.parse(raw);
-        if (!u || (u.expires && Date.now() > u.expires)) {
-          localStorage.removeItem('vocallus_user');
-          window.location.replace('login.html');
-        }
-      } catch (e) {
-        localStorage.removeItem('vocallus_user');
-        window.location.replace('login.html');
-      }
-    })();
-  </script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
@@ -124,6 +106,68 @@
       html { scroll-behavior: auto; }
     }
 </style>
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
 
@@ -185,7 +229,7 @@
             <div class="bg-white rounded-3xl shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-gray-100 p-8 mb-8 flex justify-between items-center relative overflow-hidden h-[180px]">
                 <div class="z-10 mt-[-20px]">
                     <p id="today-date" class="text-gray-800 text-[22px] mb-2 font-medium">—</p>
-                    <h1 class="text-[32px] font-semibold text-gray-900">Good Morning, <span id="user-name">Taymoor A.</span></h1>
+                    <h1 class="text-[32px] font-semibold text-gray-900">Good Morning, <span id="user-name" data-bind="agentName">Taymoor A.</span></h1>
                     <p class="text-gray-500 text-[15px] mt-2">Solana handled <span class="font-semibold text-gray-900" id="banner-calls">14</span> calls for you overnight.</p>
                 </div>
                 <div class="absolute right-0 top-0 bottom-0 w-[400px] pointer-events-none flex items-center justify-end">
@@ -341,7 +385,7 @@
                     <div class="bg-[#f9fafb] rounded-[24px] border border-gray-100 p-6 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors">
                         <div>
                             <div class="font-medium text-[15px] text-gray-500">Plan</div>
-                            <div class="font-semibold text-[19px] text-gray-900 mt-0.5">Growth</div>
+                            <div class="font-semibold text-[19px] text-gray-900 mt-0.5" data-bind="plan">None</div>
                         </div>
                         <i data-lucide="chevron-right" class="w-5 h-5 text-gray-500"></i>
                     </div>
@@ -453,7 +497,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
                     <div class="text-[13px] text-gray-500 font-medium">Plan</div>
-                    <div class="text-[24px] font-semibold text-gray-900 mt-1">Growth</div>
+                    <div class="text-[24px] font-semibold text-gray-900 mt-1" data-bind="plan">None</div>
                 </div>
                 <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
                     <div class="text-[13px] text-gray-500 font-medium">Minutes used</div>
@@ -544,70 +588,12 @@
         }, 3000);
       });
 
-      window.addEventListener('pageshow', function () {
-        document.body.classList.remove('is-leaving');
-      });
+      
 
       /* -------- Demo auth --------
          Sign in  ->  any email + password "123456"      -> account "demo"
          Sign up  ->  type "i" in all three fields       -> account "demo"
          Legacy   ->  full name "rat"                    -> account "rat" */
-      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-
-          var nameInput    = form.querySelector('input[name="name"]');
-          var emailInput   = form.querySelector('input[name="email"]');
-          var companyInput = form.querySelector('input[name="company"]');
-          var pwInput      = form.querySelector('input[name="password"]');
-
-          var displayName = null;
-
-          // Sign-in path: any email + password 123456
-          if (pwInput && pwInput.value === '123456') {
-            displayName = 'demo';
-          }
-
-          // Any form: "i" typed in every visible field -> account "demo"
-          var allInputs = form.querySelectorAll('input');
-          var allI = allInputs.length > 0;
-          allInputs.forEach(function (input) {
-            if (input.value.trim().toLowerCase() !== 'i') allI = false;
-          });
-          if (allI) {
-            displayName = 'demo';
-          }
-
-          // Legacy fallback: full name "rat"
-          if (!displayName && nameInput
-              && nameInput.value.trim().toLowerCase() === 'rat') {
-            displayName = 'rat';
-          }
-
-          if (!displayName) {
-            alert('Demo login:
-
-' +
-                  '  Any form  ->  type "i" into every field
-' +
-                  '  Sign in   ->  any email + password "123456"');
-            return;
-          }
-
-          try {
-            localStorage.setItem('vocallus_user', JSON.stringify({
-              displayName: displayName,
-              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
-            }));
-          } catch (err) { /* private mode — keep going */ }
-
-          // Navigate straight to the dashboard — no fade, no timeout.
-          var path = window.location.pathname.replace(/\/g, '/');
-          var inPages = path.indexOf('/Pages/') >= 0;
-          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-          window.location.replace(target);
-        });
-      });
 
       /* -------- Lucide (if loaded) -------- */
       if (window.lucide && lucide.createIcons) lucide.createIcons();
@@ -869,6 +855,36 @@
             activate(initialHash);
         }
     })();
+  </script>
+
+
+  <script>
+    window.requireAuth && window.requireAuth();
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        var nameEl = document.getElementById('user-name');
+        if (nameEl) nameEl.textContent = user.displayName || (user.email || '').split('@')[0] || 'there';
+        fb.getDoc(fb.doc(fb.db, 'users', user.uid)).then(function (snap) {
+          if (!snap.exists()) return;
+          var d = snap.data();
+          // Update any element that shows plan or current number.
+          document.querySelectorAll('[data-bind="plan"]').forEach(function (el) {
+            el.textContent = (d.plan && d.plan !== 'none') ? d.plan[0].toUpperCase() + d.plan.slice(1) : 'None';
+          });
+          document.querySelectorAll('[data-bind="number"]').forEach(function (el) {
+            el.textContent = d.phoneNumber || 'None';
+          });
+          document.querySelectorAll('[data-bind="agentName"]').forEach(function (el) {
+            el.textContent = d.agentName || 'Solana';
+          });
+        });
+        var so = document.getElementById('signout-btn');
+        if (so) so.addEventListener('click', function () {
+          fb.signOut(fb.auth).then(function () { window.location.href = 'login.html'; });
+        });
+      });
+    });
   </script>
 
 </body>

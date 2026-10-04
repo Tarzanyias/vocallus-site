@@ -1,24 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
-    (function () {
-      var raw = null;
-      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
-      if (!raw) { window.location.replace('login.html'); return; }
-      try {
-        var u = JSON.parse(raw);
-        if (!u || (u.expires && Date.now() > u.expires)) {
-          localStorage.removeItem('vocallus_user');
-          window.location.replace('login.html');
-        }
-      } catch (e) {
-        localStorage.removeItem('vocallus_user');
-        window.location.replace('login.html');
-      }
-    })();
-  </script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solana</title>
@@ -124,6 +106,68 @@
       html { scroll-behavior: auto; }
     }
 </style>
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
 
@@ -146,7 +190,13 @@
                     <span class="text-[11px] font-medium tracking-tight">Solana</span>
                 </a>
 
-                <a href="dashboard.html#number" data-nav="number" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                
+                <a href="calendar.html" data-nav="calendar" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Calendar</span>
+                </a>
+<a href="dashboard.html#number" data-nav="number" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
                     <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
                     <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.05 5A5 5 0 0 1 19 8.95"></path><path d="M15.05 1A9 9 0 0 1 23 8.94"></path><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                     <span class="text-[11px] font-medium tracking-tight">Number</span>
@@ -179,56 +229,29 @@
     <aside class="w-[320px] bg-[#f9fafb] border-r border-gray-200 flex flex-col flex-shrink-0">
         <div class="p-5 border-b border-gray-200">
             <div class="flex items-center gap-3 mb-2">
-                <img src="../Images/logo.png" alt="" class="w-11 h-11 rounded-2xl" />
+                <img src="../Images/logo.png" alt="" class="w-11 h-11 rounded-2xl">
                 <div class="flex-1">
                     <div class="font-semibold text-[15px] text-gray-900" id="agent-name-display">Solana</div>
                     <div class="text-[12px] text-gray-500">AI receptionist</div>
                 </div>
             </div>
         </div>
-
         <div class="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
             <div>
                 <label class="block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2">Agent name</label>
-                <input id="agent-name" type="text" value="Solana" placeholder="What should your Solana be called?"
-                       class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
+                <input id="agent-name" type="text" placeholder="Solana" class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
             </div>
-
             <div>
                 <label class="block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2">System prompt</label>
                 <p class="text-[12px] text-gray-400 mb-2">How your agent should greet and respond.</p>
-                <textarea id="system-prompt" rows="11" placeholder="You are Solana, the friendly AI receptionist for Acme Services. Greet callers warmly, ask how you can help, and book appointments when requested."
-                          class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.6] focus:outline-none focus:border-gray-400 bg-white resize-none">You are Solana, the friendly AI receptionist for Acme Services. Greet callers warmly, ask how you can help, and book appointments when requested. Keep answers short and confirm any booking by repeating the day and time back to the caller.</textarea>
+                <textarea id="system-prompt" rows="11" placeholder="You are Solana..." class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.6] focus:outline-none focus:border-gray-400 bg-white resize-none"></textarea>
             </div>
-
-            <button id="save-prompt"
-                    class="w-full btn-primary rounded-xl py-3 font-semibold text-[14px]">
-                Save changes
-            </button>
-
-            <div>
-                <div class="text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-3">Presets</div>
-                <div class="space-y-2">
-                    <button data-preset="voice" class="preset-btn w-full text-left rounded-xl border border-gray-200 bg-white px-3.5 py-3 hover:border-gray-400 transition">
-                        <div class="text-[13.5px] font-semibold text-gray-900">Voice assistant</div>
-                        <div class="text-[12px] text-gray-500 mt-0.5">Warm, friendly, conversational</div>
-                    </button>
-                    <button data-preset="booking" class="preset-btn w-full text-left rounded-xl border border-gray-200 bg-white px-3.5 py-3 hover:border-gray-400 transition">
-                        <div class="text-[13.5px] font-semibold text-gray-900">Booking agent</div>
-                        <div class="text-[12px] text-gray-500 mt-0.5">Focused on scheduling appointments</div>
-                    </button>
-                    <button data-preset="support" class="preset-btn w-full text-left rounded-xl border border-gray-200 bg-white px-3.5 py-3 hover:border-gray-400 transition">
-                        <div class="text-[13.5px] font-semibold text-gray-900">Support agent</div>
-                        <div class="text-[12px] text-gray-500 mt-0.5">Answers FAQs, escalates when needed</div>
-                    </button>
-                </div>
-            </div>
+            <button id="save-prompt" class="w-full btn-primary rounded-xl py-3 font-semibold text-[14px]">Save changes</button>
         </div>
     </aside>
 
-    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl shadow-[-5px_0_15px_-3px_rgba(0,0,0,0.1)]">
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl border-l border-gray-200">
         <div class="max-w-[1100px] mx-auto px-8 py-8">
-
             <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
                 <div>
                     <h1 class="text-[26px] font-semibold text-gray-900">Test your Solana</h1>
@@ -240,25 +263,24 @@
                 </div>
             </div>
 
-            <!-- Setup card: shown when no key is set -->
             <div id="api-setup" class="rounded-3xl border border-gray-100 p-7 mb-8 bg-[#f9fafb]">
                 <div class="mb-6">
                     <h2 class="text-[18px] font-semibold text-gray-900">Connect an AI provider</h2>
-                    <p class="text-[14px] text-gray-500 mt-1">Choose a provider and paste your API key.</p>
+                    <p class="text-[14px] text-gray-500 mt-1">Gemini is required for phone calls.</p>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6" id="provider-grid">
-                    <button data-provider="openai" class="provider-card relative rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                    <button data-provider="openai" class="provider-card rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
                         <img src="../Images/cha.png" alt="" class="w-8 h-8 rounded-lg mb-3">
                         <div class="text-[14px] font-semibold text-gray-900">OpenAI</div>
                         <div class="text-[12px] text-gray-500 mt-0.5">GPT models</div>
                     </button>
-                    <button data-provider="gemini" class="provider-card relative rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                    <button data-provider="gemini" class="provider-card rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
                         <img src="../Images/gem.png" alt="" class="w-8 h-8 rounded-lg mb-3">
-                        <div class="text-[14px] font-semibold text-gray-900">Gemini</div>
+                        <div class="text-[14px] font-semibold text-gray-900">Gemini <span class="ml-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Required for phone calls</span></div>
                         <div class="text-[12px] text-gray-500 mt-0.5">Google models</div>
                     </button>
-                    <button data-provider="claude" class="provider-card relative rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                    <button data-provider="claude" class="provider-card rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
                         <img src="../Images/cla.png" alt="" class="w-8 h-8 rounded-lg mb-3">
                         <div class="text-[14px] font-semibold text-gray-900">Claude</div>
                         <div class="text-[12px] text-gray-500 mt-0.5">Anthropic models</div>
@@ -267,74 +289,54 @@
 
                 <div class="mb-5">
                     <label class="block text-[13px] font-semibold text-gray-700 mb-2">API key</label>
-                    <input id="api-key" type="password" placeholder="Paste your API key"
-                           class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
+                    <input id="api-key" type="password" placeholder="Paste your API key" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
                     <p id="key-hint" class="text-[12px] text-gray-400 mt-1.5">Pick a provider to see the expected key format.</p>
-                </div>
-
-                <div class="mb-5">
-                    <label class="block text-[13px] font-semibold text-gray-700 mb-2">Model</label>
-
+                    <div id="key-saved" class="hidden mt-3 flex items-center justify-between rounded-xl bg-white border border-gray-200 px-4 py-3">
+                        <div>
+                            <div class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide">Saved key</div>
+                            <div id="key-masked" class="text-[14px] font-mono text-gray-900 mt-0.5">----</div>
+                        </div>
+                        <button id="key-replace" class="text-[13px] font-semibold text-gray-700 underline hover:text-black">Replace key</button>
+                    </div>
                 </div>
 
                 <div id="api-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-4 mb-5">
                     <div class="flex items-start gap-3">
                         <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                         <div>
-                            <div id="api-error-title" class="text-[14px] font-semibold text-red-800">Invalid API key</div>
-                            <div id="api-error-msg" class="text-[13px] text-red-700 mt-1">Check the key and try again.</div>
+                            <div id="api-error-title" class="text-[14px] font-semibold text-red-800">Error</div>
+                            <div id="api-error-msg" class="text-[13px] text-red-700 mt-1"></div>
                         </div>
                     </div>
                 </div>
 
-                <button id="save-key" class="btn-primary px-6 py-3 rounded-xl font-semibold text-[14px]">
-                    Save and continue
-                </button>
+                <button id="save-key" class="btn-primary px-6 py-3 rounded-xl font-semibold text-[14px]">Save and continue</button>
             </div>
 
-            <!-- Chat preview: shown after key is set -->
-            <div id="chat-preview" class="hidden rounded-3xl border border-gray-100 bg-[#f9fafb] p-7">
+            <div class="rounded-2xl border border-gray-100 bg-[#f9fafb] p-5 mb-8">
+                <div class="text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Your Solana number</div>
+                <div id="solana-number" class="text-[16px] font-semibold text-gray-900">Loading&hellip;</div>
+            </div>
 
+            <div id="chat-preview" class="rounded-3xl border border-gray-100 bg-[#f9fafb] p-7">
                 <div id="call-view">
                     <div class="text-center py-10">
                         <img src="../Images/logo.png" alt="" class="w-20 h-20 mx-auto rounded-3xl mb-4">
                         <div class="text-[22px] font-semibold text-gray-900">Test call</div>
-                        <div class="text-[14px] text-gray-500 mt-1.5">Solana will answer as configured.</div>
+                        <div class="text-[14px] text-gray-500 mt-1.5">Phone calls launch after you subscribe.</div>
                         <button id="start-call" class="mt-8 btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold text-[14px]">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                             Start test call
                         </button>
                     </div>
                 </div>
-
                 <div id="text-view" class="hidden">
-                    <div class="space-y-4 mb-6" id="chat-log">
-                        <div class="flex items-start gap-3">
-                            <img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0">
-                            <div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[70%]">
-                                <p class="text-[14px] text-gray-800 leading-[1.5]">Hi, thanks for reaching out to Acme Services. How can I help today?</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3 justify-end">
-                            <div class="bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[70%]">
-                                <p class="text-[14px] leading-[1.5]">Can I book a consultation for next Tuesday?</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0">
-                            <div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[70%]">
-                                <p class="text-[14px] text-gray-800 leading-[1.5]">Of course. Next Tuesday at 10am or 2pm are both open. Which works best?</p>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="space-y-4 mb-6" id="chat-log"></div>
                     <div class="flex items-center gap-3">
-                        <input type="text" placeholder="Type a message to test your Solana"
-                               class="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-[14px] focus:outline-none focus:border-gray-400">
-                        <button class="btn-primary px-5 py-3 rounded-xl font-semibold text-[14px]">Send</button>
+                        <input id="chat-input" type="text" placeholder="Type a message to test your Solana" class="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-[14px] focus:outline-none focus:border-gray-400">
+                        <button id="chat-send" class="btn-primary px-5 py-3 rounded-xl font-semibold text-[14px]">Send</button>
                     </div>
                 </div>
-
-
+            </div>
         </div>
     </main>
 
@@ -414,113 +416,38 @@
         }, 3000);
       });
 
-      window.addEventListener('pageshow', function () {
-        document.body.classList.remove('is-leaving');
-      });
+      
 
       /* -------- Demo auth --------
          Sign in  ->  any email + password "123456"      -> account "demo"
          Sign up  ->  type "i" in all three fields       -> account "demo"
          Legacy   ->  full name "rat"                    -> account "rat" */
-      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-
-          var nameInput    = form.querySelector('input[name="name"]');
-          var emailInput   = form.querySelector('input[name="email"]');
-          var companyInput = form.querySelector('input[name="company"]');
-          var pwInput      = form.querySelector('input[name="password"]');
-
-          var displayName = null;
-
-          // Sign-in path: any email + password 123456
-          if (pwInput && pwInput.value === '123456') {
-            displayName = 'demo';
-          }
-
-          // Any form: "i" typed in every visible field -> account "demo"
-          var allInputs = form.querySelectorAll('input');
-          var allI = allInputs.length > 0;
-          allInputs.forEach(function (input) {
-            if (input.value.trim().toLowerCase() !== 'i') allI = false;
-          });
-          if (allI) {
-            displayName = 'demo';
-          }
-
-          // Legacy fallback: full name "rat"
-          if (!displayName && nameInput
-              && nameInput.value.trim().toLowerCase() === 'rat') {
-            displayName = 'rat';
-          }
-
-          if (!displayName) {
-            alert('Demo login:
-
-' +
-                  '  Any form  ->  type "i" into every field
-' +
-                  '  Sign in   ->  any email + password "123456"');
-            return;
-          }
-
-          try {
-            localStorage.setItem('vocallus_user', JSON.stringify({
-              displayName: displayName,
-              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
-            }));
-          } catch (err) { /* private mode — keep going */ }
-
-          // Navigate straight to the dashboard — no fade, no timeout.
-          var path = window.location.pathname.replace(/\/g, '/');
-          var inPages = path.indexOf('/Pages/') >= 0;
-          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-          window.location.replace(target);
-        });
-      });
 
       /* -------- Lucide (if loaded) -------- */
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     })();
   </script>
-  <script>
-    (function () {
-      var PROVIDERS = {
-        openai: {
-          name: 'OpenAI', icon: '../Images/cha.png',
-          keyPrefixes: ['sk-'], hint: 'OpenAI keys start with "sk-".',
-          defaultModel: 'gpt-5-nano'
-        },
-        gemini: {
-          name: 'Gemini', icon: '../Images/gem.png',
-          keyPrefixes: ['AIza', 'AQ.'], hint: 'Gemini keys start with "AIza" or "AQ.".',
-          defaultModel: 'gemini-3.5-flash-lite'
-        },
-        claude: {
-          name: 'Claude', icon: '../Images/cla.png',
-          keyPrefixes: ['sk-ant-'], hint: 'Claude keys start with "sk-ant-".',
-          defaultModel: 'claude-haiku-4-5-20251001'
-        }
-      };
 
-      var currentProvider = null;
-      var chatHistory = [];
+  <script>
+    window.requireAuth && window.requireAuth();
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var PROVIDERS = {
+        openai: { name:'OpenAI', keyPrefixes:['sk-'], hint:'OpenAI keys start with "sk-".' },
+        gemini: { name:'Gemini', keyPrefixes:['AIza','AQ.'], hint:'Gemini keys start with "AIza" or "AQ.".' },
+        claude: { name:'Claude', keyPrefixes:['sk-ant-'], hint:'Claude keys start with "sk-ant-".' }
+      };
+      var uid = null, currentProvider = null;
+      var $ = function (id) { return document.getElementById(id); };
 
       var providerBtns = document.querySelectorAll('.provider-card');
-      var keyInput  = document.getElementById('api-key');
-      var keyHint   = document.getElementById('key-hint');
-      var errorBox  = document.getElementById('api-error');
-      var errorTitle= document.getElementById('api-error-title');
-      var errorMsg  = document.getElementById('api-error-msg');
-      var setupCard = document.getElementById('api-setup');
-      var previewCard = document.getElementById('chat-preview');
-      var saveBtn   = document.getElementById('save-key');
+      var keyInput = $('api-key'), keyHint = $('key-hint');
+      var errBox = $('api-error'), errTitle = $('api-error-title'), errMsg = $('api-error-msg');
+      var setupCard = $('api-setup'), preview = $('chat-preview');
+      var savedBox = $('key-saved'), masked = $('key-masked'), replaceBtn = $('key-replace');
 
-      function showError(t, m) {
-        errorTitle.textContent = t; errorMsg.textContent = m;
-        errorBox.classList.remove('hidden');
-      }
-      function hideError() { errorBox.classList.add('hidden'); }
+      function showErr(t, m) { errTitle.textContent = t; errMsg.textContent = m; errBox.classList.remove('hidden'); }
+      function hideErr() { errBox.classList.add('hidden'); }
+      function maskKey(k) { return k.slice(0,4) + '••••••' + k.slice(-4); }
 
       function selectProvider(id) {
         currentProvider = id;
@@ -531,189 +458,154 @@
           b.classList.toggle('ring-2', on);
           b.classList.toggle('ring-black/10', on);
           b.classList.toggle('border-gray-200', !on);
-          b.classList.toggle('ring-0', !on);
         });
         keyHint.textContent = p.hint;
-        hideError();
+        hideErr();
       }
 
       providerBtns.forEach(function (b) {
         b.addEventListener('click', function () { selectProvider(b.dataset.provider); });
       });
 
-      saveBtn.addEventListener('click', function () {
-        hideError();
-        var key = keyInput.value.trim();
-        var provider = currentProvider;
-        if (!provider) { showError('No provider selected', 'Pick OpenAI, Gemini, or Claude above.'); return; }
-        var p = PROVIDERS[provider];
-        if (!key) { showError('API key required', 'Paste a key from your ' + p.name + ' account.'); return; }
-        var ok = p.keyPrefixes.some(function (pre) { return key.indexOf(pre) === 0; });
-        if (key.length < 8 || !ok) { showError('Invalid API key', 'The key was rejected. ' + p.hint); return; }
-
-        try {
-          localStorage.setItem('vocallus_ai', JSON.stringify({
-            provider: provider, model: p.defaultModel,
-            key: key, configured: true
-          }));
-        } catch (e) {}
-
-        setupCard.classList.add('hidden');
-        previewCard.classList.remove('hidden');
-      });
-
-      document.getElementById('disconnect').addEventListener('click', function () {
-        try { localStorage.removeItem('vocallus_ai'); } catch (e) {}
-        setupCard.classList.remove('hidden');
-        previewCard.classList.add('hidden');
-        currentProvider = null;
-        providerBtns.forEach(function (b) {
-          b.classList.remove('border-black', 'ring-2', 'ring-black/10');
-          b.classList.add('border-gray-200', 'ring-0');
+      function loadUser() {
+        return fb.getDoc(fb.doc(fb.db, 'users', uid)).then(function (snap) {
+          if (!snap.exists()) return;
+          var d = snap.data();
+          if (d.agentName) { $('agent-name').value = d.agentName; $('agent-name-display').textContent = d.agentName; }
+          if (d.systemPrompt) $('system-prompt').value = d.systemPrompt;
+          $('solana-number').textContent = d.phoneNumber || 'No number yet — one is assigned after you subscribe.';
         });
-        keyInput.value = '';
-      });
-
-      /* Restore saved provider */
-      try {
-        var saved = JSON.parse(localStorage.getItem('vocallus_ai') || 'null');
-        if (saved && saved.configured) {
-          selectProvider(saved.provider);
-          keyInput.value = saved.key || '';
-          setupCard.classList.add('hidden');
-          previewCard.classList.remove('hidden');
-        }
-      } catch (e) {}
-
-      /* -------- Chat -------- */
-      var chatLog = document.getElementById('chat-log');
-      var chatInput = document.getElementById('chat-input');
-      var chatSend = document.getElementById('chat-send');
-
-      function getAgent() {
-        try { return JSON.parse(localStorage.getItem('vocallus_agent') || 'null') || {}; }
-        catch (e) { return {}; }
+      }
+      function loadKey() {
+        return fb.getDoc(fb.doc(fb.db, 'users', uid, 'private', 'ai')).then(function (snap) {
+          if (!snap.exists()) return;
+          var d = snap.data();
+          if (d && d.provider) {
+            selectProvider(d.provider);
+            keyInput.value = '';
+            masked.textContent = maskKey(d.apiKey || '');
+            savedBox.classList.remove('hidden');
+            keyInput.style.display = 'none';
+          }
+        });
       }
 
-      function pushBubble(role, text) {
-        var wrap = document.createElement('div');
-        wrap.className = role === 'user'
-          ? 'flex items-start gap-3 justify-end'
-          : 'flex items-start gap-3';
-        wrap.innerHTML = role === 'user'
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        uid = user.uid;
+        loadUser();
+        loadKey();
+      });
+
+      $('save-prompt').addEventListener('click', function () {
+        if (!uid) return;
+        var btn = this; btn.textContent = 'Saving…';
+        fb.updateDoc(fb.doc(fb.db, 'users', uid), {
+          agentName: $('agent-name').value.trim() || 'Solana',
+          systemPrompt: $('system-prompt').value.trim()
+        }).then(function () {
+          btn.textContent = 'Saved';
+          setTimeout(function () { btn.textContent = 'Save changes'; }, 1200);
+        }).catch(function (e) { btn.textContent = 'Save changes'; showErr('Save failed', e.message); });
+      });
+
+      $('agent-name').addEventListener('input', function () {
+        $('agent-name-display').textContent = this.value || 'Solana';
+      });
+
+      $('save-key').addEventListener('click', function () {
+        hideErr();
+        if (!uid) { showErr('Not signed in', 'Please sign in again.'); return; }
+        var key = keyInput.value.trim();
+        if (!currentProvider) { showErr('No provider selected', 'Pick a provider above.'); return; }
+        var p = PROVIDERS[currentProvider];
+        var ok = p.keyPrefixes.some(function (pre) { return key.indexOf(pre) === 0; });
+        if (key.length < 8 || !ok) { showErr('Invalid API key', p.hint); return; }
+        var model = currentProvider === 'gemini' ? 'gemini-2.5-flash'
+                  : currentProvider === 'openai' ? 'gpt-4o-mini'
+                  : 'claude-3-5-haiku-20241022';
+        fb.setDoc(fb.doc(fb.db, 'users', uid, 'private', 'ai'), {
+          provider: currentProvider, apiKey: key, model: model
+        }).then(function () {
+          masked.textContent = maskKey(key);
+          savedBox.classList.remove('hidden');
+          keyInput.value = '';
+          keyInput.style.display = 'none';
+        }).catch(function (e) { showErr('Could not save key', e.message); });
+      });
+
+      replaceBtn.addEventListener('click', function () {
+        savedBox.classList.add('hidden');
+        keyInput.style.display = '';
+        keyInput.focus();
+      });
+
+      /* ---- Text chat ---- */
+      var chatLog = $('chat-log'), chatInput = $('chat-input'), chatSend = $('chat-send');
+      var history = [];
+
+      function bubble(role, text) {
+        var el = document.createElement('div');
+        el.className = role === 'user' ? 'flex justify-end' : 'flex items-start gap-3';
+        el.innerHTML = role === 'user'
           ? '<div class="bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[70%]"><p class="text-[14px] leading-[1.5]"></p></div>'
           : '<img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0"><div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[70%]"><p class="text-[14px] text-gray-800 leading-[1.5]"></p></div>';
-        wrap.querySelector('p').textContent = text;
-        chatLog.appendChild(wrap);
+        el.querySelector('p').textContent = text;
+        chatLog.appendChild(el);
         chatLog.scrollTop = chatLog.scrollHeight;
-        return wrap;
+        return el;
       }
 
-      function askAI(userText) {
-        var cfg = null;
-        try { cfg = JSON.parse(localStorage.getItem('vocallus_ai') || 'null'); } catch (e) {}
-        if (!cfg) return Promise.reject(new Error('no config'));
-        var agent = getAgent();
-        var sys = agent.prompt || 'You are Solana, a friendly AI receptionist. Keep replies short and helpful.';
-        var name = agent.name || 'Solana';
+      function send() {
+        var text = (chatInput.value || '').trim();
+        if (!text || !uid) return;
+        chatInput.value = '';
+        bubble('user', text);
+        var thinking = bubble('assistant', '…');
+        history.push({ role: 'user', content: text });
 
-        chatHistory.push({ role: 'user', content: userText });
+        var keySnap, promptVal, agentName;
+        Promise.all([
+          fb.getDoc(fb.doc(fb.db, 'users', uid, 'private', 'ai')),
+          fb.getDoc(fb.doc(fb.db, 'users', uid))
+        ]).then(function (arr) {
+          var keyDoc = arr[0], userDoc = arr[1];
+          if (!keyDoc.exists()) throw new Error('No API key saved. Add one above.');
+          var kd = keyDoc.data();
+          if (kd.provider !== 'gemini') throw new Error('Text test only works with Gemini. Save a Gemini key.');
+          var ud = userDoc.exists() ? userDoc.data() : {};
+          promptVal = ud.systemPrompt || 'You are Solana, a friendly AI receptionist.';
+          agentName = ud.agentName || 'Solana';
 
-        // Try our Netlify function first — it handles CORS and hides nothing
-        // it shouldn't. Falls back to a direct call for providers that allow
-        // browser origins (Gemini and Claude both do).
-        var tryFn = fetch('/.netlify/functions/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider: cfg.provider, model: cfg.model, key: cfg.key,
-            system: sys, name: name, messages: chatHistory
-          })
-        }).then(function (r) {
-          if (!r.ok) throw new Error('fn ' + r.status);
-          return r.json();
-        }).then(function (j) { return j.reply; });
-
-        return tryFn.catch(function () {
-          return directCall(cfg, sys, name);
-        }).catch(function () {
-          return '(Demo reply) I would normally answer via ' + cfg.provider +
-                 ' using model ' + cfg.model + '. Once this is deployed to Netlify, ' +
-                 'the real response will come through.';
-        });
-      }
-
-      function directCall(cfg, sys, name) {
-        if (cfg.provider === 'gemini') {
           var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-                    cfg.model + ':generateContent?key=' + encodeURIComponent(cfg.key);
+                    (kd.model || 'gemini-2.5-flash') + ':generateContent?key=' +
+                    encodeURIComponent(kd.apiKey);
+
+          var body = {
+            systemInstruction: { parts: [{ text: promptVal }] },
+            contents: history.map(function (m) {
+              return { role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] };
+            })
+          };
           return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: sys }] },
-              contents: chatHistory.map(function (m) {
-                return { role: m.role === 'user' ? 'user' : 'model',
-                         parts: [{ text: m.content }] };
-              })
-            })
-          }).then(function (r) { return r.json(); })
-            .then(function (j) {
-              var t = j.candidates && j.candidates[0] &&
-                      j.candidates[0].content &&
-                      j.candidates[0].content.parts &&
-                      j.candidates[0].content.parts[0].text;
-              if (!t) throw new Error('no text');
-              return t;
-            });
-        }
-        if (cfg.provider === 'claude') {
-          return fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': cfg.key,
-              'anthropic-version': '2023-06-01',
-              'anthropic-dangerous-direct-browser-access': 'true'
-            },
-            body: JSON.stringify({
-              model: cfg.model, max_tokens: 512, system: sys,
-              messages: chatHistory
-            })
-          }).then(function (r) { return r.json(); })
-            .then(function (j) {
-              var t = j.content && j.content[0] && j.content[0].text;
-              if (!t) throw new Error('no text');
-              return t;
-            });
-        }
-        // OpenAI does not permit browser calls — the Netlify function handles it.
-        return Promise.reject(new Error('openai requires function'));
-      }
-
-      function handleSend() {
-        var text = (chatInput.value || '').trim();
-        if (!text) return;
-        chatInput.value = '';
-        pushBubble('user', text);
-        var thinking = pushBubble('assistant', '…');
-
-        askAI(text).then(function (reply) {
-          thinking.querySelector('p').textContent = reply;
-          chatHistory.push({ role: 'assistant', content: reply });
-        }).catch(function () {
-          thinking.querySelector('p').textContent = 'Something went wrong.';
+            body: JSON.stringify(body)
+          }).then(function (r) { return r.json(); });
+        }).then(function (j) {
+          var t = j.candidates && j.candidates[0] && j.candidates[0].content
+               && j.candidates[0].content.parts && j.candidates[0].content.parts[0].text;
+          if (!t) throw new Error((j.error && j.error.message) || 'No reply from Gemini.');
+          thinking.querySelector('p').textContent = t;
+          history.push({ role: 'assistant', content: t });
+        }).catch(function (e) {
+          thinking.querySelector('p').textContent = 'Error: ' + (e.message || e);
         });
       }
+      chatSend.addEventListener('click', send);
+      chatInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
 
-      chatSend.addEventListener('click', handleSend);
-      chatInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') handleSend();
-      });
-
-      /* -------- Call / Text toggle -------- */
-      var callView = document.getElementById('call-view');
-      var textView = document.getElementById('text-view');
+      /* ---- Call / Text toggle ---- */
       document.querySelectorAll('.mode-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var mode = btn.dataset.mode;
@@ -723,63 +615,17 @@
             b.classList.toggle('text-gray-900', on); b.classList.toggle('font-semibold', on);
             b.classList.toggle('text-gray-500', !on); b.classList.toggle('font-medium', !on);
           });
-          callView.classList.toggle('hidden', mode !== 'call');
-          textView.classList.toggle('hidden', mode !== 'text');
+          $('call-view').classList.toggle('hidden', mode !== 'call');
+          $('text-view').classList.toggle('hidden', mode !== 'text');
         });
       });
 
-      /* -------- Sub-sidebar -------- */
-      var nameInput = document.getElementById('agent-name');
-      var promptArea = document.getElementById('system-prompt');
-      var nameDisplay = document.getElementById('agent-name-display');
-
-      try {
-        var agent = JSON.parse(localStorage.getItem('vocallus_agent') || 'null');
-        if (agent) {
-          if (agent.name) { nameInput.value = agent.name; nameDisplay.textContent = agent.name; }
-          if (agent.prompt) promptArea.value = agent.prompt;
-        }
-      } catch (e) {}
-
-      nameInput.addEventListener('input', function () {
-        nameDisplay.textContent = nameInput.value || 'Solana';
+      /* ---- Sign out ---- */
+      var so = document.getElementById('signout-btn');
+      if (so) so.addEventListener('click', function () {
+        fb.signOut(fb.auth).then(function () { window.location.href = 'login.html'; });
       });
-
-      document.getElementById('save-prompt').addEventListener('click', function () {
-        try {
-          localStorage.setItem('vocallus_agent', JSON.stringify({
-            name: nameInput.value.trim() || 'Solana',
-            prompt: promptArea.value.trim()
-          }));
-        } catch (e) {}
-        this.textContent = 'Saved';
-        var self = this;
-        setTimeout(function () { self.textContent = 'Save changes'; }, 1200);
-      });
-
-      var PRESETS = {
-        voice: 'You are Solana, a warm and friendly AI receptionist. Greet callers by name when possible, use natural conversational language, and always confirm the reason for the call before wrapping up.',
-        booking: 'You are Solana, a booking-focused AI receptionist. Capture the caller\'s name, preferred date, preferred time, and reason for visit, then confirm the appointment slot back to them.',
-        support: 'You are Solana, a helpful support agent. Answer common questions clearly and briefly. If something is outside your knowledge, offer to take a callback message.'
-      };
-      document.querySelectorAll('.preset-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          promptArea.value = PRESETS[btn.dataset.preset] || '';
-          promptArea.focus();
-        });
-      });
-
-      document.getElementById('signout-btn').addEventListener('click', function () {
-        try {
-          localStorage.removeItem('vocallus_user');
-          localStorage.removeItem('vocallus_ai');
-          localStorage.removeItem('vocallus_agent');
-        } catch (e) {}
-        window.location.href = 'login.html';
-      });
-
-      if (window.lucide) lucide.createIcons();
-    })();
+    });
   </script>
 
   <script>

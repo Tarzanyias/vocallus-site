@@ -106,6 +106,68 @@
       html { scroll-behavior: auto; }
     }
 </style>
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
 </head>
 <body class="bg-white text-neutral-900 min-h-screen flex flex-col justify-between">
 
@@ -165,7 +227,23 @@
       </div>
 
     </div>
-  </header>
+  
+    <script>
+      window.whenFirebase && window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          var login  = document.querySelector('a[href$="login.html"].px-2');
+          var signup = document.querySelector('a[href$="signup.html"].btn-primary, a[href$="signup.html"][class*="btn-primary"]');
+          if (user) {
+            if (login)  login.style.display = 'none';
+            if (signup) {
+              signup.textContent = 'Dashboard';
+              signup.setAttribute('href', 'Pages/dashboard.html');
+            }
+          }
+        });
+      });
+    </script>
+</header>
 
   <main class="flex-1 ">
 
@@ -343,118 +421,18 @@
         }, 3000);
       });
 
-      window.addEventListener('pageshow', function () {
-        document.body.classList.remove('is-leaving');
-      });
+      
 
       /* -------- Demo auth --------
          Sign in  ->  any email + password "123456"      -> account "demo"
          Sign up  ->  type "i" in all three fields       -> account "demo"
          Legacy   ->  full name "rat"                    -> account "rat" */
-      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-
-          var nameInput    = form.querySelector('input[name="name"]');
-          var emailInput   = form.querySelector('input[name="email"]');
-          var companyInput = form.querySelector('input[name="company"]');
-          var pwInput      = form.querySelector('input[name="password"]');
-
-          var displayName = null;
-
-          // Sign-in path: any email + password 123456
-          if (pwInput && pwInput.value === '123456') {
-            displayName = 'demo';
-          }
-
-          // Any form: "i" typed in every visible field -> account "demo"
-          var allInputs = form.querySelectorAll('input');
-          var allI = allInputs.length > 0;
-          allInputs.forEach(function (input) {
-            if (input.value.trim().toLowerCase() !== 'i') allI = false;
-          });
-          if (allI) {
-            displayName = 'demo';
-          }
-
-          // Legacy fallback: full name "rat"
-          if (!displayName && nameInput
-              && nameInput.value.trim().toLowerCase() === 'rat') {
-            displayName = 'rat';
-          }
-
-          if (!displayName) {
-            alert('Demo login:
-
-' +
-                  '  Any form  ->  type "i" into every field
-' +
-                  '  Sign in   ->  any email + password "123456"');
-            return;
-          }
-
-          try {
-            localStorage.setItem('vocallus_user', JSON.stringify({
-              displayName: displayName,
-              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
-            }));
-          } catch (err) { /* private mode — keep going */ }
-
-          // Navigate straight to the dashboard — no fade, no timeout.
-          var path = window.location.pathname.replace(/\/g, '/');
-          var inPages = path.indexOf('/Pages/') >= 0;
-          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-          window.location.replace(target);
-        });
-      });
 
       /* -------- Lucide (if loaded) -------- */
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     })();
   </script>
 
-
-
-  <!-- Demo login: goes straight to the dashboard -->
-  <script>
-    document.addEventListener('submit', function (e) {
-      var form = e.target;
-      if (!form || !form.tagName || form.tagName !== 'FORM') return;
-      if (!form.hasAttribute('data-demo-form')) return;
-
-      // Stop everything else (form's own onsubmit, other listeners).
-      e.preventDefault();
-      e.stopPropagation();
-
-      var inputs = form.querySelectorAll('input');
-      var allI = inputs.length > 0;
-      for (var i = 0; i < inputs.length; i++) {
-        if (inputs[i].value.trim().toLowerCase() !== 'i') { allI = false; break; }
-      }
-
-      var nameEl = form.querySelector('input[name="name"]');
-      var pwEl   = form.querySelector('input[name="password"]');
-
-      var displayName = null;
-      if (pwEl && pwEl.value === '123456') displayName = 'demo';
-      if (allI) displayName = 'demo';
-      if (!displayName && nameEl && nameEl.value.trim().toLowerCase() === 'rat') {
-        displayName = 'rat';
-      }
-
-      if (!displayName) {
-        alert('Demo login. Type "i" into every field, or use password "123456".');
-        return;
-      }
-
-      try {
-        localStorage.setItem('vocallus_user', JSON.stringify({ displayName: displayName }));
-      } catch (err) {}
-
-      var inPages = window.location.pathname.indexOf('/Pages/') !== -1;
-      window.location.href = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-    }, true);
-  </script>
 
 </body>
 </html>

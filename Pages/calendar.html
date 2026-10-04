@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar</title>
+  <meta name="description" content="Your Vocallus appointment calendar.">
+  <link rel="icon" type="image/png" href="../Images/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.260.0/lucide.min.js"></script>
+
+  <style>
+    /* --- Fonts --------------------------------------------------------- */
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .font-inter { font-family: 'Inter', sans-serif; }
+
+    /* --- Selection ----------------------------------------------------- */
+    ::selection { background-color: #D4D4D4; color: #111111; }
+
+    /* --- Primary button ------------------------------------------------ */
+    .btn-primary {
+      background-color: #111111;
+      color: #FFFFFF;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:hover {
+      background-color: #262626;
+      transform: translateY(-1px);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* --- Nav dropdowns ------------------------------------------------- */
+    .nav-trigger {
+      background: transparent; border: 0; cursor: pointer;
+      font: inherit;
+    }
+    .nav-dropdown { position: relative; }
+    .nav-menu {
+      position: absolute; top: 100%; left: 0;
+      padding-top: 10px; min-width: 236px;
+      opacity: 0; visibility: hidden;
+      transform: translateY(-6px);
+      transition: opacity .18s ease, transform .18s ease, visibility .18s;
+      z-index: 40;
+    }
+    .nav-dropdown:hover .nav-menu,
+    .nav-dropdown.is-open .nav-menu {
+      opacity: 1; visibility: visible; transform: translateY(0);
+    }
+    .nav-dropdown:hover .nav-chevron,
+    .nav-dropdown.is-open .nav-chevron { transform: rotate(180deg); }
+    .nav-menu-inner { overflow: hidden; }
+
+    /* --- Hash-active dropdown child ----------------------------------- */
+    .nav-menu a.nav-hash-active {
+      background-color: #111111 !important;
+      color: #ffffff !important;
+    }
+
+    /* --- Page transitions --------------------------------------------- */
+    /* Smooth fade only — no curve, no slide. */
+    @keyframes pageFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    main, .page-body {
+      animation: pageFadeIn .28s ease-out both;
+    }
+    body.is-leaving { opacity: 0; transition: opacity .16s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+    }
+
+    /* --- Hero fit ------------------------------------------------------ */
+    .hero-fit { min-height: calc(100vh - 5rem); display: flex; align-items: center; }
+    @media (max-width: 1023px) {
+      .hero-fit { min-height: auto; padding-top: 2rem; padding-bottom: 2rem; }
+    }
+
+    /* --- Smooth scroll ------------------------------------------------- */
+    html { scroll-behavior: smooth; }
+
+    /* --- Dashboard ----------------------------------------------------- */
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #c1c1c1; border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    .spark-bar { transition: height .3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+      html { scroll-behavior: auto; }
+    }
+</style>
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
+</head>
+<body class="bg-white text-neutral-900 min-h-screen flex flex-col justify-between">
+
+  <header class="w-full bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-neutral-100">
+    <div class="max-w-[1400px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
+
+      <div class="flex items-center gap-10">
+        <a href="../index.html" class="flex items-center gap-2.5 select-none hover:opacity-90 transition">
+          <img src="../Images/logo.png" alt="" class="h-9 w-9" />
+          <span class="font-extrabold text-2xl tracking-tighter text-black">Vocallus</span>
+        </a>
+
+        <nav class="hidden md:flex items-center gap-1 text-[15px] font-medium text-[#111111]">
+          <div class="nav-dropdown relative" data-dropdown>
+            <button type="button" aria-haspopup="true" aria-expanded="false" class="nav-trigger inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">
+              <span>Products</span>
+              <svg class="nav-chevron w-3.5 h-3.5 text-neutral-400 stroke-[2.5] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+            </button>
+            <div class="nav-menu" role="menu">
+              <div class="nav-menu-inner rounded-2xl border border-neutral-100 bg-white p-2 shadow-lg shadow-neutral-200/60">
+              <a href="../Pages/products.html" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Overview</a>
+              <a href="../Pages/products.html#answering" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Call answering</a>
+              <a href="../Pages/products.html#messages" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Message capture</a>
+              <a href="../Pages/products.html#summaries" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Call summaries</a>
+              </div>
+            </div>
+          </div>
+          <div class="nav-dropdown relative" data-dropdown>
+            <button type="button" aria-haspopup="true" aria-expanded="false" class="nav-trigger inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">
+              <span>Solutions</span>
+              <svg class="nav-chevron w-3.5 h-3.5 text-neutral-400 stroke-[2.5] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+            </button>
+            <div class="nav-menu" role="menu">
+              <div class="nav-menu-inner rounded-2xl border border-neutral-100 bg-white p-2 shadow-lg shadow-neutral-200/60">
+              <a href="../Pages/solutions.html#healthcare" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Healthcare & dental</a>
+              <a href="../Pages/solutions.html#home-services" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Home services</a>
+              <a href="../Pages/solutions.html#legal" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Legal & professional</a>
+              <a href="../Pages/solutions.html#salons" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Salons & spas</a>
+              <a href="../Pages/solutions.html#property" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Property management</a>
+              </div>
+            </div>
+          </div>
+          <a href="../Pages/pricing.html" class="rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">Pricing</a>
+        </nav>
+      </div>
+
+      <div class="flex items-center gap-3 sm:gap-4 text-[15px] font-medium">
+        <a href="../Pages/login.html" class="px-2 py-1.5 text-neutral-700 hover:text-black transition">
+          Sign in
+        </a>
+        <a href="../Pages/talk-to-sales.html" class="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-neutral-200/90 rounded-xl text-neutral-800 font-medium hover:bg-neutral-50 transition shadow-xs">
+          Talk to Sales
+        </a>
+        <a href="../Pages/signup.html" class="btn-primary inline-flex items-center justify-center px-5 py-2 rounded-xl font-semibold shadow-sm">
+          Try for free
+        </a>
+      </div>
+
+    </div>
+  
+    <script>
+      window.whenFirebase && window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          var login  = document.querySelector('a[href$="login.html"].px-2');
+          var signup = document.querySelector('a[href$="signup.html"].btn-primary, a[href$="signup.html"][class*="btn-primary"]');
+          if (user) {
+            if (login)  login.style.display = 'none';
+            if (signup) {
+              signup.textContent = 'Dashboard';
+              signup.setAttribute('href', 'Pages/dashboard.html');
+            }
+          }
+        });
+      });
+    </script>
+</header>
+
+  <main class="flex-1 ">
+    <nav class="w-[88px] bg-[#f2f2f2] border-r border-gray-200 flex flex-col justify-between items-center py-6 flex-shrink-0 z-10">
+        <div class="flex flex-col items-center w-full space-y-4">
+            <a href="../index.html" class="mb-2 select-none">
+                <img src="../Images/logo.png" alt="Vocallus" class="w-9 h-9 rounded-xl" />
+            </a>
+
+            <div class="flex flex-col w-full items-center space-y-2">
+                <a href="dashboard.html" data-nav="home" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Home</span>
+                </a>
+
+                <a href="solana.html" data-nav="solana" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Solana</span>
+                </a>
+
+                
+                <a href="calendar.html" data-nav="calendar" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors bg-gray-200/80 text-gray-900">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-100"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Calendar</span>
+                </a>
+<a href="dashboard.html#number" data-nav="number" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.05 5A5 5 0 0 1 19 8.95"></path><path d="M15.05 1A9 9 0 0 1 23 8.94"></path><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Number</span>
+                </a>
+
+                <a href="history.html" data-nav="history" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span class="text-[11px] font-medium tracking-tight">History</span>
+                </a>
+
+                <a href="dashboard.html#finances" data-nav="finances" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Finances</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="flex flex-col w-full items-center space-y-4">
+            <a href="#" class="text-gray-500 hover:text-gray-800 relative p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-[#ff5a00] rounded-full border-2 border-[#f2f2f2]"></span>
+            </a>
+            <button id="signout-btn" title="Sign out" class="text-gray-500 hover:text-gray-800 p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+        </div>
+    </nav>
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl border-l border-gray-200">
+        <div class="max-w-[1200px] mx-auto px-8 py-8">
+            <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+                <div>
+                    <h1 class="text-[26px] font-semibold text-gray-900">Calendar</h1>
+                    <p class="text-gray-500 text-[14px] mt-0.5">Bookings from Solana and manual appointments.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="prev-week" class="px-3.5 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium hover:bg-gray-50">Prev</button>
+                    <button id="today-btn" class="px-3.5 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium hover:bg-gray-50">Today</button>
+                    <button id="next-week" class="px-3.5 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium hover:bg-gray-50">Next</button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 mb-6">
+                <button data-view="week" class="view-btn px-4 py-2 rounded-lg text-[13.5px] font-semibold bg-black text-white">Week</button>
+                <button data-view="list" class="view-btn px-4 py-2 rounded-lg text-[13.5px] font-medium border border-gray-200">Upcoming</button>
+                <div id="week-label" class="ml-auto text-[14px] font-medium text-gray-700"></div>
+            </div>
+
+            <div id="week-view">
+                <div class="overflow-x-auto rounded-2xl border border-gray-100">
+                    <table class="w-full min-w-[900px] table-fixed border-collapse">
+                        <thead><tr id="cal-head" class="bg-[#f9fafb]"></tr></thead>
+                        <tbody id="cal-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="list-view" class="hidden">
+                <div id="upcoming-list" class="space-y-3"></div>
+            </div>
+
+            <div class="mt-8 rounded-2xl border border-gray-100 bg-[#f9fafb] p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-[16px] font-semibold text-gray-900">Business hours</h2>
+                    <div class="text-[13px] text-gray-500">Slot length: <span id="slot-length">30</span> min</div>
+                </div>
+                <div id="hours-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                <button id="save-hours" class="mt-4 btn-primary px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-title" class="text-[18px] font-semibold text-gray-900">New appointment</h3>
+                <button id="modal-close" class="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+            </div>
+            <form id="appt-form" class="space-y-4">
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Title</span>
+                    <input name="title" required class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                </label>
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Customer name</span>
+                    <input name="customerName" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                </label>
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Customer phone</span>
+                    <input name="customerPhone" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="block">
+                        <span class="block text-[13px] font-semibold text-gray-700 mb-1">Start</span>
+                        <input type="datetime-local" name="start" required class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                    </label>
+                    <label class="block">
+                        <span class="block text-[13px] font-semibold text-gray-700 mb-1">End</span>
+                        <input type="datetime-local" name="end" required class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                    </label>
+                </div>
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Notes</span>
+                    <textarea name="notes" rows="2" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]"></textarea>
+                </label>
+                <div class="flex items-center justify-between gap-3 pt-2">
+                    <button type="button" id="appt-delete" class="hidden text-[13.5px] font-semibold text-red-600 hover:underline">Delete</button>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button type="button" id="modal-cancel" class="px-4 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium">Cancel</button>
+                        <button type="submit" class="btn-primary px-5 py-2 rounded-lg font-semibold text-[13.5px]">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-neutral-100 bg-white">
+    <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-16">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-10">
+
+        <div class="md:col-span-5">
+          <a href="../index.html" class="flex items-center gap-2.5 select-none">
+            <img src="../Images/logo.png" alt="" class="h-8 w-8" />
+            <span class="font-extrabold text-xl tracking-tighter text-black">Vocallus</span>
+          </a>
+          <p class="mt-4 text-[14.5px] leading-[1.65] text-neutral-500 max-w-[340px]">
+            Answer every call, 24/7, with Solana — the AI receptionist built
+            directly into your business phone system.
+          </p>
+        </div>
+
+        <div class="md:col-span-3">
+          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Product</p>
+          <ul class="mt-5 space-y-3.5">
+              <li><a href="../Pages/products.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Products</a></li>
+              <li><a href="../Pages/solutions.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Solutions</a></li>
+              <li><a href="../Pages/pricing.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Pricing</a></li>
+              <li><a href="../Pages/resources.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Resources</a></li>
+          </ul>
+        </div>
+
+        <div class="md:col-span-2">
+          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Company</p>
+          <ul class="mt-5 space-y-3.5">
+              <li><a href="../Pages/dashboard.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Dashboard</a></li>
+              <li><a href="../Pages/talk-to-sales.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Talk to Sales</a></li>
+              <li><a href="../Pages/signup.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign up</a></li>
+              <li><a href="../Pages/login.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign in</a></li>
+          </ul>
+        </div>
+
+        <div class="md:col-span-2">
+          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Contact</p>
+          <ul class="mt-5 space-y-3.5">
+            <li><a href="mailto:hello@vocallus.example" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">hello@vocallus.example</a></li>
+            <li><a href="tel:+15550000000" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">(555) 000-0000</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="mt-14 pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p class="text-[13px] text-neutral-400">&copy; 2026 Vocallus. All rights reserved.</p>
+        <div class="flex items-center gap-5 text-[13px] text-neutral-400">
+          <a href="#" class="hover:text-[#111111] transition-colors">Privacy</a>
+          <a href="#" class="hover:text-[#111111] transition-colors">Terms</a>
+          <a href="#" class="hover:text-[#111111] transition-colors">Security</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+
+  <script>
+    (function () {
+      /* -------- Dropdown menus -------- */
+      var dropdowns = document.querySelectorAll('[data-dropdown]');
+
+      function setOpen(dd, open) {
+        dd.classList.toggle('is-open', open);
+        var t = dd.querySelector('.nav-trigger');
+        if (t) t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function closeAll(except) {
+        dropdowns.forEach(function (dd) { if (dd !== except) setOpen(dd, false); });
+      }
+
+      dropdowns.forEach(function (dd) {
+        var trigger = dd.querySelector('.nav-trigger');
+        if (!trigger) return;
+        trigger.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var willOpen = !dd.classList.contains('is-open');
+          closeAll(dd);
+          setOpen(dd, willOpen);
+        });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-dropdown]')) closeAll(null);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAll(null);
+      });
+
+      /* -------- Hash highlight in dropdowns -------- */
+      function updateHashHighlight() {
+        var hash = window.location.hash;
+        document.querySelectorAll('.nav-menu a').forEach(function (a) {
+          var href = a.getAttribute('href') || '';
+          var idx = href.indexOf('#');
+          var linkHash = idx >= 0 ? href.substring(idx) : '';
+          a.classList.toggle('nav-hash-active', !!hash && linkHash === hash);
+        });
+      }
+      window.addEventListener('hashchange', updateHashHighlight);
+      window.addEventListener('load', updateHashHighlight);
+
+      /* -------- Smooth page transitions -------- */
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+
+      document.addEventListener('click', function (e) {
+        if (e.defaultPrevented) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href.charAt(0) === '#') return;
+        if (/^(https?:|mailto:|tel:)/i.test(href)) return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
+
+        // Same-page navigation: let the browser handle it directly.
+        try {
+          var target = new URL(link.href, window.location.href);
+          if (target.pathname === window.location.pathname) return;
+        } catch (err) { /* fall through */ }
+
+        e.preventDefault();
+        document.body.classList.add('is-leaving');
+        window.setTimeout(function () { window.location.href = href; }, 180);
+        window.setTimeout(function () {
+          document.body.classList.remove('is-leaving');
+        }, 3000);
+      });
+
+      
+
+      /* -------- Demo auth --------
+         Sign in  ->  any email + password "123456"      -> account "demo"
+         Sign up  ->  type "i" in all three fields       -> account "demo"
+         Legacy   ->  full name "rat"                    -> account "rat" */
+
+      /* -------- Lucide (if loaded) -------- */
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    })();
+  </script>
+
+
+
+  <script>
+    window.requireAuth && window.requireAuth();
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var uid = null;
+      var currentWeekStart = startOfWeek(new Date());
+      var appts = [];
+      var hours = defaultHours();
+      var slotMin = 30;
+      var editingId = null;
+      var $ = function (id) { return document.getElementById(id); };
+
+      function startOfWeek(d) {
+        var x = new Date(d); x.setHours(0,0,0,0);
+        var day = x.getDay();
+        var diff = day === 0 ? -6 : 1 - day;
+        x.setDate(x.getDate() + diff);
+        return x;
+      }
+      function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+      function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); }
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      function toLocalInput(d) { return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes()); }
+      function defaultHours() {
+        var w = { closed:false, open:'09:00', close:'17:00' };
+        var c = { closed:true,  open:'09:00', close:'17:00' };
+        return { mon:w, tue:w, wed:w, thu:w, fri:w, sat:c, sun:c };
+      }
+
+      var DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+
+      function renderHead() {
+        var head = $('cal-head');
+        head.innerHTML = '<th class="w-[80px] py-3 text-[12px] font-semibold text-gray-500 border-b border-gray-200"></th>';
+        for (var i = 0; i < 7; i++) {
+          var d = addDays(currentWeekStart, i);
+          var th = document.createElement('th');
+          th.className = 'py-3 text-[12px] font-semibold text-gray-700 border-b border-l border-gray-200';
+          th.textContent = fmtDay(d);
+          head.appendChild(th);
+        }
+        var end = addDays(currentWeekStart, 6);
+        $('week-label').textContent = currentWeekStart.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' – ' + end.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      }
+
+      function renderBody() {
+        var body = $('cal-body');
+        body.innerHTML = '';
+        for (var h = 7; h < 20; h++) {
+          for (var m = 0; m < 60; m += slotMin) {
+            var tr = document.createElement('tr');
+            var timeCell = document.createElement('td');
+            timeCell.className = 'text-[11px] text-gray-400 align-top py-2 pl-2 border-b border-gray-100 w-[80px]';
+            timeCell.textContent = (m === 0) ? (h + ':00') : '';
+            tr.appendChild(timeCell);
+
+            for (var d = 0; d < 7; d++) {
+              var day = addDays(currentWeekStart, d);
+              var slotStart = new Date(day); slotStart.setHours(h, m, 0, 0);
+              var slotEnd = new Date(slotStart); slotEnd.setMinutes(slotEnd.getMinutes() + slotMin);
+
+              var key = DAYS[d];
+              var isClosed = hours[key] && hours[key].closed;
+              var td = document.createElement('td');
+              td.className = 'align-top border-b border-l border-gray-100 relative h-[38px] cursor-pointer hover:bg-gray-50 ' + (isClosed ? 'bg-gray-50' : '');
+              td.dataset.start = slotStart.toISOString();
+              td.dataset.end = slotEnd.toISOString();
+
+              var match = appts.find(function (a) {
+                return a.start && a.end && new Date(a.start) < slotEnd && new Date(a.end) > slotStart;
+              });
+              if (match) {
+                td.classList.remove('cursor-pointer', 'hover:bg-gray-50');
+                var chip = document.createElement('div');
+                chip.className = 'absolute inset-x-1 top-0.5 rounded-md bg-black text-white text-[11px] px-2 py-1 truncate cursor-pointer';
+                chip.textContent = match.title || 'Appointment';
+                chip.title = match.title || '';
+                chip.addEventListener('click', function (e) { e.stopPropagation(); openEdit(match.id); });
+                td.appendChild(chip);
+                if (match.source === 'ai') {
+                  var badge = document.createElement('span');
+                  badge.className = 'absolute right-1 bottom-0.5 text-[9px] font-semibold uppercase tracking-wider text-white bg-green-600 rounded px-1';
+                  badge.textContent = 'AI';
+                  td.appendChild(badge);
+                }
+              }
+              tr.appendChild(td);
+            }
+            body.appendChild(tr);
+          }
+        }
+      }
+
+      function renderList() {
+        var wrap = $('upcoming-list');
+        wrap.innerHTML = '';
+        var now = new Date();
+        var upcoming = appts.filter(function (a) { return new Date(a.start) >= now; })
+                            .sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+        if (!upcoming.length) {
+          wrap.innerHTML = '<div class="py-16 text-center text-gray-400 text-[15px]">No upcoming appointments.</div>';
+          return;
+        }
+        upcoming.forEach(function (a) {
+          var row = document.createElement('div');
+          row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm transition cursor-pointer flex items-start gap-4';
+          row.innerHTML =
+            '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0">' +
+              '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+            '</div>' +
+            '<div class="flex-1">' +
+              '<div class="flex items-center gap-2 flex-wrap">' +
+                '<div class="font-semibold text-[15px] text-gray-900"></div>' +
+                (a.source === 'ai' ? '<span class="text-[10px] font-bold uppercase tracking-wider text-white bg-green-600 rounded px-1.5 py-0.5">Booked by Solana</span>' : '') +
+                '<div class="text-[12px] text-gray-400 ml-auto">' + new Date(a.start).toLocaleString() + '</div>' +
+              '</div>' +
+              '<p class="text-[13.5px] text-gray-600 mt-1"></p>' +
+            '</div>';
+          row.querySelector('div.font-semibold').textContent = a.title || 'Appointment';
+          row.querySelector('p').textContent = (a.customerName || '') + (a.customerPhone ? ' · ' + a.customerPhone : '');
+          row.addEventListener('click', function () { openEdit(a.id); });
+          wrap.appendChild(row);
+        });
+      }
+
+      function renderHours() {
+        var grid = $('hours-grid');
+        grid.innerHTML = '';
+        DAYS.forEach(function (k) {
+          var h = hours[k] || { closed:true, open:'09:00', close:'17:00' };
+          var cell = document.createElement('div');
+          cell.className = 'rounded-xl border border-gray-200 bg-white p-3';
+          cell.innerHTML =
+            '<div class="flex items-center justify-between mb-2">' +
+              '<span class="text-[12.5px] font-semibold uppercase tracking-wide text-gray-600">' + k + '</span>' +
+              '<label class="inline-flex items-center gap-1.5 text-[12px] text-gray-500">' +
+                '<input type="checkbox" data-day="'+k+'" data-field="closed" ' + (h.closed ? 'checked' : '') + ' class="rounded">' +
+                'Closed' +
+              '</label>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 gap-2">' +
+              '<input type="time" data-day="'+k+'" data-field="open" value="'+h.open+'" ' + (h.closed ? 'disabled' : '') + ' class="rounded-lg border border-gray-200 px-2 py-1.5 text-[12.5px]">' +
+              '<input type="time" data-day="'+k+'" data-field="close" value="'+h.close+'" ' + (h.closed ? 'disabled' : '') + ' class="rounded-lg border border-gray-200 px-2 py-1.5 text-[12.5px]">' +
+            '</div>';
+          grid.appendChild(cell);
+        });
+        grid.querySelectorAll('input').forEach(function (inp) {
+          inp.addEventListener('change', function () {
+            var d = inp.dataset.day, f = inp.dataset.field;
+            if (!hours[d]) hours[d] = { open:'09:00', close:'17:00', closed:false };
+            hours[d][f] = (inp.type === 'checkbox') ? inp.checked : inp.value;
+            renderHours();
+          });
+        });
+      }
+
+      function openNew(startISO, endISO) {
+        editingId = null;
+        $('modal-title').textContent = 'New appointment';
+        $('appt-delete').classList.add('hidden');
+        var f = $('appt-form'); f.reset();
+        if (startISO) f.start.value = toLocalInput(new Date(startISO));
+        if (endISO)   f.end.value   = toLocalInput(new Date(endISO));
+        $('modal').classList.remove('hidden');
+      }
+      function openEdit(id) {
+        var a = appts.find(function (x) { return x.id === id; });
+        if (!a) return;
+        editingId = id;
+        $('modal-title').textContent = 'Edit appointment';
+        $('appt-delete').classList.remove('hidden');
+        var f = $('appt-form');
+        f.title.value = a.title || '';
+        f.customerName.value = a.customerName || '';
+        f.customerPhone.value = a.customerPhone || '';
+        f.start.value = toLocalInput(new Date(a.start));
+        f.end.value = toLocalInput(new Date(a.end));
+        f.notes.value = a.notes || '';
+        $('modal').classList.remove('hidden');
+      }
+      function closeModal() { $('modal').classList.add('hidden'); editingId = null; }
+
+      $('modal-close').addEventListener('click', closeModal);
+      $('modal-cancel').addEventListener('click', closeModal);
+      $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) closeModal(); });
+
+      $('appt-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!uid) return;
+        var f = e.target;
+        var data = {
+          title: f.title.value.trim(),
+          customerName: f.customerName.value.trim(),
+          customerPhone: f.customerPhone.value.trim(),
+          start: new Date(f.start.value),
+          end: new Date(f.end.value),
+          notes: f.notes.value.trim()
+        };
+        if (editingId) {
+          fb.updateDoc(fb.doc(fb.db, 'users', uid, 'appointments', editingId), data)
+            .then(closeModal);
+        } else {
+          data.source = 'manual';
+          data.createdAt = fb.serverTimestamp();
+          fb.addDoc(fb.collection(fb.db, 'users', uid, 'appointments'), data)
+            .then(closeModal);
+        }
+      });
+
+      $('appt-delete').addEventListener('click', function () {
+        if (!uid || !editingId) return;
+        fb.deleteDoc(fb.doc(fb.db, 'users', uid, 'appointments', editingId))
+          .then(closeModal);
+      });
+
+      $('prev-week').addEventListener('click', function () { currentWeekStart = addDays(currentWeekStart, -7); renderHead(); renderBody(); });
+      $('next-week').addEventListener('click', function () { currentWeekStart = addDays(currentWeekStart, 7); renderHead(); renderBody(); });
+      $('today-btn').addEventListener('click', function () { currentWeekStart = startOfWeek(new Date()); renderHead(); renderBody(); });
+
+      document.querySelectorAll('.view-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var v = b.dataset.view;
+          document.querySelectorAll('.view-btn').forEach(function (x) {
+            var on = x.dataset.view === v;
+            x.classList.toggle('bg-black', on); x.classList.toggle('text-white', on);
+            x.classList.toggle('font-semibold', on);
+            x.classList.toggle('border', !on); x.classList.toggle('border-gray-200', !on);
+            x.classList.toggle('font-medium', !on);
+          });
+          $('week-view').classList.toggle('hidden', v !== 'week');
+          $('list-view').classList.toggle('hidden', v !== 'list');
+          if (v === 'list') renderList();
+        });
+      });
+
+      $('cal-body').addEventListener('click', function (e) {
+        var td = e.target.closest('td');
+        if (!td || !td.dataset.start) return;
+        openNew(td.dataset.start, td.dataset.end);
+      });
+
+      $('save-hours').addEventListener('click', function () {
+        if (!uid) return;
+        fb.updateDoc(fb.doc(fb.db, 'users', uid), { hours: hours, appointmentLength: slotMin });
+      });
+
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        uid = user.uid;
+        fb.getDoc(fb.doc(fb.db, 'users', uid)).then(function (snap) {
+          if (snap.exists()) {
+            var d = snap.data();
+            if (d.hours) hours = Object.assign(hours, d.hours);
+            if (d.appointmentLength) slotMin = d.appointmentLength;
+          }
+          renderHours();
+          renderHead(); renderBody();
+          fb.onSnapshot(fb.collection(fb.db, 'users', uid, 'appointments'), function (s) {
+            appts = [];
+            s.forEach(function (doc) {
+              var x = doc.data(); x.id = doc.id;
+              x.start = x.start && x.start.toDate ? x.start.toDate() : x.start;
+              x.end   = x.end   && x.end.toDate   ? x.end.toDate()   : x.end;
+              appts.push(x);
+            });
+            renderBody();
+            if (!$('list-view').classList.contains('hidden')) renderList();
+          });
+        });
+      });
+    });
+  </script>
+
+</body>
+</html>

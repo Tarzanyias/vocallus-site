@@ -354,67 +354,12 @@ SHARED_JS = """
         }, 3000);
       });
 
-      window.addEventListener('pageshow', function () {
-        document.body.classList.remove('is-leaving');
-      });
+      
 
       /* -------- Demo auth --------
          Sign in  ->  any email + password "123456"      -> account "demo"
          Sign up  ->  type "i" in all three fields       -> account "demo"
          Legacy   ->  full name "rat"                    -> account "rat" */
-      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-
-          var nameInput    = form.querySelector('input[name="name"]');
-          var emailInput   = form.querySelector('input[name="email"]');
-          var companyInput = form.querySelector('input[name="company"]');
-          var pwInput      = form.querySelector('input[name="password"]');
-
-          var displayName = null;
-
-          // Sign-in path: any email + password 123456
-          if (pwInput && pwInput.value === '123456') {
-            displayName = 'demo';
-          }
-
-          // Any form: "i" typed in every visible field -> account "demo"
-          var allInputs = form.querySelectorAll('input');
-          var allI = allInputs.length > 0;
-          allInputs.forEach(function (input) {
-            if (input.value.trim().toLowerCase() !== 'i') allI = false;
-          });
-          if (allI) {
-            displayName = 'demo';
-          }
-
-          // Legacy fallback: full name "rat"
-          if (!displayName && nameInput
-              && nameInput.value.trim().toLowerCase() === 'rat') {
-            displayName = 'rat';
-          }
-
-          if (!displayName) {
-            alert('Demo login:\n\n' +
-                  '  Any form  ->  type "i" into every field\n' +
-                  '  Sign in   ->  any email + password "123456"');
-            return;
-          }
-
-          try {
-            localStorage.setItem('vocallus_user', JSON.stringify({
-              displayName: displayName,
-              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
-            }));
-          } catch (err) { /* private mode — keep going */ }
-
-          // Navigate straight to the dashboard — no fade, no timeout.
-          var path = window.location.pathname.replace(/\\/g, '/');
-          var inPages = path.indexOf('/Pages/') >= 0;
-          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-          window.location.replace(target);
-        });
-      });
 
       /* -------- Lucide (if loaded) -------- */
       if (window.lucide && lucide.createIcons) lucide.createIcons();
@@ -463,48 +408,6 @@ ${content}
 ${footer}
 
 ${scripts}
-
-
-  <!-- Demo login: goes straight to the dashboard -->
-  <script>
-    document.addEventListener('submit', function (e) {
-      var form = e.target;
-      if (!form || !form.tagName || form.tagName !== 'FORM') return;
-      if (!form.hasAttribute('data-demo-form')) return;
-
-      // Stop everything else (form's own onsubmit, other listeners).
-      e.preventDefault();
-      e.stopPropagation();
-
-      var inputs = form.querySelectorAll('input');
-      var allI = inputs.length > 0;
-      for (var i = 0; i < inputs.length; i++) {
-        if (inputs[i].value.trim().toLowerCase() !== 'i') { allI = false; break; }
-      }
-
-      var nameEl = form.querySelector('input[name="name"]');
-      var pwEl   = form.querySelector('input[name="password"]');
-
-      var displayName = null;
-      if (pwEl && pwEl.value === '123456') displayName = 'demo';
-      if (allI) displayName = 'demo';
-      if (!displayName && nameEl && nameEl.value.trim().toLowerCase() === 'rat') {
-        displayName = 'rat';
-      }
-
-      if (!displayName) {
-        alert('Demo login. Type "i" into every field, or use password "123456".');
-        return;
-      }
-
-      try {
-        localStorage.setItem('vocallus_user', JSON.stringify({ displayName: displayName }));
-      } catch (err) {}
-
-      var inPages = window.location.pathname.indexOf('/Pages/') !== -1;
-      window.location.href = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-    }, true);
-  </script>
 
 </body>
 </html>""")
@@ -2709,7 +2612,7 @@ def page_history(_ctx):
 
 
 # ---- wrap render_page so solana / history use the dashboard shell ----
-_prev_render_page = render_page
+_prev_render_page_2 = render_page
 
 def render_page(path, builder):
     name = Path(path).name
@@ -2729,7 +2632,7 @@ def render_page(path, builder):
             content=content,
             scripts=SHARED_JS + extra,
         )
-    return _prev_render_page(path, builder)
+    return _prev_render_page_2(path, builder)
 
 
 # ---- wrap ensure_images to also create the provider icons ----
@@ -2856,67 +2759,1166 @@ _PROVIDER_SELECT_JS = '''
 '''
 
 
-# --- edit.py: session guard wrapper (single, safe) ---
-_vocallus_prev_render = render_page
+import re
 
-_VOCALLUS_GUARD_APP = """
-  <script>
-    (function () {
-      var raw = null;
-      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
-      if (!raw) { window.location.replace('login.html'); return; }
-      try {
-        var u = JSON.parse(raw);
-        if (!u || (u.expires && Date.now() > u.expires)) {
-          localStorage.removeItem('vocallus_user');
-          window.location.replace('login.html');
-        }
-      } catch (e) {
-        localStorage.removeItem('vocallus_user');
-        window.location.replace('login.html');
-      }
-    })();
+# --- edit.py: Firebase v10 + Calendar + Pricing ---
+
+FIREBASE_SCRIPT = '''
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
   </script>
-"""
-
-_VOCALLUS_GUARD_AUTH = """
   <script>
-    (function () {
-      var raw = null;
-      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
-      if (!raw) return;
-      try {
-        var u = JSON.parse(raw);
-        if (!u || (u.expires && Date.now() > u.expires)) {
-          localStorage.removeItem('vocallus_user');
-          return;
-        }
-        var configured = false;
-        try { configured = !!localStorage.getItem('vocallus_agent'); } catch (e) {}
-        window.location.replace(configured ? 'dashboard.html' : 'solana.html');
-      } catch (e) {}
-    })();
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
   </script>
-"""
+'''
 
-_VOCALLUS_APP_PAGES = {"dashboard.html", "solana.html", "history.html"}
-_VOCALLUS_AUTH_PAGES = {"login.html", "signup.html"}
-
+# ---------- render_page: inject Firebase into every page ----------
+_prev_render_page_1 = render_page
 
 def render_page(path, builder):
-    html = _vocallus_prev_render(path, builder)
-    name = Path(path).name
-    if name in _VOCALLUS_APP_PAGES:
-        guard = _VOCALLUS_GUARD_APP
-    elif name in _VOCALLUS_AUTH_PAGES:
-        guard = _VOCALLUS_GUARD_AUTH
-    else:
-        return html
-    if "<head>" in html:
-        html = html.replace("<head>", "<head>" + guard, 1)
+    html = _prev_render_page_1(path, builder)
+    if "<!-- Firebase v10 modular SDK" not in html and "</head>" in html:
+        html = html.replace("</head>", FIREBASE_SCRIPT + "\n</head>", 1)
     return html
 
-# --- end edit.py: session guard wrapper (single, safe) ---
+
+# ---------- header: signed-in Dashboard button ----------
+_prev_render_header = render_header
+
+def render_header(ctx, current_page=""):
+    html = _prev_render_header(ctx, current_page)
+    # Add a script that flips "Sign in"/"Try for free" to "Dashboard" when authed.
+    swap = '''
+    <script>
+      window.whenFirebase && window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          var login  = document.querySelector('a[href$="login.html"].px-2');
+          var signup = document.querySelector('a[href$="signup.html"].btn-primary, a[href$="signup.html"][class*="btn-primary"]');
+          if (user) {
+            if (login)  login.style.display = 'none';
+            if (signup) {
+              signup.textContent = 'Dashboard';
+              signup.setAttribute('href', 'Pages/dashboard.html');
+            }
+          }
+        });
+      });
+    </script>'''
+    if "</header>" in html and "whenFirebase && window.whenFirebase" not in html:
+        html = html.replace("</header>", swap + "\n</header>", 1)
+    return html
+
+
+# ---------- shared default system prompt ----------
+DEFAULT_PROMPT = (
+    "You are Solana, a friendly AI receptionist. Keep replies short and "
+    "helpful. Greet the caller warmly, capture their name and reason for "
+    "calling, and confirm any appointment back to them."
+)
+
+
+# ---------- login page ----------
+LOGIN_BODY = '''
+      <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-16 lg:py-24 w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          <div class="lg:col-span-6 flex flex-col justify-center">
+            <span class="inline-flex self-start items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Welcome back</span>
+            <h1 class="mt-5 text-4xl sm:text-5xl lg:text-[52px] font-bold leading-[1.08] tracking-[-0.035em] text-[#111111]">Sign in to Vocallus</h1>
+            <p class="mt-6 text-[17px] sm:text-[18px] leading-[1.58] text-[#55565B] max-w-[520px]">Pick up right where you left off.</p>
+          </div>
+          <div class="lg:col-span-6 flex justify-center lg:justify-end">
+            <div class="w-full max-w-[460px] rounded-3xl border border-neutral-100 bg-white p-8 sm:p-10 shadow-sm">
+              <button type="button" id="google-signin" class="w-full inline-flex items-center justify-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-6 py-3.5 font-bold text-[16px] text-neutral-800 shadow-xs hover:bg-neutral-50 transition mb-5">
+                <img src="../Images/gicon.png" alt="" class="h-5 w-5">
+                Sign in with Google
+              </button>
+              <div class="flex items-center gap-3 mb-5">
+                <div class="flex-1 h-px bg-neutral-200"></div>
+                <span class="text-[12px] font-semibold text-neutral-400 uppercase tracking-wider">or</span>
+                <div class="flex-1 h-px bg-neutral-200"></div>
+              </div>
+              <form id="login-form" class="space-y-5" novalidate>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Email</span>
+                  <input type="email" name="email" placeholder="you@company.com" required autocomplete="email" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Password</span>
+                  <input type="password" name="password" placeholder="********" required autocomplete="current-password" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <div id="login-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-3.5 text-[13.5px] text-red-700"></div>
+                <button type="submit" class="btn-primary w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-bold text-[16px] shadow-sm">Sign in</button>
+              </form>
+              <p class="mt-6 text-center text-[13.5px] text-neutral-500">
+                New to Vocallus? <a href="signup.html" class="font-semibold text-[#111111] hover:underline">Try for free</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+'''
+
+LOGIN_JS = '''
+  <script>
+    window.redirectIfAuthed && window.redirectIfAuthed('dashboard.html');
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var errEl = document.getElementById('login-error');
+      function showErr(msg) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+      function hideErr() { errEl.classList.add('hidden'); }
+
+      document.getElementById('google-signin').addEventListener('click', function () {
+        hideErr();
+        var provider = new fb.GoogleAuthProvider();
+        fb.signInWithPopup(fb.auth, provider)
+          .then(function () { window.location.href = 'dashboard.html'; })
+          .catch(function (e) { showErr(e.message || String(e)); });
+      });
+
+      document.getElementById('login-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        hideErr();
+        var email = this.email.value.trim();
+        var pw = this.password.value;
+        fb.signInWithEmailAndPassword(fb.auth, email, pw)
+          .then(function () { window.location.href = 'dashboard.html'; })
+          .catch(function (e) { showErr(e.message || String(e)); });
+      });
+    });
+  </script>
+'''
+
+def page_login(ctx):
+    return "Sign in", "Sign in to your Vocallus inbox.", LOGIN_BODY, ""
+
+
+# ---------- signup page ----------
+SIGNUP_BODY = '''
+      <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-16 lg:py-24 w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          <div class="lg:col-span-6 flex flex-col justify-center">
+            <span class="inline-flex self-start items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Free demo</span>
+            <h1 class="mt-5 text-4xl sm:text-5xl lg:text-[52px] font-bold leading-[1.08] tracking-[-0.035em] text-[#111111]">Try Vocallus free</h1>
+            <p class="mt-6 text-[17px] sm:text-[18px] leading-[1.58] text-[#55565B] max-w-[520px]">Set up Solana in minutes.</p>
+          </div>
+          <div class="lg:col-span-6 flex justify-center lg:justify-end">
+            <div class="w-full max-w-[460px] rounded-3xl border border-neutral-100 bg-white p-8 sm:p-10 shadow-sm">
+              <button type="button" id="google-signup" class="w-full inline-flex items-center justify-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-6 py-3.5 font-bold text-[16px] text-neutral-800 shadow-xs hover:bg-neutral-50 transition mb-5">
+                <img src="../Images/gicon.png" alt="" class="h-5 w-5">
+                Sign up with Google
+              </button>
+              <div class="flex items-center gap-3 mb-5">
+                <div class="flex-1 h-px bg-neutral-200"></div>
+                <span class="text-[12px] font-semibold text-neutral-400 uppercase tracking-wider">or</span>
+                <div class="flex-1 h-px bg-neutral-200"></div>
+              </div>
+              <form id="signup-form" class="space-y-5" novalidate>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Full name</span>
+                  <input type="text" name="name" placeholder="Jordan Rivera" required autocomplete="name" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Email</span>
+                  <input type="email" name="email" placeholder="you@company.com" required autocomplete="email" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Company</span>
+                  <input type="text" name="company" placeholder="Acme Services" required autocomplete="organization" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Password</span>
+                  <input type="password" name="password" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <div id="signup-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-3.5 text-[13.5px] text-red-700"></div>
+                <button type="submit" class="btn-primary w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-bold text-[16px] shadow-sm">Create my account</button>
+              </form>
+              <p class="mt-6 text-center text-[13.5px] text-neutral-500">
+                Already have an account? <a href="login.html" class="font-semibold text-[#111111] hover:underline">Sign in</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+'''
+
+SIGNUP_JS = '''
+  <script>
+    window.redirectIfAuthed && window.redirectIfAuthed('dashboard.html');
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var errEl = document.getElementById('signup-error');
+      function showErr(m) { errEl.textContent = m; errEl.classList.remove('hidden'); }
+      function hideErr() { errEl.classList.add('hidden'); }
+
+      function ensureUserDoc(user, extra) {
+        var ref = fb.doc(fb.db, 'users', user.uid);
+        return fb.getDoc(ref).then(function (snap) {
+          if (!snap.exists()) {
+            var data = Object.assign({
+              name: (extra && extra.name) || user.displayName || '',
+              email: user.email || '',
+              company: (extra && extra.company) || '',
+              plan: 'none',
+              agentName: 'Solana',
+              systemPrompt: 'You are Solana, a friendly AI receptionist. Keep replies short and helpful. Greet the caller warmly, capture their name and reason for calling, and confirm any appointment back to them.',
+              createdAt: fb.serverTimestamp()
+            }, {});
+            return fb.setDoc(ref, data);
+          }
+          return Promise.resolve();
+        });
+      }
+
+      document.getElementById('google-signup').addEventListener('click', function () {
+        hideErr();
+        var provider = new fb.GoogleAuthProvider();
+        fb.signInWithPopup(fb.auth, provider)
+          .then(function (res) { return ensureUserDoc(res.user); })
+          .then(function () { window.location.href = 'dashboard.html'; })
+          .catch(function (e) { showErr(e.message || String(e)); });
+      });
+
+      document.getElementById('signup-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        hideErr();
+        var name = this.name.value.trim();
+        var email = this.email.value.trim();
+        var company = this.company.value.trim();
+        var pw = this.password.value;
+        if (pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
+
+        fb.createUserWithEmailAndPassword(fb.auth, email, pw)
+          .then(function (cred) {
+            return fb.updateProfile(cred.user, { displayName: name })
+              .then(function () { return ensureUserDoc(cred.user, { name: name, company: company }); });
+          })
+          .then(function () { window.location.href = 'dashboard.html'; })
+          .catch(function (e) { showErr(e.message || String(e)); });
+      });
+    });
+  </script>
+'''
+
+def page_signup(ctx):
+    return "Sign up", "Try Vocallus free.", SIGNUP_BODY, ""
+
+
+# ---------- Solana page (working chat, Firestore) ----------
+SOLANA_BODY_TPL_NEW = '''{sidebar}
+    <aside class="w-[320px] bg-[#f9fafb] border-r border-gray-200 flex flex-col flex-shrink-0">
+        <div class="p-5 border-b border-gray-200">
+            <div class="flex items-center gap-3 mb-2">
+                <img src="../Images/logo.png" alt="" class="w-11 h-11 rounded-2xl">
+                <div class="flex-1">
+                    <div class="font-semibold text-[15px] text-gray-900" id="agent-name-display">Solana</div>
+                    <div class="text-[12px] text-gray-500">AI receptionist</div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+            <div>
+                <label class="block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2">Agent name</label>
+                <input id="agent-name" type="text" placeholder="Solana" class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
+            </div>
+            <div>
+                <label class="block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2">System prompt</label>
+                <p class="text-[12px] text-gray-400 mb-2">How your agent should greet and respond.</p>
+                <textarea id="system-prompt" rows="11" placeholder="You are Solana..." class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.6] focus:outline-none focus:border-gray-400 bg-white resize-none"></textarea>
+            </div>
+            <button id="save-prompt" class="w-full btn-primary rounded-xl py-3 font-semibold text-[14px]">Save changes</button>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl border-l border-gray-200">
+        <div class="max-w-[1100px] mx-auto px-8 py-8">
+            <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+                <div>
+                    <h1 class="text-[26px] font-semibold text-gray-900">Test your Solana</h1>
+                    <p class="text-gray-500 text-[14px] mt-0.5">Try your agent before connecting a phone number.</p>
+                </div>
+                <div class="flex bg-gray-100 rounded-full p-1">
+                    <button data-mode="call" class="mode-btn px-5 py-2 rounded-full text-[14px] font-semibold bg-white shadow-sm text-gray-900">Call</button>
+                    <button data-mode="text" class="mode-btn px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">Text</button>
+                </div>
+            </div>
+
+            <div id="api-setup" class="rounded-3xl border border-gray-100 p-7 mb-8 bg-[#f9fafb]">
+                <div class="mb-6">
+                    <h2 class="text-[18px] font-semibold text-gray-900">Connect an AI provider</h2>
+                    <p class="text-[14px] text-gray-500 mt-1">Gemini is required for phone calls.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6" id="provider-grid">
+                    <button data-provider="openai" class="provider-card rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                        <img src="../Images/cha.png" alt="" class="w-8 h-8 rounded-lg mb-3">
+                        <div class="text-[14px] font-semibold text-gray-900">OpenAI</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">GPT models</div>
+                    </button>
+                    <button data-provider="gemini" class="provider-card rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                        <img src="../Images/gem.png" alt="" class="w-8 h-8 rounded-lg mb-3">
+                        <div class="text-[14px] font-semibold text-gray-900">Gemini <span class="ml-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Required for phone calls</span></div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">Google models</div>
+                    </button>
+                    <button data-provider="claude" class="provider-card rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                        <img src="../Images/cla.png" alt="" class="w-8 h-8 rounded-lg mb-3">
+                        <div class="text-[14px] font-semibold text-gray-900">Claude</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">Anthropic models</div>
+                    </button>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-[13px] font-semibold text-gray-700 mb-2">API key</label>
+                    <input id="api-key" type="password" placeholder="Paste your API key" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
+                    <p id="key-hint" class="text-[12px] text-gray-400 mt-1.5">Pick a provider to see the expected key format.</p>
+                    <div id="key-saved" class="hidden mt-3 flex items-center justify-between rounded-xl bg-white border border-gray-200 px-4 py-3">
+                        <div>
+                            <div class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide">Saved key</div>
+                            <div id="key-masked" class="text-[14px] font-mono text-gray-900 mt-0.5">----</div>
+                        </div>
+                        <button id="key-replace" class="text-[13px] font-semibold text-gray-700 underline hover:text-black">Replace key</button>
+                    </div>
+                </div>
+
+                <div id="api-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-4 mb-5">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <div>
+                            <div id="api-error-title" class="text-[14px] font-semibold text-red-800">Error</div>
+                            <div id="api-error-msg" class="text-[13px] text-red-700 mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="save-key" class="btn-primary px-6 py-3 rounded-xl font-semibold text-[14px]">Save and continue</button>
+            </div>
+
+            <div class="rounded-2xl border border-gray-100 bg-[#f9fafb] p-5 mb-8">
+                <div class="text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Your Solana number</div>
+                <div id="solana-number" class="text-[16px] font-semibold text-gray-900">Loading&hellip;</div>
+            </div>
+
+            <div id="chat-preview" class="rounded-3xl border border-gray-100 bg-[#f9fafb] p-7">
+                <div id="call-view">
+                    <div class="text-center py-10">
+                        <img src="../Images/logo.png" alt="" class="w-20 h-20 mx-auto rounded-3xl mb-4">
+                        <div class="text-[22px] font-semibold text-gray-900">Test call</div>
+                        <div class="text-[14px] text-gray-500 mt-1.5">Phone calls launch after you subscribe.</div>
+                        <button id="start-call" class="mt-8 btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold text-[14px]">
+                            Start test call
+                        </button>
+                    </div>
+                </div>
+                <div id="text-view" class="hidden">
+                    <div class="space-y-4 mb-6" id="chat-log"></div>
+                    <div class="flex items-center gap-3">
+                        <input id="chat-input" type="text" placeholder="Type a message to test your Solana" class="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-[14px] focus:outline-none focus:border-gray-400">
+                        <button id="chat-send" class="btn-primary px-5 py-3 rounded-xl font-semibold text-[14px]">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>'''
+
+
+SOLANA_JS = '''
+  <script>
+    window.requireAuth && window.requireAuth();
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var PROVIDERS = {
+        openai: { name:'OpenAI', keyPrefixes:['sk-'], hint:'OpenAI keys start with "sk-".' },
+        gemini: { name:'Gemini', keyPrefixes:['AIza','AQ.'], hint:'Gemini keys start with "AIza" or "AQ.".' },
+        claude: { name:'Claude', keyPrefixes:['sk-ant-'], hint:'Claude keys start with "sk-ant-".' }
+      };
+      var uid = null, currentProvider = null;
+      var $ = function (id) { return document.getElementById(id); };
+
+      var providerBtns = document.querySelectorAll('.provider-card');
+      var keyInput = $('api-key'), keyHint = $('key-hint');
+      var errBox = $('api-error'), errTitle = $('api-error-title'), errMsg = $('api-error-msg');
+      var setupCard = $('api-setup'), preview = $('chat-preview');
+      var savedBox = $('key-saved'), masked = $('key-masked'), replaceBtn = $('key-replace');
+
+      function showErr(t, m) { errTitle.textContent = t; errMsg.textContent = m; errBox.classList.remove('hidden'); }
+      function hideErr() { errBox.classList.add('hidden'); }
+      function maskKey(k) { return k.slice(0,4) + '••••••' + k.slice(-4); }
+
+      function selectProvider(id) {
+        currentProvider = id;
+        var p = PROVIDERS[id];
+        providerBtns.forEach(function (b) {
+          var on = b.dataset.provider === id;
+          b.classList.toggle('border-black', on);
+          b.classList.toggle('ring-2', on);
+          b.classList.toggle('ring-black/10', on);
+          b.classList.toggle('border-gray-200', !on);
+        });
+        keyHint.textContent = p.hint;
+        hideErr();
+      }
+
+      providerBtns.forEach(function (b) {
+        b.addEventListener('click', function () { selectProvider(b.dataset.provider); });
+      });
+
+      function loadUser() {
+        return fb.getDoc(fb.doc(fb.db, 'users', uid)).then(function (snap) {
+          if (!snap.exists()) return;
+          var d = snap.data();
+          if (d.agentName) { $('agent-name').value = d.agentName; $('agent-name-display').textContent = d.agentName; }
+          if (d.systemPrompt) $('system-prompt').value = d.systemPrompt;
+          $('solana-number').textContent = d.phoneNumber || 'No number yet — one is assigned after you subscribe.';
+        });
+      }
+      function loadKey() {
+        return fb.getDoc(fb.doc(fb.db, 'users', uid, 'private', 'ai')).then(function (snap) {
+          if (!snap.exists()) return;
+          var d = snap.data();
+          if (d && d.provider) {
+            selectProvider(d.provider);
+            keyInput.value = '';
+            masked.textContent = maskKey(d.apiKey || '');
+            savedBox.classList.remove('hidden');
+            keyInput.style.display = 'none';
+          }
+        });
+      }
+
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        uid = user.uid;
+        loadUser();
+        loadKey();
+      });
+
+      $('save-prompt').addEventListener('click', function () {
+        if (!uid) return;
+        var btn = this; btn.textContent = 'Saving…';
+        fb.updateDoc(fb.doc(fb.db, 'users', uid), {
+          agentName: $('agent-name').value.trim() || 'Solana',
+          systemPrompt: $('system-prompt').value.trim()
+        }).then(function () {
+          btn.textContent = 'Saved';
+          setTimeout(function () { btn.textContent = 'Save changes'; }, 1200);
+        }).catch(function (e) { btn.textContent = 'Save changes'; showErr('Save failed', e.message); });
+      });
+
+      $('agent-name').addEventListener('input', function () {
+        $('agent-name-display').textContent = this.value || 'Solana';
+      });
+
+      $('save-key').addEventListener('click', function () {
+        hideErr();
+        if (!uid) { showErr('Not signed in', 'Please sign in again.'); return; }
+        var key = keyInput.value.trim();
+        if (!currentProvider) { showErr('No provider selected', 'Pick a provider above.'); return; }
+        var p = PROVIDERS[currentProvider];
+        var ok = p.keyPrefixes.some(function (pre) { return key.indexOf(pre) === 0; });
+        if (key.length < 8 || !ok) { showErr('Invalid API key', p.hint); return; }
+        var model = currentProvider === 'gemini' ? 'gemini-2.5-flash'
+                  : currentProvider === 'openai' ? 'gpt-4o-mini'
+                  : 'claude-3-5-haiku-20241022';
+        fb.setDoc(fb.doc(fb.db, 'users', uid, 'private', 'ai'), {
+          provider: currentProvider, apiKey: key, model: model
+        }).then(function () {
+          masked.textContent = maskKey(key);
+          savedBox.classList.remove('hidden');
+          keyInput.value = '';
+          keyInput.style.display = 'none';
+        }).catch(function (e) { showErr('Could not save key', e.message); });
+      });
+
+      replaceBtn.addEventListener('click', function () {
+        savedBox.classList.add('hidden');
+        keyInput.style.display = '';
+        keyInput.focus();
+      });
+
+      /* ---- Text chat ---- */
+      var chatLog = $('chat-log'), chatInput = $('chat-input'), chatSend = $('chat-send');
+      var history = [];
+
+      function bubble(role, text) {
+        var el = document.createElement('div');
+        el.className = role === 'user' ? 'flex justify-end' : 'flex items-start gap-3';
+        el.innerHTML = role === 'user'
+          ? '<div class="bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[70%]"><p class="text-[14px] leading-[1.5]"></p></div>'
+          : '<img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0"><div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[70%]"><p class="text-[14px] text-gray-800 leading-[1.5]"></p></div>';
+        el.querySelector('p').textContent = text;
+        chatLog.appendChild(el);
+        chatLog.scrollTop = chatLog.scrollHeight;
+        return el;
+      }
+
+      function send() {
+        var text = (chatInput.value || '').trim();
+        if (!text || !uid) return;
+        chatInput.value = '';
+        bubble('user', text);
+        var thinking = bubble('assistant', '…');
+        history.push({ role: 'user', content: text });
+
+        var keySnap, promptVal, agentName;
+        Promise.all([
+          fb.getDoc(fb.doc(fb.db, 'users', uid, 'private', 'ai')),
+          fb.getDoc(fb.doc(fb.db, 'users', uid))
+        ]).then(function (arr) {
+          var keyDoc = arr[0], userDoc = arr[1];
+          if (!keyDoc.exists()) throw new Error('No API key saved. Add one above.');
+          var kd = keyDoc.data();
+          if (kd.provider !== 'gemini') throw new Error('Text test only works with Gemini. Save a Gemini key.');
+          var ud = userDoc.exists() ? userDoc.data() : {};
+          promptVal = ud.systemPrompt || 'You are Solana, a friendly AI receptionist.';
+          agentName = ud.agentName || 'Solana';
+
+          var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+                    (kd.model || 'gemini-2.5-flash') + ':generateContent?key=' +
+                    encodeURIComponent(kd.apiKey);
+
+          var body = {
+            systemInstruction: { parts: [{ text: promptVal }] },
+            contents: history.map(function (m) {
+              return { role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] };
+            })
+          };
+          return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          }).then(function (r) { return r.json(); });
+        }).then(function (j) {
+          var t = j.candidates && j.candidates[0] && j.candidates[0].content
+               && j.candidates[0].content.parts && j.candidates[0].content.parts[0].text;
+          if (!t) throw new Error((j.error && j.error.message) || 'No reply from Gemini.');
+          thinking.querySelector('p').textContent = t;
+          history.push({ role: 'assistant', content: t });
+        }).catch(function (e) {
+          thinking.querySelector('p').textContent = 'Error: ' + (e.message || e);
+        });
+      }
+      chatSend.addEventListener('click', send);
+      chatInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
+
+      /* ---- Call / Text toggle ---- */
+      document.querySelectorAll('.mode-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var mode = btn.dataset.mode;
+          document.querySelectorAll('.mode-btn').forEach(function (b) {
+            var on = b.dataset.mode === mode;
+            b.classList.toggle('bg-white', on); b.classList.toggle('shadow-sm', on);
+            b.classList.toggle('text-gray-900', on); b.classList.toggle('font-semibold', on);
+            b.classList.toggle('text-gray-500', !on); b.classList.toggle('font-medium', !on);
+          });
+          $('call-view').classList.toggle('hidden', mode !== 'call');
+          $('text-view').classList.toggle('hidden', mode !== 'text');
+        });
+      });
+
+      /* ---- Sign out ---- */
+      var so = document.getElementById('signout-btn');
+      if (so) so.addEventListener('click', function () {
+        fb.signOut(fb.auth).then(function () { window.location.href = 'login.html'; });
+      });
+    });
+  </script>
+'''
+
+def page_solana(_ctx):
+    body = SOLANA_BODY_TPL_NEW.replace("{sidebar}", _render_sidebar("solana"))
+    return "Solana", "Configure and test your Solana agent.", body, ""
+
+
+# ---------- Calendar page ----------
+CALENDAR_BODY = '''{sidebar}
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl border-l border-gray-200">
+        <div class="max-w-[1200px] mx-auto px-8 py-8">
+            <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+                <div>
+                    <h1 class="text-[26px] font-semibold text-gray-900">Calendar</h1>
+                    <p class="text-gray-500 text-[14px] mt-0.5">Bookings from Solana and manual appointments.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="prev-week" class="px-3.5 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium hover:bg-gray-50">Prev</button>
+                    <button id="today-btn" class="px-3.5 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium hover:bg-gray-50">Today</button>
+                    <button id="next-week" class="px-3.5 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium hover:bg-gray-50">Next</button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 mb-6">
+                <button data-view="week" class="view-btn px-4 py-2 rounded-lg text-[13.5px] font-semibold bg-black text-white">Week</button>
+                <button data-view="list" class="view-btn px-4 py-2 rounded-lg text-[13.5px] font-medium border border-gray-200">Upcoming</button>
+                <div id="week-label" class="ml-auto text-[14px] font-medium text-gray-700"></div>
+            </div>
+
+            <div id="week-view">
+                <div class="overflow-x-auto rounded-2xl border border-gray-100">
+                    <table class="w-full min-w-[900px] table-fixed border-collapse">
+                        <thead><tr id="cal-head" class="bg-[#f9fafb]"></tr></thead>
+                        <tbody id="cal-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="list-view" class="hidden">
+                <div id="upcoming-list" class="space-y-3"></div>
+            </div>
+
+            <div class="mt-8 rounded-2xl border border-gray-100 bg-[#f9fafb] p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-[16px] font-semibold text-gray-900">Business hours</h2>
+                    <div class="text-[13px] text-gray-500">Slot length: <span id="slot-length">30</span> min</div>
+                </div>
+                <div id="hours-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                <button id="save-hours" class="mt-4 btn-primary px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-title" class="text-[18px] font-semibold text-gray-900">New appointment</h3>
+                <button id="modal-close" class="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+            </div>
+            <form id="appt-form" class="space-y-4">
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Title</span>
+                    <input name="title" required class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                </label>
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Customer name</span>
+                    <input name="customerName" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                </label>
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Customer phone</span>
+                    <input name="customerPhone" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="block">
+                        <span class="block text-[13px] font-semibold text-gray-700 mb-1">Start</span>
+                        <input type="datetime-local" name="start" required class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                    </label>
+                    <label class="block">
+                        <span class="block text-[13px] font-semibold text-gray-700 mb-1">End</span>
+                        <input type="datetime-local" name="end" required class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]">
+                    </label>
+                </div>
+                <label class="block">
+                    <span class="block text-[13px] font-semibold text-gray-700 mb-1">Notes</span>
+                    <textarea name="notes" rows="2" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px]"></textarea>
+                </label>
+                <div class="flex items-center justify-between gap-3 pt-2">
+                    <button type="button" id="appt-delete" class="hidden text-[13.5px] font-semibold text-red-600 hover:underline">Delete</button>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button type="button" id="modal-cancel" class="px-4 py-2 rounded-lg border border-gray-200 text-[13.5px] font-medium">Cancel</button>
+                        <button type="submit" class="btn-primary px-5 py-2 rounded-lg font-semibold text-[13.5px]">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>'''
+
+CALENDAR_JS = '''
+  <script>
+    window.requireAuth && window.requireAuth();
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var uid = null;
+      var currentWeekStart = startOfWeek(new Date());
+      var appts = [];
+      var hours = defaultHours();
+      var slotMin = 30;
+      var editingId = null;
+      var $ = function (id) { return document.getElementById(id); };
+
+      function startOfWeek(d) {
+        var x = new Date(d); x.setHours(0,0,0,0);
+        var day = x.getDay();
+        var diff = day === 0 ? -6 : 1 - day;
+        x.setDate(x.getDate() + diff);
+        return x;
+      }
+      function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+      function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); }
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      function toLocalInput(d) { return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes()); }
+      function defaultHours() {
+        var w = { closed:false, open:'09:00', close:'17:00' };
+        var c = { closed:true,  open:'09:00', close:'17:00' };
+        return { mon:w, tue:w, wed:w, thu:w, fri:w, sat:c, sun:c };
+      }
+
+      var DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+
+      function renderHead() {
+        var head = $('cal-head');
+        head.innerHTML = '<th class="w-[80px] py-3 text-[12px] font-semibold text-gray-500 border-b border-gray-200"></th>';
+        for (var i = 0; i < 7; i++) {
+          var d = addDays(currentWeekStart, i);
+          var th = document.createElement('th');
+          th.className = 'py-3 text-[12px] font-semibold text-gray-700 border-b border-l border-gray-200';
+          th.textContent = fmtDay(d);
+          head.appendChild(th);
+        }
+        var end = addDays(currentWeekStart, 6);
+        $('week-label').textContent = currentWeekStart.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' – ' + end.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      }
+
+      function renderBody() {
+        var body = $('cal-body');
+        body.innerHTML = '';
+        for (var h = 7; h < 20; h++) {
+          for (var m = 0; m < 60; m += slotMin) {
+            var tr = document.createElement('tr');
+            var timeCell = document.createElement('td');
+            timeCell.className = 'text-[11px] text-gray-400 align-top py-2 pl-2 border-b border-gray-100 w-[80px]';
+            timeCell.textContent = (m === 0) ? (h + ':00') : '';
+            tr.appendChild(timeCell);
+
+            for (var d = 0; d < 7; d++) {
+              var day = addDays(currentWeekStart, d);
+              var slotStart = new Date(day); slotStart.setHours(h, m, 0, 0);
+              var slotEnd = new Date(slotStart); slotEnd.setMinutes(slotEnd.getMinutes() + slotMin);
+
+              var key = DAYS[d];
+              var isClosed = hours[key] && hours[key].closed;
+              var td = document.createElement('td');
+              td.className = 'align-top border-b border-l border-gray-100 relative h-[38px] cursor-pointer hover:bg-gray-50 ' + (isClosed ? 'bg-gray-50' : '');
+              td.dataset.start = slotStart.toISOString();
+              td.dataset.end = slotEnd.toISOString();
+
+              var match = appts.find(function (a) {
+                return a.start && a.end && new Date(a.start) < slotEnd && new Date(a.end) > slotStart;
+              });
+              if (match) {
+                td.classList.remove('cursor-pointer', 'hover:bg-gray-50');
+                var chip = document.createElement('div');
+                chip.className = 'absolute inset-x-1 top-0.5 rounded-md bg-black text-white text-[11px] px-2 py-1 truncate cursor-pointer';
+                chip.textContent = match.title || 'Appointment';
+                chip.title = match.title || '';
+                chip.addEventListener('click', function (e) { e.stopPropagation(); openEdit(match.id); });
+                td.appendChild(chip);
+                if (match.source === 'ai') {
+                  var badge = document.createElement('span');
+                  badge.className = 'absolute right-1 bottom-0.5 text-[9px] font-semibold uppercase tracking-wider text-white bg-green-600 rounded px-1';
+                  badge.textContent = 'AI';
+                  td.appendChild(badge);
+                }
+              }
+              tr.appendChild(td);
+            }
+            body.appendChild(tr);
+          }
+        }
+      }
+
+      function renderList() {
+        var wrap = $('upcoming-list');
+        wrap.innerHTML = '';
+        var now = new Date();
+        var upcoming = appts.filter(function (a) { return new Date(a.start) >= now; })
+                            .sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+        if (!upcoming.length) {
+          wrap.innerHTML = '<div class="py-16 text-center text-gray-400 text-[15px]">No upcoming appointments.</div>';
+          return;
+        }
+        upcoming.forEach(function (a) {
+          var row = document.createElement('div');
+          row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm transition cursor-pointer flex items-start gap-4';
+          row.innerHTML =
+            '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0">' +
+              '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+            '</div>' +
+            '<div class="flex-1">' +
+              '<div class="flex items-center gap-2 flex-wrap">' +
+                '<div class="font-semibold text-[15px] text-gray-900"></div>' +
+                (a.source === 'ai' ? '<span class="text-[10px] font-bold uppercase tracking-wider text-white bg-green-600 rounded px-1.5 py-0.5">Booked by Solana</span>' : '') +
+                '<div class="text-[12px] text-gray-400 ml-auto">' + new Date(a.start).toLocaleString() + '</div>' +
+              '</div>' +
+              '<p class="text-[13.5px] text-gray-600 mt-1"></p>' +
+            '</div>';
+          row.querySelector('div.font-semibold').textContent = a.title || 'Appointment';
+          row.querySelector('p').textContent = (a.customerName || '') + (a.customerPhone ? ' · ' + a.customerPhone : '');
+          row.addEventListener('click', function () { openEdit(a.id); });
+          wrap.appendChild(row);
+        });
+      }
+
+      function renderHours() {
+        var grid = $('hours-grid');
+        grid.innerHTML = '';
+        DAYS.forEach(function (k) {
+          var h = hours[k] || { closed:true, open:'09:00', close:'17:00' };
+          var cell = document.createElement('div');
+          cell.className = 'rounded-xl border border-gray-200 bg-white p-3';
+          cell.innerHTML =
+            '<div class="flex items-center justify-between mb-2">' +
+              '<span class="text-[12.5px] font-semibold uppercase tracking-wide text-gray-600">' + k + '</span>' +
+              '<label class="inline-flex items-center gap-1.5 text-[12px] text-gray-500">' +
+                '<input type="checkbox" data-day="'+k+'" data-field="closed" ' + (h.closed ? 'checked' : '') + ' class="rounded">' +
+                'Closed' +
+              '</label>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 gap-2">' +
+              '<input type="time" data-day="'+k+'" data-field="open" value="'+h.open+'" ' + (h.closed ? 'disabled' : '') + ' class="rounded-lg border border-gray-200 px-2 py-1.5 text-[12.5px]">' +
+              '<input type="time" data-day="'+k+'" data-field="close" value="'+h.close+'" ' + (h.closed ? 'disabled' : '') + ' class="rounded-lg border border-gray-200 px-2 py-1.5 text-[12.5px]">' +
+            '</div>';
+          grid.appendChild(cell);
+        });
+        grid.querySelectorAll('input').forEach(function (inp) {
+          inp.addEventListener('change', function () {
+            var d = inp.dataset.day, f = inp.dataset.field;
+            if (!hours[d]) hours[d] = { open:'09:00', close:'17:00', closed:false };
+            hours[d][f] = (inp.type === 'checkbox') ? inp.checked : inp.value;
+            renderHours();
+          });
+        });
+      }
+
+      function openNew(startISO, endISO) {
+        editingId = null;
+        $('modal-title').textContent = 'New appointment';
+        $('appt-delete').classList.add('hidden');
+        var f = $('appt-form'); f.reset();
+        if (startISO) f.start.value = toLocalInput(new Date(startISO));
+        if (endISO)   f.end.value   = toLocalInput(new Date(endISO));
+        $('modal').classList.remove('hidden');
+      }
+      function openEdit(id) {
+        var a = appts.find(function (x) { return x.id === id; });
+        if (!a) return;
+        editingId = id;
+        $('modal-title').textContent = 'Edit appointment';
+        $('appt-delete').classList.remove('hidden');
+        var f = $('appt-form');
+        f.title.value = a.title || '';
+        f.customerName.value = a.customerName || '';
+        f.customerPhone.value = a.customerPhone || '';
+        f.start.value = toLocalInput(new Date(a.start));
+        f.end.value = toLocalInput(new Date(a.end));
+        f.notes.value = a.notes || '';
+        $('modal').classList.remove('hidden');
+      }
+      function closeModal() { $('modal').classList.add('hidden'); editingId = null; }
+
+      $('modal-close').addEventListener('click', closeModal);
+      $('modal-cancel').addEventListener('click', closeModal);
+      $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) closeModal(); });
+
+      $('appt-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!uid) return;
+        var f = e.target;
+        var data = {
+          title: f.title.value.trim(),
+          customerName: f.customerName.value.trim(),
+          customerPhone: f.customerPhone.value.trim(),
+          start: new Date(f.start.value),
+          end: new Date(f.end.value),
+          notes: f.notes.value.trim()
+        };
+        if (editingId) {
+          fb.updateDoc(fb.doc(fb.db, 'users', uid, 'appointments', editingId), data)
+            .then(closeModal);
+        } else {
+          data.source = 'manual';
+          data.createdAt = fb.serverTimestamp();
+          fb.addDoc(fb.collection(fb.db, 'users', uid, 'appointments'), data)
+            .then(closeModal);
+        }
+      });
+
+      $('appt-delete').addEventListener('click', function () {
+        if (!uid || !editingId) return;
+        fb.deleteDoc(fb.doc(fb.db, 'users', uid, 'appointments', editingId))
+          .then(closeModal);
+      });
+
+      $('prev-week').addEventListener('click', function () { currentWeekStart = addDays(currentWeekStart, -7); renderHead(); renderBody(); });
+      $('next-week').addEventListener('click', function () { currentWeekStart = addDays(currentWeekStart, 7); renderHead(); renderBody(); });
+      $('today-btn').addEventListener('click', function () { currentWeekStart = startOfWeek(new Date()); renderHead(); renderBody(); });
+
+      document.querySelectorAll('.view-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var v = b.dataset.view;
+          document.querySelectorAll('.view-btn').forEach(function (x) {
+            var on = x.dataset.view === v;
+            x.classList.toggle('bg-black', on); x.classList.toggle('text-white', on);
+            x.classList.toggle('font-semibold', on);
+            x.classList.toggle('border', !on); x.classList.toggle('border-gray-200', !on);
+            x.classList.toggle('font-medium', !on);
+          });
+          $('week-view').classList.toggle('hidden', v !== 'week');
+          $('list-view').classList.toggle('hidden', v !== 'list');
+          if (v === 'list') renderList();
+        });
+      });
+
+      $('cal-body').addEventListener('click', function (e) {
+        var td = e.target.closest('td');
+        if (!td || !td.dataset.start) return;
+        openNew(td.dataset.start, td.dataset.end);
+      });
+
+      $('save-hours').addEventListener('click', function () {
+        if (!uid) return;
+        fb.updateDoc(fb.doc(fb.db, 'users', uid), { hours: hours, appointmentLength: slotMin });
+      });
+
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        uid = user.uid;
+        fb.getDoc(fb.doc(fb.db, 'users', uid)).then(function (snap) {
+          if (snap.exists()) {
+            var d = snap.data();
+            if (d.hours) hours = Object.assign(hours, d.hours);
+            if (d.appointmentLength) slotMin = d.appointmentLength;
+          }
+          renderHours();
+          renderHead(); renderBody();
+          fb.onSnapshot(fb.collection(fb.db, 'users', uid, 'appointments'), function (s) {
+            appts = [];
+            s.forEach(function (doc) {
+              var x = doc.data(); x.id = doc.id;
+              x.start = x.start && x.start.toDate ? x.start.toDate() : x.start;
+              x.end   = x.end   && x.end.toDate   ? x.end.toDate()   : x.end;
+              appts.push(x);
+            });
+            renderBody();
+            if (!$('list-view').classList.contains('hidden')) renderList();
+          });
+        });
+      });
+    });
+  </script>
+'''
+
+def page_calendar(_ctx):
+    body = CALENDAR_BODY.replace("{sidebar}", _render_sidebar("calendar"))
+    return "Calendar", "Your Vocallus appointment calendar.", body, ""
+
+
+# ---------- extend the sidebar to include Calendar ----------
+_SIDEBAR_TPL = SIDEBAR_TPL
+def _render_sidebar(active):
+    html = _SIDEBAR_TPL
+    # Insert Calendar between Solana and Number if missing
+    if 'data-nav="calendar"' not in html:
+        solana_block = re.search(r'(\s*<a href="solana\.html".*?</a>\s*)', html, re.DOTALL)
+        if solana_block:
+            cal = (
+                '\n                <a href="calendar.html" data-nav="calendar" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors __CALENDAR_CLS__">\n'
+                '                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity __CALENDAR_BAR__"></div>\n'
+                '                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>\n'
+                '                    <span class="text-[11px] font-medium tracking-tight">Calendar</span>\n'
+                '                </a>\n'
+            )
+            html = html[:solana_block.end()] + cal + html[solana_block.end():]
+    for name in ("home","solana","calendar","number","history","finances"):
+        if name == active:
+            cls, bar = "bg-gray-200/80 text-gray-900", "opacity-100"
+        else:
+            cls, bar = "text-gray-500 hover:text-gray-900 hover:bg-gray-100", "opacity-0"
+        html = html.replace("__" + name.upper() + "_CLS__", cls)
+        html = html.replace("__" + name.upper() + "_BAR__", bar)
+    return html
+
+
+# ---------- Pricing ----------
+NEW_PRICING = '''
+        <div class="text-center max-w-[720px] mx-auto">
+          <span class="inline-flex items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Pricing</span>
+          <h2 class="mt-5 text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.12] tracking-[-0.03em] text-[#111111]">Simple pricing that scales</h2>
+          <p class="mt-5 text-[17px] leading-[1.6] text-[#55565B]">Two plans. Cancel anytime.</p>
+        </div>
+        <div class="mt-20 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start max-w-[900px] mx-auto" id="pricing-cards">
+          <div class="rounded-3xl border border-gray-300 ring-2 ring-black/5 bg-white p-8 shadow-xs flex flex-col">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Pro</h3>
+              <span class="inline-flex items-center rounded-full bg-[#111111] border border-[#111111] px-3 py-1 text-[12px] font-semibold text-white">Most popular</span>
+            </div>
+            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">Bring your own Gemini API key.</p>
+            <div class="mt-6 flex items-end gap-1.5">
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$15</span>
+              <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
+            </div>
+            <ul class="mt-7 space-y-3 flex-1">
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Bring your own Gemini API key</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>1 phone number</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Calendar booking</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Call history</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 300 minutes / month</li>
+            </ul>
+            <div class="mt-8">
+              <button data-plan="pro" class="plan-btn btn-primary inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] shadow-xs">Choose Pro</button>
+            </div>
+          </div>
+          <div class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs flex flex-col">
+            <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Max</h3>
+            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">AI included — no API key needed.</p>
+            <div class="mt-6 flex items-end gap-1.5">
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$99</span>
+              <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
+            </div>
+            <ul class="mt-7 space-y-3 flex-1">
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>AI included (no API key)</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>1 phone number</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Calendar booking</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Call history</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 1,500 minutes / month</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Priority support</li>
+            </ul>
+            <div class="mt-8">
+              <button data-plan="max" class="plan-btn inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] border border-neutral-200 text-neutral-800 hover:bg-neutral-50 transition shadow-xs">Choose Max</button>
+            </div>
+          </div>
+        </div>
+        <script>
+          window.STRIPE_PRO_LINK = "";
+          window.STRIPE_MAX_LINK = "";
+          window.whenFirebase && window.whenFirebase(function (fb) {
+            document.querySelectorAll('.plan-btn').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var plan = btn.dataset.plan;
+                var user = fb.auth.currentUser;
+                if (!user) { window.location.href = 'signup.html?plan=' + plan; return; }
+                var link = plan === 'pro' ? window.STRIPE_PRO_LINK : window.STRIPE_MAX_LINK;
+                if (!link) { alert('Checkout coming soon'); return; }
+                var u = encodeURIComponent(user.uid);
+                var e = encodeURIComponent(user.email || '');
+                window.location.href = link + '?client_reference_id=' + u + '&prefilled_email=' + e;
+              });
+            });
+          });
+        </script>
+'''
+
+def page_pricing(_ctx):
+    return ("Pricing", "Simple pricing for Vocallus.",
+            section_wrap("pricing", NEW_PRICING), "")
+
+
+# ---------- Dashboard: real data ----------
+DASH_JS_PATCH = '''
+  <script>
+    window.requireAuth && window.requireAuth();
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        var nameEl = document.getElementById('user-name');
+        if (nameEl) nameEl.textContent = user.displayName || (user.email || '').split('@')[0] || 'there';
+        fb.getDoc(fb.doc(fb.db, 'users', user.uid)).then(function (snap) {
+          if (!snap.exists()) return;
+          var d = snap.data();
+          // Update any element that shows plan or current number.
+          document.querySelectorAll('[data-bind="plan"]').forEach(function (el) {
+            el.textContent = (d.plan && d.plan !== 'none') ? d.plan[0].toUpperCase() + d.plan.slice(1) : 'None';
+          });
+          document.querySelectorAll('[data-bind="number"]').forEach(function (el) {
+            el.textContent = d.phoneNumber || 'None';
+          });
+          document.querySelectorAll('[data-bind="agentName"]').forEach(function (el) {
+            el.textContent = d.agentName || 'Solana';
+          });
+        });
+        var so = document.getElementById('signout-btn');
+        if (so) so.addEventListener('click', function () {
+          fb.signOut(fb.auth).then(function () { window.location.href = 'login.html'; });
+        });
+      });
+    });
+  </script>
+'''
+
+
+# ---------- Final PAGES rebind ----------
+PAGES = [
+    ("index.html",               page_index),
+    ("Pages/products.html",      page_products),
+    ("Pages/solutions.html",     page_solutions),
+    ("Pages/pricing.html",       page_pricing),
+    ("Pages/resources.html",     page_resources),
+    ("Pages/login.html",         page_login),
+    ("Pages/signup.html",        page_signup),
+    ("Pages/talk-to-sales.html", page_talk_to_sales),
+    ("Pages/dashboard.html",     page_dashboard),
+    ("Pages/solana.html",        page_solana),
+    ("Pages/history.html",       page_history),
+    ("Pages/calendar.html",      page_calendar),
+]
+
+# ---------- render_page picks the right extra JS ----------
+_prev_render_page2 = render_page
+
+def render_page(path, builder):
+    html = _prev_render_page2(path, builder)
+    name = Path(path).name
+    extra = ""
+    if name == "login.html":     extra = LOGIN_JS
+    elif name == "signup.html":  extra = SIGNUP_JS
+    elif name == "solana.html":  extra = SOLANA_JS
+    elif name == "calendar.html":extra = CALENDAR_JS
+    elif name == "dashboard.html": extra = DASH_JS_PATCH
+    if extra and "</body>" in html and extra.strip()[:30] not in html:
+        html = html.replace("</body>", extra + "\n</body>", 1)
+    # Tag dashboard elements with data-bind
+    if name == "dashboard.html":
+        html = html.replace('id="user-name"', 'id="user-name" data-bind="agentName"', 1)
+        # "Growth" plan chip
+        html = html.replace('>Growth<', ' data-bind="plan">None<')
+    return html
+
+# --- end edit.py: Firebase v10 + Calendar + Pricing ---
 
 
 if __name__ == "__main__":

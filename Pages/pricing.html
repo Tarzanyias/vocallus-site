@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pricing</title>
-  <meta name="description" content="Simple, predictable pricing for a 24/7 AI receptionist. Start with a free demo, cancel anytime.">
+  <meta name="description" content="Simple pricing for Vocallus.">
   <link rel="icon" type="image/png" href="../Images/favicon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -106,6 +106,68 @@
       html { scroll-behavior: auto; }
     }
 </style>
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
 </head>
 <body class="bg-white text-neutral-900 min-h-screen flex flex-col justify-between">
 
@@ -165,7 +227,23 @@
       </div>
 
     </div>
-  </header>
+  
+    <script>
+      window.whenFirebase && window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          var login  = document.querySelector('a[href$="login.html"].px-2');
+          var signup = document.querySelector('a[href$="signup.html"].btn-primary, a[href$="signup.html"][class*="btn-primary"]');
+          if (user) {
+            if (login)  login.style.display = 'none';
+            if (signup) {
+              signup.textContent = 'Dashboard';
+              signup.setAttribute('href', 'Pages/dashboard.html');
+            }
+          }
+        });
+      });
+    </script>
+</header>
 
   <main class="flex-1 ">
 
@@ -173,81 +251,71 @@
       <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-20 lg:py-28">
         
         <div class="text-center max-w-[720px] mx-auto">
-          <span class="inline-flex self-start items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Pricing</span>
-          <h2 class="mt-5 text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.12] tracking-[-0.03em] text-[#111111]">Simple pricing that scales with your call volume</h2>
-          <p class="mt-5 text-[17px] leading-[1.6] text-[#55565B]">Every plan includes a free demo, unlimited users, and no setup fees. Upgrade, downgrade, or cancel whenever you like.</p>
+          <span class="inline-flex items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Pricing</span>
+          <h2 class="mt-5 text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.12] tracking-[-0.03em] text-[#111111]">Simple pricing that scales</h2>
+          <p class="mt-5 text-[17px] leading-[1.6] text-[#55565B]">Two plans. Cancel anytime.</p>
         </div>
-        
-        <div class="mt-20 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs flex flex-col">
+        <div class="mt-20 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start max-w-[900px] mx-auto" id="pricing-cards">
+          <div class="rounded-3xl border border-gray-300 ring-2 ring-black/5 bg-white p-8 shadow-xs flex flex-col">
             <div class="flex items-center justify-between gap-3">
-              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Starter</h3>
-              
-            </div>
-            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">For solo operators and single-line businesses.</p>
-            <div class="mt-6 flex items-end gap-1.5">
-              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$49</span>
-              <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
-            </div>
-            <ul class="mt-7 space-y-3 flex-1">
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 100 answered calls / month</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>24/7 call answering</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Message capture & email delivery</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Custom greeting</li>
-            </ul>
-            <div class="mt-8">
-              <a href="../Pages/signup.html" class="border border-neutral-200/90 text-neutral-800 hover:bg-neutral-50 inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] transition shadow-xs">
-                Try for free
-              </a>
-            </div>
-          </div>
-          <div class="rounded-3xl border border-neutral-300 ring-2 ring-neutral-100 bg-white p-8 shadow-xs flex flex-col">
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Growth</h3>
+              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Pro</h3>
               <span class="inline-flex items-center rounded-full bg-[#111111] border border-[#111111] px-3 py-1 text-[12px] font-semibold text-white">Most popular</span>
             </div>
-            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">For teams that book appointments all day long.</p>
+            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">Bring your own Gemini API key.</p>
             <div class="mt-6 flex items-end gap-1.5">
-              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$129</span>
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$15</span>
               <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
             </div>
             <ul class="mt-7 space-y-3 flex-1">
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 500 answered calls / month</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Everything in Starter</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Calendar booking & rescheduling</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Two-way SMS follow-ups</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Call summaries in your inbox</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Bring your own Gemini API key</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>1 phone number</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Calendar booking</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Call history</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 300 minutes / month</li>
             </ul>
             <div class="mt-8">
-              <a href="../Pages/signup.html" class="btn-primary inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] transition shadow-xs">
-                Try for free
-              </a>
+              <button data-plan="pro" class="plan-btn btn-primary inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] shadow-xs">Choose Pro</button>
             </div>
           </div>
           <div class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs flex flex-col">
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Scale</h3>
-              
-            </div>
-            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">For multi-location and high-volume operations.</p>
+            <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Max</h3>
+            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">AI included — no API key needed.</p>
             <div class="mt-6 flex items-end gap-1.5">
-              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$299</span>
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$99</span>
               <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
             </div>
             <ul class="mt-7 space-y-3 flex-1">
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Unlimited answered calls</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Everything in Growth</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Multi-location routing</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>CRM & helpdesk integrations</li>
-              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Dedicated onboarding</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>AI included (no API key)</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>1 phone number</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Calendar booking</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Call history</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 1,500 minutes / month</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Priority support</li>
             </ul>
             <div class="mt-8">
-              <a href="../Pages/signup.html" class="border border-neutral-200/90 text-neutral-800 hover:bg-neutral-50 inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] transition shadow-xs">
-                Talk to Sales
-              </a>
+              <button data-plan="max" class="plan-btn inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] border border-neutral-200 text-neutral-800 hover:bg-neutral-50 transition shadow-xs">Choose Max</button>
             </div>
           </div>
         </div>
+        <script>
+          window.STRIPE_PRO_LINK = "";
+          window.STRIPE_MAX_LINK = "";
+          window.whenFirebase && window.whenFirebase(function (fb) {
+            document.querySelectorAll('.plan-btn').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var plan = btn.dataset.plan;
+                var user = fb.auth.currentUser;
+                if (!user) { window.location.href = 'signup.html?plan=' + plan; return; }
+                var link = plan === 'pro' ? window.STRIPE_PRO_LINK : window.STRIPE_MAX_LINK;
+                if (!link) { alert('Checkout coming soon'); return; }
+                var u = encodeURIComponent(user.uid);
+                var e = encodeURIComponent(user.email || '');
+                window.location.href = link + '?client_reference_id=' + u + '&prefilled_email=' + e;
+              });
+            });
+          });
+        </script>
+
       </div>
     </section>
 
@@ -385,118 +453,18 @@
         }, 3000);
       });
 
-      window.addEventListener('pageshow', function () {
-        document.body.classList.remove('is-leaving');
-      });
+      
 
       /* -------- Demo auth --------
          Sign in  ->  any email + password "123456"      -> account "demo"
          Sign up  ->  type "i" in all three fields       -> account "demo"
          Legacy   ->  full name "rat"                    -> account "rat" */
-      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-
-          var nameInput    = form.querySelector('input[name="name"]');
-          var emailInput   = form.querySelector('input[name="email"]');
-          var companyInput = form.querySelector('input[name="company"]');
-          var pwInput      = form.querySelector('input[name="password"]');
-
-          var displayName = null;
-
-          // Sign-in path: any email + password 123456
-          if (pwInput && pwInput.value === '123456') {
-            displayName = 'demo';
-          }
-
-          // Any form: "i" typed in every visible field -> account "demo"
-          var allInputs = form.querySelectorAll('input');
-          var allI = allInputs.length > 0;
-          allInputs.forEach(function (input) {
-            if (input.value.trim().toLowerCase() !== 'i') allI = false;
-          });
-          if (allI) {
-            displayName = 'demo';
-          }
-
-          // Legacy fallback: full name "rat"
-          if (!displayName && nameInput
-              && nameInput.value.trim().toLowerCase() === 'rat') {
-            displayName = 'rat';
-          }
-
-          if (!displayName) {
-            alert('Demo login:
-
-' +
-                  '  Any form  ->  type "i" into every field
-' +
-                  '  Sign in   ->  any email + password "123456"');
-            return;
-          }
-
-          try {
-            localStorage.setItem('vocallus_user', JSON.stringify({
-              displayName: displayName,
-              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
-            }));
-          } catch (err) { /* private mode — keep going */ }
-
-          // Navigate straight to the dashboard — no fade, no timeout.
-          var path = window.location.pathname.replace(/\/g, '/');
-          var inPages = path.indexOf('/Pages/') >= 0;
-          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-          window.location.replace(target);
-        });
-      });
 
       /* -------- Lucide (if loaded) -------- */
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     })();
   </script>
 
-
-
-  <!-- Demo login: goes straight to the dashboard -->
-  <script>
-    document.addEventListener('submit', function (e) {
-      var form = e.target;
-      if (!form || !form.tagName || form.tagName !== 'FORM') return;
-      if (!form.hasAttribute('data-demo-form')) return;
-
-      // Stop everything else (form's own onsubmit, other listeners).
-      e.preventDefault();
-      e.stopPropagation();
-
-      var inputs = form.querySelectorAll('input');
-      var allI = inputs.length > 0;
-      for (var i = 0; i < inputs.length; i++) {
-        if (inputs[i].value.trim().toLowerCase() !== 'i') { allI = false; break; }
-      }
-
-      var nameEl = form.querySelector('input[name="name"]');
-      var pwEl   = form.querySelector('input[name="password"]');
-
-      var displayName = null;
-      if (pwEl && pwEl.value === '123456') displayName = 'demo';
-      if (allI) displayName = 'demo';
-      if (!displayName && nameEl && nameEl.value.trim().toLowerCase() === 'rat') {
-        displayName = 'rat';
-      }
-
-      if (!displayName) {
-        alert('Demo login. Type "i" into every field, or use password "123456".');
-        return;
-      }
-
-      try {
-        localStorage.setItem('vocallus_user', JSON.stringify({ displayName: displayName }));
-      } catch (err) {}
-
-      var inPages = window.location.pathname.indexOf('/Pages/') !== -1;
-      window.location.href = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-    }, true);
-  </script>
 
 </body>
 </html>

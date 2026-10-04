@@ -1,24 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
-    (function () {
-      var raw = null;
-      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
-      if (!raw) return;
-      try {
-        var u = JSON.parse(raw);
-        if (!u || (u.expires && Date.now() > u.expires)) {
-          localStorage.removeItem('vocallus_user');
-          return;
-        }
-        var configured = false;
-        try { configured = !!localStorage.getItem('vocallus_agent'); } catch (e) {}
-        window.location.replace(configured ? 'dashboard.html' : 'solana.html');
-      } catch (e) {}
-    })();
-  </script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign in</title>
@@ -124,6 +106,68 @@
       html { scroll-behavior: auto; }
     }
 </style>
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
 </head>
 <body class="bg-white text-neutral-900 min-h-screen flex flex-col justify-between">
 
@@ -183,7 +227,23 @@
       </div>
 
     </div>
-  </header>
+  
+    <script>
+      window.whenFirebase && window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          var login  = document.querySelector('a[href$="login.html"].px-2');
+          var signup = document.querySelector('a[href$="signup.html"].btn-primary, a[href$="signup.html"][class*="btn-primary"]');
+          if (user) {
+            if (login)  login.style.display = 'none';
+            if (signup) {
+              signup.textContent = 'Dashboard';
+              signup.setAttribute('href', 'Pages/dashboard.html');
+            }
+          }
+        });
+      });
+    </script>
+</header>
 
   <main class="flex-1 ">
 
@@ -191,35 +251,40 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
           <div class="lg:col-span-6 flex flex-col justify-center">
             <span class="inline-flex self-start items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Welcome back</span>
-            <h1 class="mt-5 text-4xl sm:text-5xl lg:text-[52px] font-bold leading-[1.08] tracking-[-0.035em] text-[#111111]">Sign in to your Vocallus inbox</h1>
-            <p class="mt-6 text-[17px] sm:text-[18px] leading-[1.58] text-[#55565B] max-w-[520px]">Pick up right where you left off — every call, message, and booking in one place.</p>
+            <h1 class="mt-5 text-4xl sm:text-5xl lg:text-[52px] font-bold leading-[1.08] tracking-[-0.035em] text-[#111111]">Sign in to Vocallus</h1>
+            <p class="mt-6 text-[17px] sm:text-[18px] leading-[1.58] text-[#55565B] max-w-[520px]">Pick up right where you left off.</p>
           </div>
-
           <div class="lg:col-span-6 flex justify-center lg:justify-end">
             <div class="w-full max-w-[460px] rounded-3xl border border-neutral-100 bg-white p-8 sm:p-10 shadow-sm">
-              <form class="space-y-5" action="#" method="post" data-demo-form novalidate>
-                <button type="button" class="w-full inline-flex items-center justify-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-6 py-3.5 font-bold text-[16px] tracking-[-0.01em] text-neutral-800 shadow-xs hover:bg-neutral-50 transition">
-                  <img src="../Images/gicon.png" alt="" class="h-5 w-5 select-none" />
-                  Sign in with Google
-                </button>
-                <div class="pt-1"></div>
-              <label class="block">
-                <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Email</span>
-                <input type="email" name="email" placeholder="you@company.com" required autocomplete="email" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] text-neutral-900 placeholder:text-neutral-400 outline-none transition focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100" />
-              </label>
-              <label class="block">
-                <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Password</span>
-                <input type="password" name="password" placeholder="••••••••" required autocomplete="current-password" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] text-neutral-900 placeholder:text-neutral-400 outline-none transition focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100" />
-              </label>
-                <button type="submit" class="btn-primary w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-bold text-[16px] tracking-[-0.01em] shadow-sm hover:shadow-md">
-                  Sign in
-                </button>
+              <button type="button" id="google-signin" class="w-full inline-flex items-center justify-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-6 py-3.5 font-bold text-[16px] text-neutral-800 shadow-xs hover:bg-neutral-50 transition mb-5">
+                <img src="../Images/gicon.png" alt="" class="h-5 w-5">
+                Sign in with Google
+              </button>
+              <div class="flex items-center gap-3 mb-5">
+                <div class="flex-1 h-px bg-neutral-200"></div>
+                <span class="text-[12px] font-semibold text-neutral-400 uppercase tracking-wider">or</span>
+                <div class="flex-1 h-px bg-neutral-200"></div>
+              </div>
+              <form id="login-form" class="space-y-5" novalidate>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Email</span>
+                  <input type="email" name="email" placeholder="you@company.com" required autocomplete="email" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <label class="block">
+                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Password</span>
+                  <input type="password" name="password" placeholder="********" required autocomplete="current-password" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
+                </label>
+                <div id="login-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-3.5 text-[13.5px] text-red-700"></div>
+                <button type="submit" class="btn-primary w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-bold text-[16px] shadow-sm">Sign in</button>
               </form>
-              <p class="mt-6 text-center text-[13.5px] text-neutral-500">New to Vocallus? <a href="../Pages/signup.html" class="font-semibold text-[#111111] hover:underline">Try for free</a></p>
+              <p class="mt-6 text-center text-[13.5px] text-neutral-500">
+                New to Vocallus? <a href="signup.html" class="font-semibold text-[#111111] hover:underline">Try for free</a>
+              </p>
             </div>
           </div>
         </div>
       </div>
+
   </main>
 
   <footer class="border-t border-neutral-100 bg-white">
@@ -354,70 +419,12 @@
         }, 3000);
       });
 
-      window.addEventListener('pageshow', function () {
-        document.body.classList.remove('is-leaving');
-      });
+      
 
       /* -------- Demo auth --------
          Sign in  ->  any email + password "123456"      -> account "demo"
          Sign up  ->  type "i" in all three fields       -> account "demo"
          Legacy   ->  full name "rat"                    -> account "rat" */
-      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-
-          var nameInput    = form.querySelector('input[name="name"]');
-          var emailInput   = form.querySelector('input[name="email"]');
-          var companyInput = form.querySelector('input[name="company"]');
-          var pwInput      = form.querySelector('input[name="password"]');
-
-          var displayName = null;
-
-          // Sign-in path: any email + password 123456
-          if (pwInput && pwInput.value === '123456') {
-            displayName = 'demo';
-          }
-
-          // Any form: "i" typed in every visible field -> account "demo"
-          var allInputs = form.querySelectorAll('input');
-          var allI = allInputs.length > 0;
-          allInputs.forEach(function (input) {
-            if (input.value.trim().toLowerCase() !== 'i') allI = false;
-          });
-          if (allI) {
-            displayName = 'demo';
-          }
-
-          // Legacy fallback: full name "rat"
-          if (!displayName && nameInput
-              && nameInput.value.trim().toLowerCase() === 'rat') {
-            displayName = 'rat';
-          }
-
-          if (!displayName) {
-            alert('Demo login:
-
-' +
-                  '  Any form  ->  type "i" into every field
-' +
-                  '  Sign in   ->  any email + password "123456"');
-            return;
-          }
-
-          try {
-            localStorage.setItem('vocallus_user', JSON.stringify({
-              displayName: displayName,
-              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
-            }));
-          } catch (err) { /* private mode — keep going */ }
-
-          // Navigate straight to the dashboard — no fade, no timeout.
-          var path = window.location.pathname.replace(/\/g, '/');
-          var inPages = path.indexOf('/Pages/') >= 0;
-          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-          window.location.replace(target);
-        });
-      });
 
       /* -------- Lucide (if loaded) -------- */
       if (window.lucide && lucide.createIcons) lucide.createIcons();
@@ -426,45 +433,31 @@
 
 
 
-  <!-- Demo login: goes straight to the dashboard -->
   <script>
-    document.addEventListener('submit', function (e) {
-      var form = e.target;
-      if (!form || !form.tagName || form.tagName !== 'FORM') return;
-      if (!form.hasAttribute('data-demo-form')) return;
+    window.redirectIfAuthed && window.redirectIfAuthed('dashboard.html');
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var errEl = document.getElementById('login-error');
+      function showErr(msg) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+      function hideErr() { errEl.classList.add('hidden'); }
 
-      // Stop everything else (form's own onsubmit, other listeners).
-      e.preventDefault();
-      e.stopPropagation();
+      document.getElementById('google-signin').addEventListener('click', function () {
+        hideErr();
+        var provider = new fb.GoogleAuthProvider();
+        fb.signInWithPopup(fb.auth, provider)
+          .then(function () { window.location.href = 'dashboard.html'; })
+          .catch(function (e) { showErr(e.message || String(e)); });
+      });
 
-      var inputs = form.querySelectorAll('input');
-      var allI = inputs.length > 0;
-      for (var i = 0; i < inputs.length; i++) {
-        if (inputs[i].value.trim().toLowerCase() !== 'i') { allI = false; break; }
-      }
-
-      var nameEl = form.querySelector('input[name="name"]');
-      var pwEl   = form.querySelector('input[name="password"]');
-
-      var displayName = null;
-      if (pwEl && pwEl.value === '123456') displayName = 'demo';
-      if (allI) displayName = 'demo';
-      if (!displayName && nameEl && nameEl.value.trim().toLowerCase() === 'rat') {
-        displayName = 'rat';
-      }
-
-      if (!displayName) {
-        alert('Demo login. Type "i" into every field, or use password "123456".');
-        return;
-      }
-
-      try {
-        localStorage.setItem('vocallus_user', JSON.stringify({ displayName: displayName }));
-      } catch (err) {}
-
-      var inPages = window.location.pathname.indexOf('/Pages/') !== -1;
-      window.location.href = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
-    }, true);
+      document.getElementById('login-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        hideErr();
+        var email = this.email.value.trim();
+        var pw = this.password.value;
+        fb.signInWithEmailAndPassword(fb.auth, email, pw)
+          .then(function () { window.location.href = 'dashboard.html'; })
+          .catch(function (e) { showErr(e.message || String(e)); });
+      });
+    });
   </script>
 
 </body>
