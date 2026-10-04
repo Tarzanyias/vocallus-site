@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function () {
+      var raw = null;
+      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
+      if (!raw) { window.location.replace('login.html'); return; }
+      try {
+        var u = JSON.parse(raw);
+        if (!u || (u.expires && Date.now() > u.expires)) {
+          localStorage.removeItem('vocallus_user');
+          window.location.replace('login.html');
+        }
+      } catch (e) {
+        localStorage.removeItem('vocallus_user');
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>History</title>
+  <meta name="description" content="Every call and text Solana has handled.">
+  <link rel="icon" type="image/png" href="../Images/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.260.0/lucide.min.js"></script>
+
+  <style>
+    /* --- Fonts --------------------------------------------------------- */
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .font-inter { font-family: 'Inter', sans-serif; }
+
+    /* --- Selection ----------------------------------------------------- */
+    ::selection { background-color: #D4D4D4; color: #111111; }
+
+    /* --- Primary button ------------------------------------------------ */
+    .btn-primary {
+      background-color: #111111;
+      color: #FFFFFF;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:hover {
+      background-color: #262626;
+      transform: translateY(-1px);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* --- Nav dropdowns ------------------------------------------------- */
+    .nav-trigger {
+      background: transparent; border: 0; cursor: pointer;
+      font: inherit;
+    }
+    .nav-dropdown { position: relative; }
+    .nav-menu {
+      position: absolute; top: 100%; left: 0;
+      padding-top: 10px; min-width: 236px;
+      opacity: 0; visibility: hidden;
+      transform: translateY(-6px);
+      transition: opacity .18s ease, transform .18s ease, visibility .18s;
+      z-index: 40;
+    }
+    .nav-dropdown:hover .nav-menu,
+    .nav-dropdown.is-open .nav-menu {
+      opacity: 1; visibility: visible; transform: translateY(0);
+    }
+    .nav-dropdown:hover .nav-chevron,
+    .nav-dropdown.is-open .nav-chevron { transform: rotate(180deg); }
+    .nav-menu-inner { overflow: hidden; }
+
+    /* --- Hash-active dropdown child ----------------------------------- */
+    .nav-menu a.nav-hash-active {
+      background-color: #111111 !important;
+      color: #ffffff !important;
+    }
+
+    /* --- Page transitions --------------------------------------------- */
+    /* Smooth fade only — no curve, no slide. */
+    @keyframes pageFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    main, .page-body {
+      animation: pageFadeIn .28s ease-out both;
+    }
+    body.is-leaving { opacity: 0; transition: opacity .16s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+    }
+
+    /* --- Hero fit ------------------------------------------------------ */
+    .hero-fit { min-height: calc(100vh - 5rem); display: flex; align-items: center; }
+    @media (max-width: 1023px) {
+      .hero-fit { min-height: auto; padding-top: 2rem; padding-bottom: 2rem; }
+    }
+
+    /* --- Smooth scroll ------------------------------------------------- */
+    html { scroll-behavior: smooth; }
+
+    /* --- Dashboard ----------------------------------------------------- */
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #c1c1c1; border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    .spark-bar { transition: height .3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+      html { scroll-behavior: auto; }
+    }
+</style>
+</head>
+<body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
+
+    <nav class="w-[88px] bg-[#f2f2f2] border-r border-gray-200 flex flex-col justify-between items-center py-6 flex-shrink-0 z-10">
+        <div class="flex flex-col items-center w-full space-y-4">
+            <a href="../index.html" class="mb-2 select-none">
+                <img src="../Images/logo.png" alt="Vocallus" class="w-9 h-9 rounded-xl" />
+            </a>
+
+            <div class="flex flex-col w-full items-center space-y-2">
+                <a href="dashboard.html" data-nav="home" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Home</span>
+                </a>
+
+                <a href="solana.html" data-nav="solana" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Solana</span>
+                </a>
+
+                <a href="dashboard.html#number" data-nav="number" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.05 5A5 5 0 0 1 19 8.95"></path><path d="M15.05 1A9 9 0 0 1 23 8.94"></path><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Number</span>
+                </a>
+
+                <a href="history.html" data-nav="history" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors bg-gray-200/80 text-gray-900">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-100"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span class="text-[11px] font-medium tracking-tight">History</span>
+                </a>
+
+                <a href="dashboard.html#finances" data-nav="finances" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Finances</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="flex flex-col w-full items-center space-y-4">
+            <a href="#" class="text-gray-500 hover:text-gray-800 relative p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-[#ff5a00] rounded-full border-2 border-[#f2f2f2]"></span>
+            </a>
+            <button id="signout-btn" title="Sign out" class="text-gray-500 hover:text-gray-800 p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+        </div>
+    </nav>
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl shadow-[-5px_0_15px_-3px_rgba(0,0,0,0.1)]">
+        <div class="max-w-[1100px] mx-auto px-8 py-8">
+
+            <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+                <div>
+                    <h1 class="text-[28px] font-semibold text-gray-900">History</h1>
+                    <p class="text-gray-500 text-[14px] mt-0.5">Every call and text Solana has handled.</p>
+                </div>
+                <div class="flex bg-gray-100 rounded-full p-1">
+                    <button data-filter="all" class="hist-filter px-5 py-2 rounded-full text-[14px] font-semibold bg-white shadow-sm text-gray-900">All</button>
+                    <button data-filter="call" class="hist-filter px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">Calls</button>
+                    <button data-filter="text" class="hist-filter px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">Texts</button>
+                </div>
+            </div>
+
+            <div id="history-list" class="space-y-3"></div>
+        </div>
+    </main>
+
+
+  <script>
+    (function () {
+      /* -------- Dropdown menus -------- */
+      var dropdowns = document.querySelectorAll('[data-dropdown]');
+
+      function setOpen(dd, open) {
+        dd.classList.toggle('is-open', open);
+        var t = dd.querySelector('.nav-trigger');
+        if (t) t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function closeAll(except) {
+        dropdowns.forEach(function (dd) { if (dd !== except) setOpen(dd, false); });
+      }
+
+      dropdowns.forEach(function (dd) {
+        var trigger = dd.querySelector('.nav-trigger');
+        if (!trigger) return;
+        trigger.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var willOpen = !dd.classList.contains('is-open');
+          closeAll(dd);
+          setOpen(dd, willOpen);
+        });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-dropdown]')) closeAll(null);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAll(null);
+      });
+
+      /* -------- Hash highlight in dropdowns -------- */
+      function updateHashHighlight() {
+        var hash = window.location.hash;
+        document.querySelectorAll('.nav-menu a').forEach(function (a) {
+          var href = a.getAttribute('href') || '';
+          var idx = href.indexOf('#');
+          var linkHash = idx >= 0 ? href.substring(idx) : '';
+          a.classList.toggle('nav-hash-active', !!hash && linkHash === hash);
+        });
+      }
+      window.addEventListener('hashchange', updateHashHighlight);
+      window.addEventListener('load', updateHashHighlight);
+
+      /* -------- Smooth page transitions -------- */
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+
+      document.addEventListener('click', function (e) {
+        if (e.defaultPrevented) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href.charAt(0) === '#') return;
+        if (/^(https?:|mailto:|tel:)/i.test(href)) return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
+
+        // Same-page navigation: let the browser handle it directly.
+        try {
+          var target = new URL(link.href, window.location.href);
+          if (target.pathname === window.location.pathname) return;
+        } catch (err) { /* fall through */ }
+
+        e.preventDefault();
+        document.body.classList.add('is-leaving');
+        window.setTimeout(function () { window.location.href = href; }, 180);
+        window.setTimeout(function () {
+          document.body.classList.remove('is-leaving');
+        }, 3000);
+      });
+
+      window.addEventListener('pageshow', function () {
+        document.body.classList.remove('is-leaving');
+      });
+
+      /* -------- Demo auth --------
+         Sign in  ->  any email + password "123456"      -> account "demo"
+         Sign up  ->  type "i" in all three fields       -> account "demo"
+         Legacy   ->  full name "rat"                    -> account "rat" */
+      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+
+          var nameInput    = form.querySelector('input[name="name"]');
+          var emailInput   = form.querySelector('input[name="email"]');
+          var companyInput = form.querySelector('input[name="company"]');
+          var pwInput      = form.querySelector('input[name="password"]');
+
+          var displayName = null;
+
+          // Sign-in path: any email + password 123456
+          if (pwInput && pwInput.value === '123456') {
+            displayName = 'demo';
+          }
+
+          // Any form: "i" typed in every visible field -> account "demo"
+          var allInputs = form.querySelectorAll('input');
+          var allI = allInputs.length > 0;
+          allInputs.forEach(function (input) {
+            if (input.value.trim().toLowerCase() !== 'i') allI = false;
+          });
+          if (allI) {
+            displayName = 'demo';
+          }
+
+          // Legacy fallback: full name "rat"
+          if (!displayName && nameInput
+              && nameInput.value.trim().toLowerCase() === 'rat') {
+            displayName = 'rat';
+          }
+
+          if (!displayName) {
+            alert('Demo login:
+
+' +
+                  '  Any form  ->  type "i" into every field
+' +
+                  '  Sign in   ->  any email + password "123456"');
+            return;
+          }
+
+          try {
+            localStorage.setItem('vocallus_user', JSON.stringify({
+              displayName: displayName,
+              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
+            }));
+          } catch (err) { /* private mode — keep going */ }
+
+          // Navigate straight to the dashboard — no fade, no timeout.
+          var path = window.location.pathname.replace(/\/g, '/');
+          var inPages = path.indexOf('/Pages/') >= 0;
+          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
+          window.location.replace(target);
+        });
+      });
+
+      /* -------- Lucide (if loaded) -------- */
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var EVENTS = [
+        { id: 1, kind: 'call', caller: 'Maya R.', phone: '(415) 555-0128',
+          time: '6 hours ago', duration: '2:47',
+          preview: 'Reschedule her Thursday appointment to Friday at 10am.',
+          tags: ['Appointment'] },
+        { id: 2, kind: 'text', caller: 'Nina S.', phone: '(925) 555-0101',
+          time: '5 hours ago', duration: '—',
+          preview: 'Sent confirmation: "You're all set for tomorrow at 10. Reply C to cancel."',
+          tags: ['Confirmation'] },
+        { id: 3, kind: 'call', caller: 'Daniel K.', phone: '(510) 555-0177',
+          time: '4 hours ago', duration: '0:22',
+          preview: 'Hung up before greeting finished. Marked as missed.',
+          tags: ['Missed'] },
+        { id: 4, kind: 'text', caller: 'Marcus B.', phone: '(415) 555-0199',
+          time: '3 hours ago', duration: '—',
+          preview: 'Quote follow-up sent with pricing for the recurring plan.',
+          tags: ['Quote'] },
+        { id: 5, kind: 'call', caller: 'Patricia L.', phone: '(650) 555-0142',
+          time: '2 hours ago', duration: '3:12',
+          preview: 'Booked new consultation for Tuesday at 2:15pm.',
+          tags: ['Booked'] },
+        { id: 6, kind: 'call', caller: 'Unknown', phone: '(628) 555-0114',
+          time: '1 hour ago', duration: '0:52',
+          preview: 'Asked about emergency after-hours service. Callback queued.',
+          tags: ['FAQ'] }
+      ];
+
+      var list = document.getElementById('history-list');
+      var currentFilter = 'all';
+
+      function render() {
+        list.innerHTML = '';
+        var filtered = EVENTS.filter(function (e) {
+          return currentFilter === 'all' || e.kind === currentFilter;
+        });
+
+        if (!filtered.length) {
+          list.innerHTML = ''
+            + '<div class="py-20 text-center">'
+            + '  <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">'
+            + '    <svg class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>'
+            + '  </div>'
+            + '  <p class="text-[16px] font-medium text-gray-700">Call history will appear here</p>'
+            + '  <p class="text-[13.5px] text-gray-400 mt-1">Once Solana starts handling calls and texts, they'll show up in this list.</p>'
+            + '</div>';
+          return;
+        }
+
+        filtered.forEach(function (e) {
+          var isCall = e.kind === 'call';
+          var iconSvg = isCall
+            ? '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>'
+            : '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>';
+          var bg = isCall ? 'bg-black' : 'bg-gray-700';
+
+          var row = document.createElement('div');
+          row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm transition';
+          row.innerHTML = `
+            <div class="flex items-start gap-4">
+              <div class="w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconSvg}</svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="font-semibold text-[15px] text-gray-900">${e.caller}</div>
+                  <div class="text-[13px] text-gray-400">${e.phone}</div>
+                  <div class="text-[12px] text-gray-400 ml-auto">${e.time}</div>
+                </div>
+                <p class="text-[14px] text-gray-700 mt-1.5 leading-[1.55]">${e.preview}</p>
+                <div class="flex items-center gap-2 mt-3 flex-wrap">
+                  ${e.tags.map(function (t) { return '<span class="bg-[#f2f2f2] text-gray-600 text-[12px] px-2.5 py-0.5 rounded-full font-medium">' + t + '</span>'; }).join('')}
+                  ${isCall ? '<span class="text-[12px] text-gray-400 ml-1">' + e.duration + '</span>' : ''}
+                </div>
+              </div>
+            </div>
+          `;
+          list.appendChild(row);
+        });
+      }
+
+      document.querySelectorAll('.hist-filter').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.hist-filter').forEach(function (b) {
+            var on = b === btn;
+            b.classList.toggle('bg-white', on);
+            b.classList.toggle('shadow-sm', on);
+            b.classList.toggle('text-gray-900', on);
+            b.classList.toggle('font-semibold', on);
+            b.classList.toggle('text-gray-500', !on);
+            b.classList.toggle('font-medium', !on);
+          });
+          currentFilter = btn.dataset.filter;
+          render();
+        });
+      });
+
+      document.getElementById('signout-btn').addEventListener('click', function () {
+        try { localStorage.removeItem('vocallus_user'); } catch (e) {}
+        window.location.href = 'login.html';
+      });
+
+      render();
+    })();
+  </script>
+
+</body>
+</html>

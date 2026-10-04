@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function () {
+      var raw = null;
+      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
+      if (!raw) { window.location.replace('login.html'); return; }
+      try {
+        var u = JSON.parse(raw);
+        if (!u || (u.expires && Date.now() > u.expires)) {
+          localStorage.removeItem('vocallus_user');
+          window.location.replace('login.html');
+        }
+      } catch (e) {
+        localStorage.removeItem('vocallus_user');
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <meta name="description" content="Your Vocallus dashboard.">
+  <link rel="icon" type="image/png" href="../Images/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.260.0/lucide.min.js"></script>
+
+  <style>
+    /* --- Fonts --------------------------------------------------------- */
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .font-inter { font-family: 'Inter', sans-serif; }
+
+    /* --- Selection ----------------------------------------------------- */
+    ::selection { background-color: #D4D4D4; color: #111111; }
+
+    /* --- Primary button ------------------------------------------------ */
+    .btn-primary {
+      background-color: #111111;
+      color: #FFFFFF;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:hover {
+      background-color: #262626;
+      transform: translateY(-1px);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* --- Nav dropdowns ------------------------------------------------- */
+    .nav-trigger {
+      background: transparent; border: 0; cursor: pointer;
+      font: inherit;
+    }
+    .nav-dropdown { position: relative; }
+    .nav-menu {
+      position: absolute; top: 100%; left: 0;
+      padding-top: 10px; min-width: 236px;
+      opacity: 0; visibility: hidden;
+      transform: translateY(-6px);
+      transition: opacity .18s ease, transform .18s ease, visibility .18s;
+      z-index: 40;
+    }
+    .nav-dropdown:hover .nav-menu,
+    .nav-dropdown.is-open .nav-menu {
+      opacity: 1; visibility: visible; transform: translateY(0);
+    }
+    .nav-dropdown:hover .nav-chevron,
+    .nav-dropdown.is-open .nav-chevron { transform: rotate(180deg); }
+    .nav-menu-inner { overflow: hidden; }
+
+    /* --- Hash-active dropdown child ----------------------------------- */
+    .nav-menu a.nav-hash-active {
+      background-color: #111111 !important;
+      color: #ffffff !important;
+    }
+
+    /* --- Page transitions --------------------------------------------- */
+    /* Smooth fade only — no curve, no slide. */
+    @keyframes pageFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    main, .page-body {
+      animation: pageFadeIn .28s ease-out both;
+    }
+    body.is-leaving { opacity: 0; transition: opacity .16s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+    }
+
+    /* --- Hero fit ------------------------------------------------------ */
+    .hero-fit { min-height: calc(100vh - 5rem); display: flex; align-items: center; }
+    @media (max-width: 1023px) {
+      .hero-fit { min-height: auto; padding-top: 2rem; padding-bottom: 2rem; }
+    }
+
+    /* --- Smooth scroll ------------------------------------------------- */
+    html { scroll-behavior: smooth; }
+
+    /* --- Dashboard ----------------------------------------------------- */
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #c1c1c1; border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    .spark-bar { transition: height .3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+      html { scroll-behavior: auto; }
+    }
+</style>
+</head>
+<body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
+
+
+    <!-- Sidebar -->
+    <nav class="w-[88px] bg-[#f2f2f2] border-r border-gray-200 flex flex-col justify-between items-center py-6 flex-shrink-0 z-10">
+        <div class="flex flex-col items-center w-full space-y-4">
+            <a href="../index.html" class="mb-2 select-none">
+                <img src="../Images/logo.png" alt="Vocallus" class="w-9 h-9 rounded-xl" />
+            </a>
+
+            <div class="flex flex-col w-full items-center space-y-2">
+                <a href="dashboard.html" data-panel="home" class="dash-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl bg-gray-200/80 text-gray-900 transition-colors">
+                    <div class="dash-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full opacity-100 transition-opacity"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    <span class="text-[11px] font-semibold tracking-tight">Home</span>
+                </a>
+
+                <a href="solana.html" class="flex flex-col items-center justify-center w-full py-2.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Solana</span>
+                </a>
+
+                <a href="dashboard.html#number" data-panel="number" class="dash-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                    <div class="dash-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full opacity-0 transition-opacity"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.05 5A5 5 0 0 1 19 8.95"></path><path d="M15.05 1A9 9 0 0 1 23 8.94"></path><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Number</span>
+                </a>
+
+                <a href="history.html" class="flex flex-col items-center justify-center w-full py-2.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span class="text-[11px] font-medium tracking-tight">History</span>
+                </a>
+
+                <a href="dashboard.html#finances" data-panel="finances" class="dash-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                    <div class="dash-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full opacity-0 transition-opacity"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Finances</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="flex flex-col w-full items-center space-y-4">
+            <a href="#" class="text-gray-500 hover:text-gray-800 relative p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-[#ff5a00] rounded-full border-2 border-[#f2f2f2]"></span>
+            </a>
+            <button id="signout-btn" title="Sign out" class="text-gray-500 hover:text-gray-800 p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl shadow-[-5px_0_15px_-3px_rgba(0,0,0,0.1)]">
+        <div id="panel-home" class="panel max-w-[1200px] mx-auto px-8 py-8">
+
+            <!-- Welcome Banner -->
+            <div class="bg-white rounded-3xl shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-gray-100 p-8 mb-8 flex justify-between items-center relative overflow-hidden h-[180px]">
+                <div class="z-10 mt-[-20px]">
+                    <p id="today-date" class="text-gray-800 text-[22px] mb-2 font-medium">—</p>
+                    <h1 class="text-[32px] font-semibold text-gray-900">Good Morning, <span id="user-name">Taymoor A.</span></h1>
+                    <p class="text-gray-500 text-[15px] mt-2">Solana handled <span class="font-semibold text-gray-900" id="banner-calls">14</span> calls for you overnight.</p>
+                </div>
+                <div class="absolute right-0 top-0 bottom-0 w-[400px] pointer-events-none flex items-center justify-end">
+                    <svg width="400" height="180" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg" class="absolute right-0">
+                        <path d="M 200 40 Q 230 20 260 40 Q 290 20 320 50" stroke="#f3f4f6" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <circle cx="250" cy="50" r="40" fill="#f9fafb" />
+                        <circle cx="300" cy="60" r="30" fill="#f9fafb" />
+                        <path d="M 360 30 L 260 70 L 320 90 Z" fill="#d4d4d4" />
+                        <path d="M 360 30 L 320 90 L 310 110 L 340 80 Z" fill="#a3a3a3" />
+                        <path d="M 330 80 L 350 140 L 380 90 Z" fill="#22c55e" />
+                        <path d="M 330 80 L 320 120 L 340 125 Z" fill="#16a34a" />
+                        <path d="M 230 80 L 250 120 L 290 100 Z" fill="#3b82f6" />
+                        <path d="M 230 80 L 240 105 L 260 100 Z" fill="#2563eb" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Stat Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        </div>
+                        <span class="text-[12px] font-semibold text-green-700 bg-green-100 px-2 py-1 rounded-full">+18%</span>
+                    </div>
+                    <div class="text-[13px] text-gray-500 font-medium">Calls answered</div>
+                    <div class="text-[28px] font-semibold text-gray-900 mt-1" data-stat="answered">0</div>
+                    <div class="text-[12px] text-gray-400 mt-1">Today</div>
+                </div>
+                <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                        </div>
+                        <span class="text-[12px] font-semibold text-gray-600 bg-gray-200 px-2 py-1 rounded-full">0 missed</span>
+                    </div>
+                    <div class="text-[13px] text-gray-500 font-medium">Messages captured</div>
+                    <div class="text-[28px] font-semibold text-gray-900 mt-1" data-stat="messages">0</div>
+                    <div class="text-[12px] text-gray-400 mt-1">Today</div>
+                </div>
+                <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        </div>
+                        <span class="text-[12px] font-semibold text-green-700 bg-green-100 px-2 py-1 rounded-full">+4</span>
+                    </div>
+                    <div class="text-[13px] text-gray-500 font-medium">Appointments booked</div>
+                    <div class="text-[28px] font-semibold text-gray-900 mt-1" data-stat="appointments">0</div>
+                    <div class="text-[12px] text-gray-400 mt-1">This week</div>
+                </div>
+                <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <span class="text-[12px] font-semibold text-gray-600 bg-gray-200 px-2 py-1 rounded-full">avg</span>
+                    </div>
+                    <div class="text-[13px] text-gray-500 font-medium">Avg. call duration</div>
+                    <div class="text-[28px] font-semibold text-gray-900 mt-1" data-stat="duration">0:00</div>
+                    <div class="text-[12px] text-gray-400 mt-1">Last 24h</div>
+                </div>
+            </div>
+
+            <!-- Two Column Layout -->
+            <div class="flex flex-col lg:flex-row gap-8">
+                <div class="flex-1 w-full lg:w-[68%]">
+                    <div class="bg-white rounded-3xl border border-gray-100 p-7 mb-8 shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 class="text-[19px] font-semibold text-gray-900">Call volume</h2>
+                                <p class="text-[13px] text-gray-500 mt-0.5">Last 7 days</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center gap-1.5 text-[13px] text-gray-600"><span class="w-2.5 h-2.5 rounded-full bg-black"></span> Answered</span>
+                                <span class="inline-flex items-center gap-1.5 text-[13px] text-gray-600 ml-3"><span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span> Missed</span>
+                            </div>
+                        </div>
+                        <div id="chart" class="flex items-end justify-between gap-3 h-[180px]"></div>
+                        <div id="chart-labels" class="flex justify-between gap-3 mt-3 text-[12px] text-gray-400 font-medium"></div>
+                    </div>
+
+                    <div class="relative mb-6">
+                        <i data-lucide="search" class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5"></i>
+                        <input id="call-search" type="text" placeholder="Search calls, callers, or transcripts" class="w-full pl-12 pr-4 py-[14px] rounded-2xl border border-gray-300 focus:outline-none focus:border-gray-400 hover:border-gray-400 text-[15px] shadow-sm">
+                    </div>
+
+                    <div class="flex justify-between items-center border-b border-gray-200 mb-0">
+                        <div class="flex space-x-8">
+                            <button data-tab="all" class="tab-btn text-black font-medium pb-4 border-b-2 border-black text-[15px]">All calls</button>
+                            <button data-tab="answered" class="tab-btn text-gray-600 hover:text-black font-medium pb-4 text-[15px]">Answered</button>
+                            <button data-tab="missed" class="tab-btn text-gray-600 hover:text-black font-medium pb-4 text-[15px]">Missed</button>
+                            <button data-tab="appointment" class="tab-btn text-gray-600 hover:text-black font-medium pb-4 text-[15px]">Booked</button>
+                            <button data-tab="transferred" class="tab-btn text-gray-600 hover:text-black font-medium pb-4 text-[15px] flex items-center">
+                                Transferred <span class="bg-[#ff5a00] text-white text-[11px] rounded-full w-5 h-5 flex items-center justify-center ml-2 leading-none">2</span>
+                            </button>
+                        </div>
+                        <button class="flex items-center text-gray-600 border border-gray-300 rounded-full px-4 py-1.5 text-[15px] hover:bg-gray-50 transition-colors mb-2 font-medium">
+                            <i data-lucide="sliders-horizontal" class="w-4 h-4 mr-2 text-green-600"></i> Filters
+                        </button>
+                    </div>
+
+                    <div id="call-list" class="flex flex-col"></div>
+                </div>
+
+                <div class="w-full lg:w-[32%] flex flex-col gap-6">
+                    <div class="bg-[#f9fafb] rounded-[24px] border border-gray-100 p-6 pt-8 pb-8">
+                        <div class="flex items-center mb-6">
+                            <div class="w-16 h-16 rounded-full overflow-hidden bg-white flex items-center justify-center mr-4 relative border border-gray-200">
+                                <img src="../Images/logo.png" class="w-full h-full object-cover">
+                                <span class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-[#f9fafb]"></span>
+                            </div>
+                            <div>
+                                <h2 class="font-medium text-lg">Solana</h2>
+                                <p class="text-[13px] text-gray-500 mt-1">Online &amp; answering</p>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between items-center group cursor-pointer mb-1">
+                                    <span class="text-[15px] font-medium">Current number</span>
+                                    <div class="bg-white border border-gray-200 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <i data-lucide="pencil" class="w-3.5 h-3.5 text-gray-500"></i>
+                                    </div>
+                                </div>
+                                <div class="text-[15px] text-gray-700">(555) 000-0000</div>
+                            </div>
+                            <div class="pt-4">
+                                <a href="#" class="text-[15px] font-medium text-black hover:underline decoration-1 underline-offset-2">Configure Solana</a>
+                                <div class="mt-3 flex items-center w-full">
+                                    <div class="flex-1 bg-gray-200 h-1.5 rounded-full overflow-hidden flex"><div class="bg-black w-[85%] h-full rounded-full"></div></div>
+                                    <span class="text-xs font-medium text-gray-600 ml-3">85%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-[#f9fafb] rounded-[24px] border border-gray-100 p-6 pb-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <span class="font-medium text-[19px] text-gray-900">Live activity</span>
+                            <span class="flex items-center gap-1.5 text-[12px] font-semibold text-green-700">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-600"></span>
+                                </span>
+                                Live
+                            </span>
+                        </div>
+                        <div id="activity-feed" class="space-y-5"></div>
+                    </div>
+
+                    <div class="bg-[#f9fafb] rounded-[24px] border border-gray-100 p-6 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors">
+                        <div>
+                            <div class="font-medium text-[15px] text-gray-500">Plan</div>
+                            <div class="font-semibold text-[19px] text-gray-900 mt-0.5">Growth</div>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-5 h-5 text-gray-500"></i>
+                    </div>
+
+                    <div class="bg-[#f9fafb] rounded-[24px] border border-gray-100 p-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="font-medium text-[19px] text-gray-900">Minutes used</span>
+                            <span class="text-[14px] font-semibold text-gray-900">142 / 500</span>
+                        </div>
+                        <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden"><div class="bg-black h-full rounded-full" style="width: 28.4%"></div></div>
+                        <p class="text-[13px] text-gray-500 mt-3">Resets on November 1</p>
+                    </div>
+
+                    <div class="bg-[#f9fafb] rounded-[24px] border border-gray-100 p-6 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors">
+                        <span class="font-medium text-[19px] text-gray-900">Settings</span>
+                        <i data-lucide="chevron-down" class="w-5 h-5 text-gray-500"></i>
+                    </div>
+
+                    <div class="bg-[#f9fafb] rounded-[24px] border border-gray-100 p-6">
+                        <a href="#" class="text-[15px] font-medium text-gray-900 underline decoration-gray-300 hover:no-underline flex items-center">
+                            Help &amp; support <i data-lucide="external-link" class="w-4 h-4 ml-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-solana" class="panel hidden max-w-[1200px] mx-auto px-8 py-8">
+            <div class="mb-8">
+                <h1 class="text-[32px] font-semibold text-gray-900">Solana</h1>
+                <p class="text-gray-500 text-[15px] mt-1">Configure your AI receptionist.</p>
+            </div>
+            <div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+                <h2 class="text-[19px] font-semibold text-gray-900 mb-5">Agent status</h2>
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="w-14 h-14 rounded-full bg-black flex items-center justify-center text-white text-lg font-bold relative">
+                        S
+                        <span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white"></span>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900">Online</div>
+                        <div class="text-[13px] text-gray-500">Answering calls 24/7</div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between rounded-xl bg-[#f9fafb] border border-gray-100 px-4 py-3">
+                        <span class="text-[14px] font-medium text-gray-700">Greeting</span>
+                        <span class="text-[14px] text-gray-500">Hi, thanks for calling&hellip;</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-xl bg-[#f9fafb] border border-gray-100 px-4 py-3">
+                        <span class="text-[14px] font-medium text-gray-700">Voice</span>
+                        <span class="text-[14px] text-gray-500">Aria</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-xl bg-[#f9fafb] border border-gray-100 px-4 py-3">
+                        <span class="text-[14px] font-medium text-gray-700">Language</span>
+                        <span class="text-[14px] text-gray-500">English (US)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-number" class="panel hidden max-w-[1200px] mx-auto px-8 py-8">
+            <div class="mb-8">
+                <h1 class="text-[32px] font-semibold text-gray-900">Number</h1>
+                <p class="text-gray-500 text-[15px] mt-1">The phone number Solana answers.</p>
+            </div>
+            <div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+                <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+                    <div>
+                        <div class="text-[13px] text-gray-500 font-medium">Current number</div>
+                        <div class="text-[24px] font-semibold text-gray-900 mt-1">(555) 000-0000</div>
+                    </div>
+                    <button class="btn-primary inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-[14px]">
+                        Change number
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="rounded-xl bg-[#f9fafb] border border-gray-100 px-4 py-3">
+                        <div class="text-[12px] text-gray-500 font-medium">Forwarding</div>
+                        <div class="text-[14px] text-gray-900 font-medium mt-0.5">On</div>
+                    </div>
+                    <div class="rounded-xl bg-[#f9fafb] border border-gray-100 px-4 py-3">
+                        <div class="text-[12px] text-gray-500 font-medium">Voicemail</div>
+                        <div class="text-[14px] text-gray-900 font-medium mt-0.5">Disabled</div>
+                    </div>
+                    <div class="rounded-xl bg-[#f9fafb] border border-gray-100 px-4 py-3">
+                        <div class="text-[12px] text-gray-500 font-medium">Area code</div>
+                        <div class="text-[14px] text-gray-900 font-medium mt-0.5">555</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-calls" class="panel hidden max-w-[1200px] mx-auto px-8 py-8">
+            <div class="mb-8">
+                <h1 class="text-[32px] font-semibold text-gray-900">Calls</h1>
+                <p class="text-gray-500 text-[15px] mt-1">Every call Solana has handled.</p>
+            </div>
+            <div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+                <p class="text-gray-500 text-[15px]">A full call history will appear here. For now, see the list on the Home tab.</p>
+            </div>
+        </div>
+
+        <div id="panel-finances" class="panel hidden max-w-[1200px] mx-auto px-8 py-8">
+            <div class="mb-8">
+                <h1 class="text-[32px] font-semibold text-gray-900">Finances</h1>
+                <p class="text-gray-500 text-[15px] mt-1">Billing, plan, and usage.</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
+                    <div class="text-[13px] text-gray-500 font-medium">Plan</div>
+                    <div class="text-[24px] font-semibold text-gray-900 mt-1">Growth</div>
+                </div>
+                <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
+                    <div class="text-[13px] text-gray-500 font-medium">Minutes used</div>
+                    <div class="text-[24px] font-semibold text-gray-900 mt-1">142 / 500</div>
+                </div>
+                <div class="bg-[#f9fafb] rounded-[20px] border border-gray-100 p-6">
+                    <div class="text-[13px] text-gray-500 font-medium">Next billing</div>
+                    <div class="text-[24px] font-semibold text-gray-900 mt-1">Nov 1</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+
+  <script>
+    (function () {
+      /* -------- Dropdown menus -------- */
+      var dropdowns = document.querySelectorAll('[data-dropdown]');
+
+      function setOpen(dd, open) {
+        dd.classList.toggle('is-open', open);
+        var t = dd.querySelector('.nav-trigger');
+        if (t) t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function closeAll(except) {
+        dropdowns.forEach(function (dd) { if (dd !== except) setOpen(dd, false); });
+      }
+
+      dropdowns.forEach(function (dd) {
+        var trigger = dd.querySelector('.nav-trigger');
+        if (!trigger) return;
+        trigger.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var willOpen = !dd.classList.contains('is-open');
+          closeAll(dd);
+          setOpen(dd, willOpen);
+        });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-dropdown]')) closeAll(null);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAll(null);
+      });
+
+      /* -------- Hash highlight in dropdowns -------- */
+      function updateHashHighlight() {
+        var hash = window.location.hash;
+        document.querySelectorAll('.nav-menu a').forEach(function (a) {
+          var href = a.getAttribute('href') || '';
+          var idx = href.indexOf('#');
+          var linkHash = idx >= 0 ? href.substring(idx) : '';
+          a.classList.toggle('nav-hash-active', !!hash && linkHash === hash);
+        });
+      }
+      window.addEventListener('hashchange', updateHashHighlight);
+      window.addEventListener('load', updateHashHighlight);
+
+      /* -------- Smooth page transitions -------- */
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+
+      document.addEventListener('click', function (e) {
+        if (e.defaultPrevented) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href.charAt(0) === '#') return;
+        if (/^(https?:|mailto:|tel:)/i.test(href)) return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
+
+        // Same-page navigation: let the browser handle it directly.
+        try {
+          var target = new URL(link.href, window.location.href);
+          if (target.pathname === window.location.pathname) return;
+        } catch (err) { /* fall through */ }
+
+        e.preventDefault();
+        document.body.classList.add('is-leaving');
+        window.setTimeout(function () { window.location.href = href; }, 180);
+        window.setTimeout(function () {
+          document.body.classList.remove('is-leaving');
+        }, 3000);
+      });
+
+      window.addEventListener('pageshow', function () {
+        document.body.classList.remove('is-leaving');
+      });
+
+      /* -------- Demo auth --------
+         Sign in  ->  any email + password "123456"      -> account "demo"
+         Sign up  ->  type "i" in all three fields       -> account "demo"
+         Legacy   ->  full name "rat"                    -> account "rat" */
+      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+
+          var nameInput    = form.querySelector('input[name="name"]');
+          var emailInput   = form.querySelector('input[name="email"]');
+          var companyInput = form.querySelector('input[name="company"]');
+          var pwInput      = form.querySelector('input[name="password"]');
+
+          var displayName = null;
+
+          // Sign-in path: any email + password 123456
+          if (pwInput && pwInput.value === '123456') {
+            displayName = 'demo';
+          }
+
+          // Any form: "i" typed in every visible field -> account "demo"
+          var allInputs = form.querySelectorAll('input');
+          var allI = allInputs.length > 0;
+          allInputs.forEach(function (input) {
+            if (input.value.trim().toLowerCase() !== 'i') allI = false;
+          });
+          if (allI) {
+            displayName = 'demo';
+          }
+
+          // Legacy fallback: full name "rat"
+          if (!displayName && nameInput
+              && nameInput.value.trim().toLowerCase() === 'rat') {
+            displayName = 'rat';
+          }
+
+          if (!displayName) {
+            alert('Demo login:
+
+' +
+                  '  Any form  ->  type "i" into every field
+' +
+                  '  Sign in   ->  any email + password "123456"');
+            return;
+          }
+
+          try {
+            localStorage.setItem('vocallus_user', JSON.stringify({
+              displayName: displayName,
+              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
+            }));
+          } catch (err) { /* private mode — keep going */ }
+
+          // Navigate straight to the dashboard — no fade, no timeout.
+          var path = window.location.pathname.replace(/\/g, '/');
+          var inPages = path.indexOf('/Pages/') >= 0;
+          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
+          window.location.replace(target);
+        });
+      });
+
+      /* -------- Lucide (if loaded) -------- */
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    })();
+  </script>
+
+  <script>
+    // ============================================================
+    // SIMULATED DATA — swap each block for a Firebase read when ready.
+    // ============================================================
+    // TODO: getAuth().currentUser
+    const mockUser = { displayName: 'Taymoor A.' };
+
+    // TODO: Firestore query on `calls` ordered by createdAt desc.
+    const mockCalls = [
+        { id: 'c1', type: 'answered', caller: 'Maya R.', phone: '(415) 555-0128',
+          postedAt: '6 hours ago', duration: '2:47',
+          summary: 'Reschedule her Thursday appointment to Friday at 10am.',
+          tags: ['Appointment', 'Reschedule'],
+          action: { label: 'Moved to Fri 10:00', kind: 'booked' }, verified: true },
+        { id: 'c2', type: 'answered', caller: 'Unknown', phone: '(628) 555-0114',
+          postedAt: '5 hours ago', duration: '0:52',
+          summary: 'Asked whether you offer emergency after-hours service. Said Solana would have someone call back within the hour.',
+          tags: ['After hours', 'FAQ'],
+          action: { label: 'Callback queued', kind: 'transfer' }, verified: true },
+        { id: 'c3', type: 'missed', caller: 'Daniel K.', phone: '(510) 555-0177',
+          postedAt: '4 hours ago', duration: '—',
+          summary: 'Caller hung up before Solana finished the greeting.',
+          tags: ['Missed'], action: null, verified: false },
+        { id: 'c4', type: 'appointment', caller: 'Patricia L.', phone: '(650) 555-0142',
+          postedAt: '3 hours ago', duration: '3:12',
+          summary: 'Booked a new consultation for Tuesday at 2:15pm and confirmed by text.',
+          tags: ['Booked', 'New client'],
+          action: { label: 'Tue 14:15 confirmed', kind: 'booked' }, verified: true },
+        { id: 'c5', type: 'answered', caller: 'Marcus B.', phone: '(415) 555-0199',
+          postedAt: '2 hours ago', duration: '1:35',
+          summary: 'Wants a quote for a recurring monthly service. Left email and asked for a call back tomorrow morning.',
+          tags: ['Quote', 'Sales'],
+          action: { label: 'Callback requested', kind: 'transfer' }, verified: true },
+        { id: 'c6', type: 'transferred', caller: 'Nina S.', phone: '(925) 555-0101',
+          postedAt: '48 min ago', duration: '0:38',
+          summary: 'Urgent — water heater leaking. Warm-transferred to your on-call line.',
+          tags: ['Urgent', 'Transfer'],
+          action: { label: 'Rang on-call', kind: 'transfer' }, verified: true },
+    ];
+
+    // TODO: aggregated rollup doc.
+    const mockStats = { answered: 14, messages: 9, appointments: 6, duration: '2:11' };
+
+    // TODO: 7-day aggregation query.
+    const mockChart = [
+        { day: 'Mon', answered: 9, missed: 1 },
+        { day: 'Tue', answered: 12, missed: 2 },
+        { day: 'Wed', answered: 15, missed: 0 },
+        { day: 'Thu', answered: 11, missed: 3 },
+        { day: 'Fri', answered: 18, missed: 1 },
+        { day: 'Sat', answered: 14, missed: 2 },
+        { day: 'Sun', answered: 16, missed: 1 },
+    ];
+
+    // TODO: Firestore onSnapshot on tenant activity.
+    const mockActivity = [
+        { time: 'Just now', text: 'Solana answered a call from Maya R.', kind: 'call' },
+        { time: '3 min ago', text: 'New appointment booked for Tuesday.', kind: 'booking' },
+        { time: '12 min ago', text: 'Text confirmation sent to Nina S.', kind: 'sms' },
+        { time: '1 hr ago', text: 'Missed call logged from Daniel K.', kind: 'missed' },
+        { time: '2 hr ago', text: 'Message captured from Marcus B.', kind: 'message' },
+    ];
+
+    // ============================================================
+    // RENDER
+    // ============================================================
+    document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric'
+    });
+    document.getElementById('user-name').textContent = mockUser.displayName;
+    document.getElementById('banner-calls').textContent = mockStats.answered;
+
+    function countUp(el, target) {
+        const start = performance.now(), duration = 700;
+        function tick(t) {
+            const p = Math.min((t - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - p, 3);
+            el.textContent = Math.round(target * eased);
+            if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+    }
+    countUp(document.querySelector('[data-stat="answered"]'), mockStats.answered);
+    countUp(document.querySelector('[data-stat="messages"]'), mockStats.messages);
+    countUp(document.querySelector('[data-stat="appointments"]'), mockStats.appointments);
+    document.querySelector('[data-stat="duration"]').textContent = mockStats.duration;
+
+    (function renderChart() {
+        const chart = document.getElementById('chart');
+        const labels = document.getElementById('chart-labels');
+        const max = Math.max(...mockChart.map(d => d.answered + d.missed));
+        mockChart.forEach(d => {
+            const total = d.answered + d.missed;
+            const h = (total / max) * 100;
+            const ap = total === 0 ? 0 : (d.answered / total) * 100;
+            const col = document.createElement('div');
+            col.className = 'flex-1 h-full flex flex-col justify-end gap-0.5';
+            col.innerHTML = `
+                <div class="spark-bar rounded-t-md bg-gray-300" style="height: ${h * (1 - ap/100)}%"></div>
+                <div class="spark-bar rounded-b-md bg-black" style="height: ${h * (ap/100)}%"></div>
+            `;
+            chart.appendChild(col);
+            const lbl = document.createElement('div');
+            lbl.className = 'flex-1 text-center';
+            lbl.textContent = d.day;
+            labels.appendChild(lbl);
+        });
+    })();
+
+    const callList = document.getElementById('call-list');
+    let currentFilter = 'all';
+    let currentSearch = '';
+
+    function renderCalls() {
+        callList.innerHTML = '';
+        const filtered = mockCalls.filter(c => {
+            const matchesTab = currentFilter === 'all' || c.type === currentFilter;
+            const n = currentSearch.toLowerCase();
+            const matchesSearch = !n
+                || c.caller.toLowerCase().includes(n)
+                || c.phone.toLowerCase().includes(n)
+                || c.summary.toLowerCase().includes(n)
+                || c.tags.some(t => t.toLowerCase().includes(n));
+            return matchesTab && matchesSearch;
+        });
+
+        if (!filtered.length) {
+            callList.innerHTML = `<div class="py-16 text-center"><p class="text-gray-400 text-[15px]">No calls match your filters.</p></div>`;
+            return;
+        }
+
+        const tagClass = 'bg-[#f2f2f2] text-gray-600 text-[13px] px-3 py-1 rounded-full font-medium';
+        filtered.forEach(c => {
+            const actionHtml = c.action
+                ? `<span class="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full">
+                       <span class="w-1.5 h-1.5 rounded-full ${c.action.kind === 'booked' ? 'bg-green-500' : 'bg-orange-500'}"></span>
+                       ${c.action.label}
+                   </span>` : '';
+            const row = document.createElement('div');
+            row.className = 'bg-white p-6 pb-8 border-b border-gray-200 relative group';
+            row.innerHTML = `
+                <div class="absolute right-6 top-6 flex space-x-2">
+                    <button class="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors border border-transparent hover:border-gray-200"><i data-lucide="thumbs-down" class="w-[18px] h-[18px]"></i></button>
+                    <button class="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors border border-transparent hover:border-gray-200"><i data-lucide="heart" class="w-[18px] h-[18px]"></i></button>
+                </div>
+                <div class="text-[13px] text-gray-500 mb-2">${c.postedAt} <span class="mx-1">•</span> Duration: ${c.duration}</div>
+                <h2 class="text-xl font-medium text-gray-900 mb-2 hover:text-black cursor-pointer w-4/5">${c.caller}<span class="text-[13px] font-normal text-gray-400 ml-2">${c.phone}</span></h2>
+                <p class="text-[15px] text-gray-800 mb-4 leading-[1.6]">${c.summary}</p>
+                <div class="flex flex-wrap gap-2 mb-4">${c.tags.map(t => `<span class="${tagClass}">${t}</span>`).join('')}</div>
+                <div class="flex items-center justify-between gap-4 flex-wrap">
+                    <div class="flex items-center text-[13px] text-gray-600 space-x-4">
+                        ${c.verified
+                            ? `<div class="flex items-center text-gray-800 font-medium"><svg class="w-4 h-4 mr-1 text-blue-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Verified caller</div>`
+                            : `<div class="flex items-center text-gray-500 font-medium"><svg class="w-4 h-4 mr-1 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>Unverified</div>`}
+                    </div>
+                    ${actionHtml}
+                </div>
+            `;
+            callList.appendChild(row);
+        });
+        if (window.lucide) lucide.createIcons();
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('text-black', 'border-b-2', 'border-black');
+                b.classList.add('text-gray-600');
+            });
+            btn.classList.remove('text-gray-600');
+            btn.classList.add('text-black', 'border-b-2', 'border-black');
+            currentFilter = btn.dataset.tab;
+            renderCalls();
+        });
+    });
+    document.getElementById('call-search').addEventListener('input', e => {
+        currentSearch = e.target.value.trim();
+        renderCalls();
+    });
+    renderCalls();
+
+    (function renderActivity() {
+        const feed = document.getElementById('activity-feed');
+        const iconMap = {
+            call:    { icon: 'phone',         bg: 'bg-black' },
+            booking: { icon: 'calendar',      bg: 'bg-black' },
+            sms:     { icon: 'message-circle', bg: 'bg-gray-700' },
+            missed:  { icon: 'phone-missed',  bg: 'bg-gray-400' },
+            message: { icon: 'mail',          bg: 'bg-gray-700' },
+        };
+        mockActivity.forEach(a => {
+            const conf = iconMap[a.kind] || iconMap.call;
+            const el = document.createElement('div');
+            el.className = 'flex items-start gap-3';
+            el.innerHTML = `
+                <div class="w-8 h-8 rounded-full ${conf.bg} flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i data-lucide="${conf.icon}" class="w-4 h-4 text-white"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-[14px] text-gray-800 leading-[1.5]">${a.text}</p>
+                    <p class="text-[12px] text-gray-400 mt-0.5">${a.time}</p>
+                </div>
+            `;
+            feed.appendChild(el);
+        });
+        if (window.lucide) lucide.createIcons();
+    })();
+
+    document.getElementById('signout-btn').addEventListener('click', () => {
+        try { localStorage.removeItem('vocallus_user'); } catch (e) {}
+        window.location.href = 'login.html';
+    });
+
+    // Sidebar tab switching — swap panels, no reload.
+    (function () {
+        var tabs = document.querySelectorAll('.dash-tab');
+        var panels = document.querySelectorAll('.panel');
+
+        function activate(name) {
+            tabs.forEach(function (t) {
+                var on = t.dataset.panel === name;
+                t.classList.toggle('bg-gray-200/80', on);
+                t.classList.toggle('text-gray-900', on);
+                t.classList.toggle('text-gray-500', !on);
+                var bar = t.querySelector('.dash-bar');
+                if (bar) {
+                    bar.classList.toggle('opacity-100', on);
+                    bar.classList.toggle('opacity-0', !on);
+                }
+            });
+            panels.forEach(function (p) {
+                p.classList.toggle('hidden', p.id !== 'panel-' + name);
+            });
+        }
+
+        tabs.forEach(function (t) {
+            t.addEventListener('click', function (e) {
+                var href = t.getAttribute('href') || '';
+                // Real navigation links (solana.html, history.html) let the
+                // browser handle it — only intercept in-page tab links.
+                if (href.indexOf('#') === -1) return;
+                e.preventDefault();
+                activate(t.dataset.panel);
+                if (history.replaceState) {
+                    history.replaceState(null, '', '#' + t.dataset.panel);
+                }
+            });
+        });
+
+        // Activate the panel matching the URL hash on load.
+        var initialHash = (window.location.hash || '').replace('#', '');
+        if (initialHash && document.getElementById('panel-' + initialHash)) {
+            activate(initialHash);
+        }
+    })();
+  </script>
+
+</body>
+</html>

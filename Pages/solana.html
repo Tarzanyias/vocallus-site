@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function () {
+      var raw = null;
+      try { raw = localStorage.getItem('vocallus_user'); } catch (e) {}
+      if (!raw) { window.location.replace('login.html'); return; }
+      try {
+        var u = JSON.parse(raw);
+        if (!u || (u.expires && Date.now() > u.expires)) {
+          localStorage.removeItem('vocallus_user');
+          window.location.replace('login.html');
+        }
+      } catch (e) {
+        localStorage.removeItem('vocallus_user');
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana</title>
+  <meta name="description" content="Configure and test your Solana agent.">
+  <link rel="icon" type="image/png" href="../Images/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.260.0/lucide.min.js"></script>
+
+  <style>
+    /* --- Fonts --------------------------------------------------------- */
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .font-inter { font-family: 'Inter', sans-serif; }
+
+    /* --- Selection ----------------------------------------------------- */
+    ::selection { background-color: #D4D4D4; color: #111111; }
+
+    /* --- Primary button ------------------------------------------------ */
+    .btn-primary {
+      background-color: #111111;
+      color: #FFFFFF;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:hover {
+      background-color: #262626;
+      transform: translateY(-1px);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* --- Nav dropdowns ------------------------------------------------- */
+    .nav-trigger {
+      background: transparent; border: 0; cursor: pointer;
+      font: inherit;
+    }
+    .nav-dropdown { position: relative; }
+    .nav-menu {
+      position: absolute; top: 100%; left: 0;
+      padding-top: 10px; min-width: 236px;
+      opacity: 0; visibility: hidden;
+      transform: translateY(-6px);
+      transition: opacity .18s ease, transform .18s ease, visibility .18s;
+      z-index: 40;
+    }
+    .nav-dropdown:hover .nav-menu,
+    .nav-dropdown.is-open .nav-menu {
+      opacity: 1; visibility: visible; transform: translateY(0);
+    }
+    .nav-dropdown:hover .nav-chevron,
+    .nav-dropdown.is-open .nav-chevron { transform: rotate(180deg); }
+    .nav-menu-inner { overflow: hidden; }
+
+    /* --- Hash-active dropdown child ----------------------------------- */
+    .nav-menu a.nav-hash-active {
+      background-color: #111111 !important;
+      color: #ffffff !important;
+    }
+
+    /* --- Page transitions --------------------------------------------- */
+    /* Smooth fade only — no curve, no slide. */
+    @keyframes pageFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    main, .page-body {
+      animation: pageFadeIn .28s ease-out both;
+    }
+    body.is-leaving { opacity: 0; transition: opacity .16s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+    }
+
+    /* --- Hero fit ------------------------------------------------------ */
+    .hero-fit { min-height: calc(100vh - 5rem); display: flex; align-items: center; }
+    @media (max-width: 1023px) {
+      .hero-fit { min-height: auto; padding-top: 2rem; padding-bottom: 2rem; }
+    }
+
+    /* --- Smooth scroll ------------------------------------------------- */
+    html { scroll-behavior: smooth; }
+
+    /* --- Dashboard ----------------------------------------------------- */
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #c1c1c1; border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    .spark-bar { transition: height .3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+      html { scroll-behavior: auto; }
+    }
+</style>
+</head>
+<body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
+
+    <nav class="w-[88px] bg-[#f2f2f2] border-r border-gray-200 flex flex-col justify-between items-center py-6 flex-shrink-0 z-10">
+        <div class="flex flex-col items-center w-full space-y-4">
+            <a href="../index.html" class="mb-2 select-none">
+                <img src="../Images/logo.png" alt="Vocallus" class="w-9 h-9 rounded-xl" />
+            </a>
+
+            <div class="flex flex-col w-full items-center space-y-2">
+                <a href="dashboard.html" data-nav="home" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Home</span>
+                </a>
+
+                <a href="solana.html" data-nav="solana" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors bg-gray-200/80 text-gray-900">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-100"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Solana</span>
+                </a>
+
+                <a href="dashboard.html#number" data-nav="number" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.05 5A5 5 0 0 1 19 8.95"></path><path d="M15.05 1A9 9 0 0 1 23 8.94"></path><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Number</span>
+                </a>
+
+                <a href="history.html" data-nav="history" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span class="text-[11px] font-medium tracking-tight">History</span>
+                </a>
+
+                <a href="dashboard.html#finances" data-nav="finances" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
+                    <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <span class="text-[11px] font-medium tracking-tight">Finances</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="flex flex-col w-full items-center space-y-4">
+            <a href="#" class="text-gray-500 hover:text-gray-800 relative p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-[#ff5a00] rounded-full border-2 border-[#f2f2f2]"></span>
+            </a>
+            <button id="signout-btn" title="Sign out" class="text-gray-500 hover:text-gray-800 p-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+        </div>
+    </nav>
+    <aside class="w-[320px] bg-[#f9fafb] border-r border-gray-200 flex flex-col flex-shrink-0">
+        <div class="p-5 border-b border-gray-200">
+            <div class="flex items-center gap-3 mb-2">
+                <img src="../Images/logo.png" alt="" class="w-11 h-11 rounded-2xl" />
+                <div class="flex-1">
+                    <div class="font-semibold text-[15px] text-gray-900" id="agent-name-display">Solana</div>
+                    <div class="text-[12px] text-gray-500">AI receptionist</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+            <div>
+                <label class="block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2">Agent name</label>
+                <input id="agent-name" type="text" value="Solana" placeholder="What should your Solana be called?"
+                       class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
+            </div>
+
+            <div>
+                <label class="block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2">System prompt</label>
+                <p class="text-[12px] text-gray-400 mb-2">How your agent should greet and respond.</p>
+                <textarea id="system-prompt" rows="11" placeholder="You are Solana, the friendly AI receptionist for Acme Services. Greet callers warmly, ask how you can help, and book appointments when requested."
+                          class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.6] focus:outline-none focus:border-gray-400 bg-white resize-none">You are Solana, the friendly AI receptionist for Acme Services. Greet callers warmly, ask how you can help, and book appointments when requested. Keep answers short and confirm any booking by repeating the day and time back to the caller.</textarea>
+            </div>
+
+            <button id="save-prompt"
+                    class="w-full btn-primary rounded-xl py-3 font-semibold text-[14px]">
+                Save changes
+            </button>
+
+            <div>
+                <div class="text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-3">Presets</div>
+                <div class="space-y-2">
+                    <button data-preset="voice" class="preset-btn w-full text-left rounded-xl border border-gray-200 bg-white px-3.5 py-3 hover:border-gray-400 transition">
+                        <div class="text-[13.5px] font-semibold text-gray-900">Voice assistant</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">Warm, friendly, conversational</div>
+                    </button>
+                    <button data-preset="booking" class="preset-btn w-full text-left rounded-xl border border-gray-200 bg-white px-3.5 py-3 hover:border-gray-400 transition">
+                        <div class="text-[13.5px] font-semibold text-gray-900">Booking agent</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">Focused on scheduling appointments</div>
+                    </button>
+                    <button data-preset="support" class="preset-btn w-full text-left rounded-xl border border-gray-200 bg-white px-3.5 py-3 hover:border-gray-400 transition">
+                        <div class="text-[13.5px] font-semibold text-gray-900">Support agent</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">Answers FAQs, escalates when needed</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl shadow-[-5px_0_15px_-3px_rgba(0,0,0,0.1)]">
+        <div class="max-w-[1100px] mx-auto px-8 py-8">
+
+            <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+                <div>
+                    <h1 class="text-[26px] font-semibold text-gray-900">Test your Solana</h1>
+                    <p class="text-gray-500 text-[14px] mt-0.5">Try your agent before connecting a phone number.</p>
+                </div>
+                <div class="flex bg-gray-100 rounded-full p-1">
+                    <button data-mode="call" class="mode-btn px-5 py-2 rounded-full text-[14px] font-semibold bg-white shadow-sm text-gray-900">Call</button>
+                    <button data-mode="text" class="mode-btn px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">Text</button>
+                </div>
+            </div>
+
+            <!-- Setup card: shown when no key is set -->
+            <div id="api-setup" class="rounded-3xl border border-gray-100 p-7 mb-8 bg-[#f9fafb]">
+                <div class="mb-6">
+                    <h2 class="text-[18px] font-semibold text-gray-900">Connect an AI provider</h2>
+                    <p class="text-[14px] text-gray-500 mt-1">Choose a provider and paste your API key.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6" id="provider-grid">
+                    <button data-provider="openai" class="provider-card relative rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                        <img src="../Images/cha.png" alt="" class="w-8 h-8 rounded-lg mb-3">
+                        <div class="text-[14px] font-semibold text-gray-900">OpenAI</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">GPT models</div>
+                    </button>
+                    <button data-provider="gemini" class="provider-card relative rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                        <img src="../Images/gem.png" alt="" class="w-8 h-8 rounded-lg mb-3">
+                        <div class="text-[14px] font-semibold text-gray-900">Gemini</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">Google models</div>
+                    </button>
+                    <button data-provider="claude" class="provider-card relative rounded-2xl border-2 border-gray-200 bg-white p-4 hover:border-gray-300 transition text-left">
+                        <img src="../Images/cla.png" alt="" class="w-8 h-8 rounded-lg mb-3">
+                        <div class="text-[14px] font-semibold text-gray-900">Claude</div>
+                        <div class="text-[12px] text-gray-500 mt-0.5">Anthropic models</div>
+                    </button>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-[13px] font-semibold text-gray-700 mb-2">API key</label>
+                    <input id="api-key" type="password" placeholder="Paste your API key"
+                           class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-400 bg-white">
+                    <p id="key-hint" class="text-[12px] text-gray-400 mt-1.5">Pick a provider to see the expected key format.</p>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-[13px] font-semibold text-gray-700 mb-2">Model</label>
+
+                </div>
+
+                <div id="api-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-4 mb-5">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <div>
+                            <div id="api-error-title" class="text-[14px] font-semibold text-red-800">Invalid API key</div>
+                            <div id="api-error-msg" class="text-[13px] text-red-700 mt-1">Check the key and try again.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="save-key" class="btn-primary px-6 py-3 rounded-xl font-semibold text-[14px]">
+                    Save and continue
+                </button>
+            </div>
+
+            <!-- Chat preview: shown after key is set -->
+            <div id="chat-preview" class="hidden rounded-3xl border border-gray-100 bg-[#f9fafb] p-7">
+
+                <div id="call-view">
+                    <div class="text-center py-10">
+                        <img src="../Images/logo.png" alt="" class="w-20 h-20 mx-auto rounded-3xl mb-4">
+                        <div class="text-[22px] font-semibold text-gray-900">Test call</div>
+                        <div class="text-[14px] text-gray-500 mt-1.5">Solana will answer as configured.</div>
+                        <button id="start-call" class="mt-8 btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold text-[14px]">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            Start test call
+                        </button>
+                    </div>
+                </div>
+
+                <div id="text-view" class="hidden">
+                    <div class="space-y-4 mb-6" id="chat-log">
+                        <div class="flex items-start gap-3">
+                            <img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0">
+                            <div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[70%]">
+                                <p class="text-[14px] text-gray-800 leading-[1.5]">Hi, thanks for reaching out to Acme Services. How can I help today?</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3 justify-end">
+                            <div class="bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[70%]">
+                                <p class="text-[14px] leading-[1.5]">Can I book a consultation for next Tuesday?</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0">
+                            <div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[70%]">
+                                <p class="text-[14px] text-gray-800 leading-[1.5]">Of course. Next Tuesday at 10am or 2pm are both open. Which works best?</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="text" placeholder="Type a message to test your Solana"
+                               class="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-[14px] focus:outline-none focus:border-gray-400">
+                        <button class="btn-primary px-5 py-3 rounded-xl font-semibold text-[14px]">Send</button>
+                    </div>
+                </div>
+
+
+        </div>
+    </main>
+
+
+  <script>
+    (function () {
+      /* -------- Dropdown menus -------- */
+      var dropdowns = document.querySelectorAll('[data-dropdown]');
+
+      function setOpen(dd, open) {
+        dd.classList.toggle('is-open', open);
+        var t = dd.querySelector('.nav-trigger');
+        if (t) t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function closeAll(except) {
+        dropdowns.forEach(function (dd) { if (dd !== except) setOpen(dd, false); });
+      }
+
+      dropdowns.forEach(function (dd) {
+        var trigger = dd.querySelector('.nav-trigger');
+        if (!trigger) return;
+        trigger.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var willOpen = !dd.classList.contains('is-open');
+          closeAll(dd);
+          setOpen(dd, willOpen);
+        });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-dropdown]')) closeAll(null);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAll(null);
+      });
+
+      /* -------- Hash highlight in dropdowns -------- */
+      function updateHashHighlight() {
+        var hash = window.location.hash;
+        document.querySelectorAll('.nav-menu a').forEach(function (a) {
+          var href = a.getAttribute('href') || '';
+          var idx = href.indexOf('#');
+          var linkHash = idx >= 0 ? href.substring(idx) : '';
+          a.classList.toggle('nav-hash-active', !!hash && linkHash === hash);
+        });
+      }
+      window.addEventListener('hashchange', updateHashHighlight);
+      window.addEventListener('load', updateHashHighlight);
+
+      /* -------- Smooth page transitions -------- */
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+
+      document.addEventListener('click', function (e) {
+        if (e.defaultPrevented) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href.charAt(0) === '#') return;
+        if (/^(https?:|mailto:|tel:)/i.test(href)) return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
+
+        // Same-page navigation: let the browser handle it directly.
+        try {
+          var target = new URL(link.href, window.location.href);
+          if (target.pathname === window.location.pathname) return;
+        } catch (err) { /* fall through */ }
+
+        e.preventDefault();
+        document.body.classList.add('is-leaving');
+        window.setTimeout(function () { window.location.href = href; }, 180);
+        window.setTimeout(function () {
+          document.body.classList.remove('is-leaving');
+        }, 3000);
+      });
+
+      window.addEventListener('pageshow', function () {
+        document.body.classList.remove('is-leaving');
+      });
+
+      /* -------- Demo auth --------
+         Sign in  ->  any email + password "123456"      -> account "demo"
+         Sign up  ->  type "i" in all three fields       -> account "demo"
+         Legacy   ->  full name "rat"                    -> account "rat" */
+      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+
+          var nameInput    = form.querySelector('input[name="name"]');
+          var emailInput   = form.querySelector('input[name="email"]');
+          var companyInput = form.querySelector('input[name="company"]');
+          var pwInput      = form.querySelector('input[name="password"]');
+
+          var displayName = null;
+
+          // Sign-in path: any email + password 123456
+          if (pwInput && pwInput.value === '123456') {
+            displayName = 'demo';
+          }
+
+          // Any form: "i" typed in every visible field -> account "demo"
+          var allInputs = form.querySelectorAll('input');
+          var allI = allInputs.length > 0;
+          allInputs.forEach(function (input) {
+            if (input.value.trim().toLowerCase() !== 'i') allI = false;
+          });
+          if (allI) {
+            displayName = 'demo';
+          }
+
+          // Legacy fallback: full name "rat"
+          if (!displayName && nameInput
+              && nameInput.value.trim().toLowerCase() === 'rat') {
+            displayName = 'rat';
+          }
+
+          if (!displayName) {
+            alert('Demo login:
+
+' +
+                  '  Any form  ->  type "i" into every field
+' +
+                  '  Sign in   ->  any email + password "123456"');
+            return;
+          }
+
+          try {
+            localStorage.setItem('vocallus_user', JSON.stringify({
+              displayName: displayName,
+              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
+            }));
+          } catch (err) { /* private mode — keep going */ }
+
+          // Navigate straight to the dashboard — no fade, no timeout.
+          var path = window.location.pathname.replace(/\/g, '/');
+          var inPages = path.indexOf('/Pages/') >= 0;
+          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
+          window.location.replace(target);
+        });
+      });
+
+      /* -------- Lucide (if loaded) -------- */
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    })();
+  </script>
+  <script>
+    (function () {
+      var PROVIDERS = {
+        openai: {
+          name: 'OpenAI', icon: '../Images/cha.png',
+          keyPrefixes: ['sk-'], hint: 'OpenAI keys start with "sk-".',
+          defaultModel: 'gpt-5-nano'
+        },
+        gemini: {
+          name: 'Gemini', icon: '../Images/gem.png',
+          keyPrefixes: ['AIza', 'AQ.'], hint: 'Gemini keys start with "AIza" or "AQ.".',
+          defaultModel: 'gemini-3.5-flash-lite'
+        },
+        claude: {
+          name: 'Claude', icon: '../Images/cla.png',
+          keyPrefixes: ['sk-ant-'], hint: 'Claude keys start with "sk-ant-".',
+          defaultModel: 'claude-haiku-4-5-20251001'
+        }
+      };
+
+      var currentProvider = null;
+      var chatHistory = [];
+
+      var providerBtns = document.querySelectorAll('.provider-card');
+      var keyInput  = document.getElementById('api-key');
+      var keyHint   = document.getElementById('key-hint');
+      var errorBox  = document.getElementById('api-error');
+      var errorTitle= document.getElementById('api-error-title');
+      var errorMsg  = document.getElementById('api-error-msg');
+      var setupCard = document.getElementById('api-setup');
+      var previewCard = document.getElementById('chat-preview');
+      var saveBtn   = document.getElementById('save-key');
+
+      function showError(t, m) {
+        errorTitle.textContent = t; errorMsg.textContent = m;
+        errorBox.classList.remove('hidden');
+      }
+      function hideError() { errorBox.classList.add('hidden'); }
+
+      function selectProvider(id) {
+        currentProvider = id;
+        var p = PROVIDERS[id];
+        providerBtns.forEach(function (b) {
+          var on = b.dataset.provider === id;
+          b.classList.toggle('border-black', on);
+          b.classList.toggle('ring-2', on);
+          b.classList.toggle('ring-black/10', on);
+          b.classList.toggle('border-gray-200', !on);
+          b.classList.toggle('ring-0', !on);
+        });
+        keyHint.textContent = p.hint;
+        hideError();
+      }
+
+      providerBtns.forEach(function (b) {
+        b.addEventListener('click', function () { selectProvider(b.dataset.provider); });
+      });
+
+      saveBtn.addEventListener('click', function () {
+        hideError();
+        var key = keyInput.value.trim();
+        var provider = currentProvider;
+        if (!provider) { showError('No provider selected', 'Pick OpenAI, Gemini, or Claude above.'); return; }
+        var p = PROVIDERS[provider];
+        if (!key) { showError('API key required', 'Paste a key from your ' + p.name + ' account.'); return; }
+        var ok = p.keyPrefixes.some(function (pre) { return key.indexOf(pre) === 0; });
+        if (key.length < 8 || !ok) { showError('Invalid API key', 'The key was rejected. ' + p.hint); return; }
+
+        try {
+          localStorage.setItem('vocallus_ai', JSON.stringify({
+            provider: provider, model: p.defaultModel,
+            key: key, configured: true
+          }));
+        } catch (e) {}
+
+        setupCard.classList.add('hidden');
+        previewCard.classList.remove('hidden');
+      });
+
+      document.getElementById('disconnect').addEventListener('click', function () {
+        try { localStorage.removeItem('vocallus_ai'); } catch (e) {}
+        setupCard.classList.remove('hidden');
+        previewCard.classList.add('hidden');
+        currentProvider = null;
+        providerBtns.forEach(function (b) {
+          b.classList.remove('border-black', 'ring-2', 'ring-black/10');
+          b.classList.add('border-gray-200', 'ring-0');
+        });
+        keyInput.value = '';
+      });
+
+      /* Restore saved provider */
+      try {
+        var saved = JSON.parse(localStorage.getItem('vocallus_ai') || 'null');
+        if (saved && saved.configured) {
+          selectProvider(saved.provider);
+          keyInput.value = saved.key || '';
+          setupCard.classList.add('hidden');
+          previewCard.classList.remove('hidden');
+        }
+      } catch (e) {}
+
+      /* -------- Chat -------- */
+      var chatLog = document.getElementById('chat-log');
+      var chatInput = document.getElementById('chat-input');
+      var chatSend = document.getElementById('chat-send');
+
+      function getAgent() {
+        try { return JSON.parse(localStorage.getItem('vocallus_agent') || 'null') || {}; }
+        catch (e) { return {}; }
+      }
+
+      function pushBubble(role, text) {
+        var wrap = document.createElement('div');
+        wrap.className = role === 'user'
+          ? 'flex items-start gap-3 justify-end'
+          : 'flex items-start gap-3';
+        wrap.innerHTML = role === 'user'
+          ? '<div class="bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[70%]"><p class="text-[14px] leading-[1.5]"></p></div>'
+          : '<img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0"><div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[70%]"><p class="text-[14px] text-gray-800 leading-[1.5]"></p></div>';
+        wrap.querySelector('p').textContent = text;
+        chatLog.appendChild(wrap);
+        chatLog.scrollTop = chatLog.scrollHeight;
+        return wrap;
+      }
+
+      function askAI(userText) {
+        var cfg = null;
+        try { cfg = JSON.parse(localStorage.getItem('vocallus_ai') || 'null'); } catch (e) {}
+        if (!cfg) return Promise.reject(new Error('no config'));
+        var agent = getAgent();
+        var sys = agent.prompt || 'You are Solana, a friendly AI receptionist. Keep replies short and helpful.';
+        var name = agent.name || 'Solana';
+
+        chatHistory.push({ role: 'user', content: userText });
+
+        // Try our Netlify function first — it handles CORS and hides nothing
+        // it shouldn't. Falls back to a direct call for providers that allow
+        // browser origins (Gemini and Claude both do).
+        var tryFn = fetch('/.netlify/functions/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: cfg.provider, model: cfg.model, key: cfg.key,
+            system: sys, name: name, messages: chatHistory
+          })
+        }).then(function (r) {
+          if (!r.ok) throw new Error('fn ' + r.status);
+          return r.json();
+        }).then(function (j) { return j.reply; });
+
+        return tryFn.catch(function () {
+          return directCall(cfg, sys, name);
+        }).catch(function () {
+          return '(Demo reply) I would normally answer via ' + cfg.provider +
+                 ' using model ' + cfg.model + '. Once this is deployed to Netlify, ' +
+                 'the real response will come through.';
+        });
+      }
+
+      function directCall(cfg, sys, name) {
+        if (cfg.provider === 'gemini') {
+          var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+                    cfg.model + ':generateContent?key=' + encodeURIComponent(cfg.key);
+          return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: sys }] },
+              contents: chatHistory.map(function (m) {
+                return { role: m.role === 'user' ? 'user' : 'model',
+                         parts: [{ text: m.content }] };
+              })
+            })
+          }).then(function (r) { return r.json(); })
+            .then(function (j) {
+              var t = j.candidates && j.candidates[0] &&
+                      j.candidates[0].content &&
+                      j.candidates[0].content.parts &&
+                      j.candidates[0].content.parts[0].text;
+              if (!t) throw new Error('no text');
+              return t;
+            });
+        }
+        if (cfg.provider === 'claude') {
+          return fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': cfg.key,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+              model: cfg.model, max_tokens: 512, system: sys,
+              messages: chatHistory
+            })
+          }).then(function (r) { return r.json(); })
+            .then(function (j) {
+              var t = j.content && j.content[0] && j.content[0].text;
+              if (!t) throw new Error('no text');
+              return t;
+            });
+        }
+        // OpenAI does not permit browser calls — the Netlify function handles it.
+        return Promise.reject(new Error('openai requires function'));
+      }
+
+      function handleSend() {
+        var text = (chatInput.value || '').trim();
+        if (!text) return;
+        chatInput.value = '';
+        pushBubble('user', text);
+        var thinking = pushBubble('assistant', '…');
+
+        askAI(text).then(function (reply) {
+          thinking.querySelector('p').textContent = reply;
+          chatHistory.push({ role: 'assistant', content: reply });
+        }).catch(function () {
+          thinking.querySelector('p').textContent = 'Something went wrong.';
+        });
+      }
+
+      chatSend.addEventListener('click', handleSend);
+      chatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') handleSend();
+      });
+
+      /* -------- Call / Text toggle -------- */
+      var callView = document.getElementById('call-view');
+      var textView = document.getElementById('text-view');
+      document.querySelectorAll('.mode-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var mode = btn.dataset.mode;
+          document.querySelectorAll('.mode-btn').forEach(function (b) {
+            var on = b.dataset.mode === mode;
+            b.classList.toggle('bg-white', on); b.classList.toggle('shadow-sm', on);
+            b.classList.toggle('text-gray-900', on); b.classList.toggle('font-semibold', on);
+            b.classList.toggle('text-gray-500', !on); b.classList.toggle('font-medium', !on);
+          });
+          callView.classList.toggle('hidden', mode !== 'call');
+          textView.classList.toggle('hidden', mode !== 'text');
+        });
+      });
+
+      /* -------- Sub-sidebar -------- */
+      var nameInput = document.getElementById('agent-name');
+      var promptArea = document.getElementById('system-prompt');
+      var nameDisplay = document.getElementById('agent-name-display');
+
+      try {
+        var agent = JSON.parse(localStorage.getItem('vocallus_agent') || 'null');
+        if (agent) {
+          if (agent.name) { nameInput.value = agent.name; nameDisplay.textContent = agent.name; }
+          if (agent.prompt) promptArea.value = agent.prompt;
+        }
+      } catch (e) {}
+
+      nameInput.addEventListener('input', function () {
+        nameDisplay.textContent = nameInput.value || 'Solana';
+      });
+
+      document.getElementById('save-prompt').addEventListener('click', function () {
+        try {
+          localStorage.setItem('vocallus_agent', JSON.stringify({
+            name: nameInput.value.trim() || 'Solana',
+            prompt: promptArea.value.trim()
+          }));
+        } catch (e) {}
+        this.textContent = 'Saved';
+        var self = this;
+        setTimeout(function () { self.textContent = 'Save changes'; }, 1200);
+      });
+
+      var PRESETS = {
+        voice: 'You are Solana, a warm and friendly AI receptionist. Greet callers by name when possible, use natural conversational language, and always confirm the reason for the call before wrapping up.',
+        booking: 'You are Solana, a booking-focused AI receptionist. Capture the caller\'s name, preferred date, preferred time, and reason for visit, then confirm the appointment slot back to them.',
+        support: 'You are Solana, a helpful support agent. Answer common questions clearly and briefly. If something is outside your knowledge, offer to take a callback message.'
+      };
+      document.querySelectorAll('.preset-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          promptArea.value = PRESETS[btn.dataset.preset] || '';
+          promptArea.focus();
+        });
+      });
+
+      document.getElementById('signout-btn').addEventListener('click', function () {
+        try {
+          localStorage.removeItem('vocallus_user');
+          localStorage.removeItem('vocallus_ai');
+          localStorage.removeItem('vocallus_agent');
+        } catch (e) {}
+        window.location.href = 'login.html';
+      });
+
+      if (window.lucide) lucide.createIcons();
+    })();
+  </script>
+
+  <script>
+    (function () {
+      if (window.__vocallusProviderSelect) return;
+      window.__vocallusProviderSelect = true;
+
+      // Inject the CSS once. .selected is a plain class, so Tailwind
+      // doesn't need to know about it — the browser applies it directly.
+      var style = document.createElement('style');
+      style.textContent =
+        '.provider-card{position:relative;transition:border-color .15s ease,box-shadow .15s ease;}' +
+        '.provider-card.selected{border-color:#111111 !important;box-shadow:0 0 0 3px rgba(17,17,17,.10) !important;}' +
+        '.provider-card .selected-badge{display:none !important;}' +
+        '.provider-card.selected .selected-badge{display:inline-flex !important;}';
+      document.head.appendChild(style);
+
+      // Event delegation in the capture phase, so nothing else can stop
+      // the click before we see it.
+      document.addEventListener('click', function (e) {
+        var card = e.target && e.target.closest ? e.target.closest('.provider-card') : null;
+        if (!card) return;
+        var cards = document.querySelectorAll('.provider-card');
+        for (var i = 0; i < cards.length; i++) {
+          cards[i].classList.toggle('selected', cards[i] === card);
+        }
+      }, true);
+
+      // If a provider was already saved, mark it selected on load.
+      try {
+        var saved = JSON.parse(localStorage.getItem('vocallus_ai') || 'null');
+        if (saved && saved.provider) {
+          var match = document.querySelector('.provider-card[data-provider="' + saved.provider + '"]');
+          if (match) match.classList.add('selected');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing</title>
+  <meta name="description" content="Simple, predictable pricing for a 24/7 AI receptionist. Start with a free demo, cancel anytime.">
+  <link rel="icon" type="image/png" href="../Images/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.260.0/lucide.min.js"></script>
+
+  <style>
+    /* --- Fonts --------------------------------------------------------- */
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .font-inter { font-family: 'Inter', sans-serif; }
+
+    /* --- Selection ----------------------------------------------------- */
+    ::selection { background-color: #D4D4D4; color: #111111; }
+
+    /* --- Primary button ------------------------------------------------ */
+    .btn-primary {
+      background-color: #111111;
+      color: #FFFFFF;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:hover {
+      background-color: #262626;
+      transform: translateY(-1px);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* --- Nav dropdowns ------------------------------------------------- */
+    .nav-trigger {
+      background: transparent; border: 0; cursor: pointer;
+      font: inherit;
+    }
+    .nav-dropdown { position: relative; }
+    .nav-menu {
+      position: absolute; top: 100%; left: 0;
+      padding-top: 10px; min-width: 236px;
+      opacity: 0; visibility: hidden;
+      transform: translateY(-6px);
+      transition: opacity .18s ease, transform .18s ease, visibility .18s;
+      z-index: 40;
+    }
+    .nav-dropdown:hover .nav-menu,
+    .nav-dropdown.is-open .nav-menu {
+      opacity: 1; visibility: visible; transform: translateY(0);
+    }
+    .nav-dropdown:hover .nav-chevron,
+    .nav-dropdown.is-open .nav-chevron { transform: rotate(180deg); }
+    .nav-menu-inner { overflow: hidden; }
+
+    /* --- Hash-active dropdown child ----------------------------------- */
+    .nav-menu a.nav-hash-active {
+      background-color: #111111 !important;
+      color: #ffffff !important;
+    }
+
+    /* --- Page transitions --------------------------------------------- */
+    /* Smooth fade only — no curve, no slide. */
+    @keyframes pageFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    main, .page-body {
+      animation: pageFadeIn .28s ease-out both;
+    }
+    body.is-leaving { opacity: 0; transition: opacity .16s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+    }
+
+    /* --- Hero fit ------------------------------------------------------ */
+    .hero-fit { min-height: calc(100vh - 5rem); display: flex; align-items: center; }
+    @media (max-width: 1023px) {
+      .hero-fit { min-height: auto; padding-top: 2rem; padding-bottom: 2rem; }
+    }
+
+    /* --- Smooth scroll ------------------------------------------------- */
+    html { scroll-behavior: smooth; }
+
+    /* --- Dashboard ----------------------------------------------------- */
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #c1c1c1; border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    .spark-bar { transition: height .3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    @media (prefers-reduced-motion: reduce) {
+      main, .page-body { animation: none; }
+      body.is-leaving { opacity: 1; transition: none; }
+      html { scroll-behavior: auto; }
+    }
+</style>
+</head>
+<body class="bg-white text-neutral-900 min-h-screen flex flex-col justify-between">
+
+  <header class="w-full bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-neutral-100">
+    <div class="max-w-[1400px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
+
+      <div class="flex items-center gap-10">
+        <a href="../index.html" class="flex items-center gap-2.5 select-none hover:opacity-90 transition">
+          <img src="../Images/logo.png" alt="" class="h-9 w-9" />
+          <span class="font-extrabold text-2xl tracking-tighter text-black">Vocallus</span>
+        </a>
+
+        <nav class="hidden md:flex items-center gap-1 text-[15px] font-medium text-[#111111]">
+          <div class="nav-dropdown relative" data-dropdown>
+            <button type="button" aria-haspopup="true" aria-expanded="false" class="nav-trigger inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">
+              <span>Products</span>
+              <svg class="nav-chevron w-3.5 h-3.5 text-neutral-400 stroke-[2.5] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+            </button>
+            <div class="nav-menu" role="menu">
+              <div class="nav-menu-inner rounded-2xl border border-neutral-100 bg-white p-2 shadow-lg shadow-neutral-200/60">
+              <a href="../Pages/products.html" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Overview</a>
+              <a href="../Pages/products.html#answering" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Call answering</a>
+              <a href="../Pages/products.html#messages" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Message capture</a>
+              <a href="../Pages/products.html#summaries" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Call summaries</a>
+              </div>
+            </div>
+          </div>
+          <div class="nav-dropdown relative" data-dropdown>
+            <button type="button" aria-haspopup="true" aria-expanded="false" class="nav-trigger inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">
+              <span>Solutions</span>
+              <svg class="nav-chevron w-3.5 h-3.5 text-neutral-400 stroke-[2.5] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+            </button>
+            <div class="nav-menu" role="menu">
+              <div class="nav-menu-inner rounded-2xl border border-neutral-100 bg-white p-2 shadow-lg shadow-neutral-200/60">
+              <a href="../Pages/solutions.html#healthcare" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Healthcare & dental</a>
+              <a href="../Pages/solutions.html#home-services" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Home services</a>
+              <a href="../Pages/solutions.html#legal" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Legal & professional</a>
+              <a href="../Pages/solutions.html#salons" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Salons & spas</a>
+              <a href="../Pages/solutions.html#property" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Property management</a>
+              </div>
+            </div>
+          </div>
+          <a href="../Pages/pricing.html" class="rounded-lg px-3 py-2 transition-colors bg-[#111111] text-white">Pricing</a>
+        </nav>
+      </div>
+
+      <div class="flex items-center gap-3 sm:gap-4 text-[15px] font-medium">
+        <a href="../Pages/login.html" class="px-2 py-1.5 text-neutral-700 hover:text-black transition">
+          Sign in
+        </a>
+        <a href="../Pages/talk-to-sales.html" class="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-neutral-200/90 rounded-xl text-neutral-800 font-medium hover:bg-neutral-50 transition shadow-xs">
+          Talk to Sales
+        </a>
+        <a href="../Pages/signup.html" class="btn-primary inline-flex items-center justify-center px-5 py-2 rounded-xl font-semibold shadow-sm">
+          Try for free
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <main class="flex-1 ">
+
+    <section id="pricing" class="scroll-mt-24 bg-white">
+      <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-20 lg:py-28">
+        
+        <div class="text-center max-w-[720px] mx-auto">
+          <span class="inline-flex self-start items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Pricing</span>
+          <h2 class="mt-5 text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.12] tracking-[-0.03em] text-[#111111]">Simple pricing that scales with your call volume</h2>
+          <p class="mt-5 text-[17px] leading-[1.6] text-[#55565B]">Every plan includes a free demo, unlimited users, and no setup fees. Upgrade, downgrade, or cancel whenever you like.</p>
+        </div>
+        
+        <div class="mt-20 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs flex flex-col">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Starter</h3>
+              
+            </div>
+            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">For solo operators and single-line businesses.</p>
+            <div class="mt-6 flex items-end gap-1.5">
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$49</span>
+              <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
+            </div>
+            <ul class="mt-7 space-y-3 flex-1">
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 100 answered calls / month</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>24/7 call answering</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Message capture & email delivery</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Custom greeting</li>
+            </ul>
+            <div class="mt-8">
+              <a href="../Pages/signup.html" class="border border-neutral-200/90 text-neutral-800 hover:bg-neutral-50 inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] transition shadow-xs">
+                Try for free
+              </a>
+            </div>
+          </div>
+          <div class="rounded-3xl border border-neutral-300 ring-2 ring-neutral-100 bg-white p-8 shadow-xs flex flex-col">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Growth</h3>
+              <span class="inline-flex items-center rounded-full bg-[#111111] border border-[#111111] px-3 py-1 text-[12px] font-semibold text-white">Most popular</span>
+            </div>
+            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">For teams that book appointments all day long.</p>
+            <div class="mt-6 flex items-end gap-1.5">
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$129</span>
+              <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
+            </div>
+            <ul class="mt-7 space-y-3 flex-1">
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 500 answered calls / month</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Everything in Starter</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Calendar booking & rescheduling</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Two-way SMS follow-ups</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Call summaries in your inbox</li>
+            </ul>
+            <div class="mt-8">
+              <a href="../Pages/signup.html" class="btn-primary inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] transition shadow-xs">
+                Try for free
+              </a>
+            </div>
+          </div>
+          <div class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs flex flex-col">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Scale</h3>
+              
+            </div>
+            <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">For multi-location and high-volume operations.</p>
+            <div class="mt-6 flex items-end gap-1.5">
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$299</span>
+              <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
+            </div>
+            <ul class="mt-7 space-y-3 flex-1">
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Unlimited answered calls</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Everything in Growth</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Multi-location routing</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>CRM & helpdesk integrations</li>
+              <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Dedicated onboarding</li>
+            </ul>
+            <div class="mt-8">
+              <a href="../Pages/signup.html" class="border border-neutral-200/90 text-neutral-800 hover:bg-neutral-50 inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] transition shadow-xs">
+                Talk to Sales
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-neutral-100 bg-white">
+    <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-16">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-10">
+
+        <div class="md:col-span-5">
+          <a href="../index.html" class="flex items-center gap-2.5 select-none">
+            <img src="../Images/logo.png" alt="" class="h-8 w-8" />
+            <span class="font-extrabold text-xl tracking-tighter text-black">Vocallus</span>
+          </a>
+          <p class="mt-4 text-[14.5px] leading-[1.65] text-neutral-500 max-w-[340px]">
+            Answer every call, 24/7, with Solana — the AI receptionist built
+            directly into your business phone system.
+          </p>
+        </div>
+
+        <div class="md:col-span-3">
+          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Product</p>
+          <ul class="mt-5 space-y-3.5">
+              <li><a href="../Pages/products.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Products</a></li>
+              <li><a href="../Pages/solutions.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Solutions</a></li>
+              <li><a href="../Pages/pricing.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Pricing</a></li>
+              <li><a href="../Pages/resources.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Resources</a></li>
+          </ul>
+        </div>
+
+        <div class="md:col-span-2">
+          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Company</p>
+          <ul class="mt-5 space-y-3.5">
+              <li><a href="../Pages/dashboard.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Dashboard</a></li>
+              <li><a href="../Pages/talk-to-sales.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Talk to Sales</a></li>
+              <li><a href="../Pages/signup.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign up</a></li>
+              <li><a href="../Pages/login.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign in</a></li>
+          </ul>
+        </div>
+
+        <div class="md:col-span-2">
+          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Contact</p>
+          <ul class="mt-5 space-y-3.5">
+            <li><a href="mailto:hello@vocallus.example" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">hello@vocallus.example</a></li>
+            <li><a href="tel:+15550000000" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">(555) 000-0000</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="mt-14 pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p class="text-[13px] text-neutral-400">&copy; 2026 Vocallus. All rights reserved.</p>
+        <div class="flex items-center gap-5 text-[13px] text-neutral-400">
+          <a href="#" class="hover:text-[#111111] transition-colors">Privacy</a>
+          <a href="#" class="hover:text-[#111111] transition-colors">Terms</a>
+          <a href="#" class="hover:text-[#111111] transition-colors">Security</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+
+  <script>
+    (function () {
+      /* -------- Dropdown menus -------- */
+      var dropdowns = document.querySelectorAll('[data-dropdown]');
+
+      function setOpen(dd, open) {
+        dd.classList.toggle('is-open', open);
+        var t = dd.querySelector('.nav-trigger');
+        if (t) t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function closeAll(except) {
+        dropdowns.forEach(function (dd) { if (dd !== except) setOpen(dd, false); });
+      }
+
+      dropdowns.forEach(function (dd) {
+        var trigger = dd.querySelector('.nav-trigger');
+        if (!trigger) return;
+        trigger.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var willOpen = !dd.classList.contains('is-open');
+          closeAll(dd);
+          setOpen(dd, willOpen);
+        });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-dropdown]')) closeAll(null);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAll(null);
+      });
+
+      /* -------- Hash highlight in dropdowns -------- */
+      function updateHashHighlight() {
+        var hash = window.location.hash;
+        document.querySelectorAll('.nav-menu a').forEach(function (a) {
+          var href = a.getAttribute('href') || '';
+          var idx = href.indexOf('#');
+          var linkHash = idx >= 0 ? href.substring(idx) : '';
+          a.classList.toggle('nav-hash-active', !!hash && linkHash === hash);
+        });
+      }
+      window.addEventListener('hashchange', updateHashHighlight);
+      window.addEventListener('load', updateHashHighlight);
+
+      /* -------- Smooth page transitions -------- */
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+
+      document.addEventListener('click', function (e) {
+        if (e.defaultPrevented) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href.charAt(0) === '#') return;
+        if (/^(https?:|mailto:|tel:)/i.test(href)) return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
+
+        // Same-page navigation: let the browser handle it directly.
+        try {
+          var target = new URL(link.href, window.location.href);
+          if (target.pathname === window.location.pathname) return;
+        } catch (err) { /* fall through */ }
+
+        e.preventDefault();
+        document.body.classList.add('is-leaving');
+        window.setTimeout(function () { window.location.href = href; }, 180);
+        window.setTimeout(function () {
+          document.body.classList.remove('is-leaving');
+        }, 3000);
+      });
+
+      window.addEventListener('pageshow', function () {
+        document.body.classList.remove('is-leaving');
+      });
+
+      /* -------- Demo auth --------
+         Sign in  ->  any email + password "123456"      -> account "demo"
+         Sign up  ->  type "i" in all three fields       -> account "demo"
+         Legacy   ->  full name "rat"                    -> account "rat" */
+      document.querySelectorAll('form[data-demo-form]').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+
+          var nameInput    = form.querySelector('input[name="name"]');
+          var emailInput   = form.querySelector('input[name="email"]');
+          var companyInput = form.querySelector('input[name="company"]');
+          var pwInput      = form.querySelector('input[name="password"]');
+
+          var displayName = null;
+
+          // Sign-in path: any email + password 123456
+          if (pwInput && pwInput.value === '123456') {
+            displayName = 'demo';
+          }
+
+          // Any form: "i" typed in every visible field -> account "demo"
+          var allInputs = form.querySelectorAll('input');
+          var allI = allInputs.length > 0;
+          allInputs.forEach(function (input) {
+            if (input.value.trim().toLowerCase() !== 'i') allI = false;
+          });
+          if (allI) {
+            displayName = 'demo';
+          }
+
+          // Legacy fallback: full name "rat"
+          if (!displayName && nameInput
+              && nameInput.value.trim().toLowerCase() === 'rat') {
+            displayName = 'rat';
+          }
+
+          if (!displayName) {
+            alert('Demo login:
+
+' +
+                  '  Any form  ->  type "i" into every field
+' +
+                  '  Sign in   ->  any email + password "123456"');
+            return;
+          }
+
+          try {
+            localStorage.setItem('vocallus_user', JSON.stringify({
+              displayName: displayName,
+              expires: Date.now() + 30 * 24 * 60 * 60 * 1000
+            }));
+          } catch (err) { /* private mode — keep going */ }
+
+          // Navigate straight to the dashboard — no fade, no timeout.
+          var path = window.location.pathname.replace(/\/g, '/');
+          var inPages = path.indexOf('/Pages/') >= 0;
+          var target = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
+          window.location.replace(target);
+        });
+      });
+
+      /* -------- Lucide (if loaded) -------- */
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    })();
+  </script>
+
+
+
+  <!-- Demo login: goes straight to the dashboard -->
+  <script>
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!form || !form.tagName || form.tagName !== 'FORM') return;
+      if (!form.hasAttribute('data-demo-form')) return;
+
+      // Stop everything else (form's own onsubmit, other listeners).
+      e.preventDefault();
+      e.stopPropagation();
+
+      var inputs = form.querySelectorAll('input');
+      var allI = inputs.length > 0;
+      for (var i = 0; i < inputs.length; i++) {
+        if (inputs[i].value.trim().toLowerCase() !== 'i') { allI = false; break; }
+      }
+
+      var nameEl = form.querySelector('input[name="name"]');
+      var pwEl   = form.querySelector('input[name="password"]');
+
+      var displayName = null;
+      if (pwEl && pwEl.value === '123456') displayName = 'demo';
+      if (allI) displayName = 'demo';
+      if (!displayName && nameEl && nameEl.value.trim().toLowerCase() === 'rat') {
+        displayName = 'rat';
+      }
+
+      if (!displayName) {
+        alert('Demo login. Type "i" into every field, or use password "123456".');
+        return;
+      }
+
+      try {
+        localStorage.setItem('vocallus_user', JSON.stringify({ displayName: displayName }));
+      } catch (err) {}
+
+      var inPages = window.location.pathname.indexOf('/Pages/') !== -1;
+      window.location.href = inPages ? 'dashboard.html' : 'Pages/dashboard.html';
+    }, true);
+  </script>
+
+</body>
+</html>
