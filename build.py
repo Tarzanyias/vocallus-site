@@ -2612,7 +2612,7 @@ def page_history(_ctx):
 
 
 # ---- wrap render_page so solana / history use the dashboard shell ----
-_prev_render_page_2 = render_page
+_prev_render_page_2__u3 = render_page
 
 def render_page(path, builder):
     name = Path(path).name
@@ -2632,7 +2632,7 @@ def render_page(path, builder):
             content=content,
             scripts=SHARED_JS + extra,
         )
-    return _prev_render_page_2(path, builder)
+    return _prev_render_page_2__u3(path, builder)
 
 
 # ---- wrap ensure_images to also create the provider icons ----
@@ -2827,20 +2827,20 @@ FIREBASE_SCRIPT = '''
 '''
 
 # ---------- render_page: inject Firebase into every page ----------
-_prev_render_page_1 = render_page
+_prev_render_page_1__u2 = render_page
 
 def render_page(path, builder):
-    html = _prev_render_page_1(path, builder)
+    html = _prev_render_page_1__u2(path, builder)
     if "<!-- Firebase v10 modular SDK" not in html and "</head>" in html:
         html = html.replace("</head>", FIREBASE_SCRIPT + "\n</head>", 1)
     return html
 
 
 # ---------- header: signed-in Dashboard button ----------
-_prev_render_header = render_header
+_prev_render_header_2__u4 = render_header
 
 def render_header(ctx, current_page=""):
-    html = _prev_render_header(ctx, current_page)
+    html = _prev_render_header_2__u4(ctx, current_page)
     # Add a script that flips "Sign in"/"Try for free" to "Dashboard" when authed.
     swap = '''
     <script>
@@ -3898,10 +3898,10 @@ PAGES = [
 ]
 
 # ---------- render_page picks the right extra JS ----------
-_prev_render_page2 = render_page
+_prev_render_page2__u1 = render_page
 
 def render_page(path, builder):
-    html = _prev_render_page2(path, builder)
+    html = _prev_render_page2__u1(path, builder)
     name = Path(path).name
     extra = ""
     if name == "login.html":     extra = LOGIN_JS
@@ -5251,6 +5251,468 @@ PAGES = [
 ]
 
 # --- end edit.py: bug fixes for calendar/panel/buy/key ---
+
+
+
+
+# --- edit.py: smooth header auth swap ---
+
+# Strip any previous header-swap script, then inject a new one that:
+#   • fades "Sign in" out over ~220ms
+#   • fades the primary button out, swaps its text + href, fades it back in
+#   • uses "Go to Dashboard" with an arrow instead of just "Dashboard"
+#   • does nothing for signed-out visitors (default buttons stay)
+#   • honors prefers-reduced-motion (instant swap, no fade)
+
+_HEADER_SWAP_RE = re.compile(
+    r'\s*<script>\s*window\.whenFirebase && window\.whenFirebase.*?</script>',
+    re.DOTALL,
+)
+
+_NEW_HEADER_SWAP = '''
+  <script>
+    /* header-auth-swap */
+    (function () {
+      function run() {
+        var fb = window.__fb;
+        if (!fb) return;
+        var header = document.querySelector('header');
+        if (!header) return;
+
+        var login   = header.querySelector('a[href$="login.html"]');
+        var primary = header.querySelector(
+          'a[href$="signup.html"].btn-primary, ' +
+          'a[href$="signup.html"][class*="btn-primary"]'
+        );
+        if (!primary) return;
+
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduce) {
+          [login, primary].forEach(function (el) {
+            if (el) el.style.transition = 'opacity .22s ease';
+          });
+        }
+
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) return; // signed out: leave defaults alone
+
+          // Hide "Sign in"
+          if (login && !login.dataset.authSwapped) {
+            login.dataset.authSwapped = '1';
+            if (reduce) {
+              login.style.display = 'none';
+            } else {
+              login.style.opacity = '0';
+              setTimeout(function () { login.style.display = 'none'; }, 220);
+            }
+          }
+
+          // Swap primary button
+          if (!primary.dataset.authSwapped) {
+            primary.dataset.authSwapped = '1';
+
+            var swap = function () {
+              primary.setAttribute('href', 'Pages/dashboard.html');
+              primary.innerHTML =
+                'Go to Dashboard' +
+                '<svg class="w-4 h-4 ml-2" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" ' +
+                'stroke-linejoin="round">' +
+                '<path d="M5 12h14"></path><path d="M12 5l7 7-7 7"></path>' +
+                '</svg>';
+            };
+
+            if (reduce) {
+              swap();
+            } else {
+              primary.style.opacity = '0';
+              setTimeout(function () {
+                swap();
+                primary.style.opacity = '1';
+              }, 180);
+            }
+          }
+        });
+      }
+
+      if (window.__fb) run();
+      else window.addEventListener('firebase-ready', run, { once: true });
+    })();
+  </script>
+'''
+
+_prev_render_header_1__u3 = render_header
+
+def render_header(ctx, current_page=""):
+    html = _prev_render_header_1__u3(ctx, current_page)
+    html = _HEADER_SWAP_RE.sub('', html)
+    if "</header>" in html:
+        html = html.replace("</header>", _NEW_HEADER_SWAP + "\n</header>", 1)
+    return html
+
+# --- end edit.py: smooth header auth swap ---
+
+
+
+
+# --- edit.py: header auth swap (Talk to Sales / Dashboard) ---
+
+# Strip any earlier header-swap scripts so only ours runs.
+_HEADER_SWAP_RE = re.compile(
+    r'\s*<script>\s*(?:/\* header-auth-swap \*/|\s*window\.whenFirebase && window\.whenFirebase).*?</script>',
+    re.DOTALL,
+)
+
+_NEW_HEADER_SWAP = '''
+  <script>
+    /* header-auth-swap */
+    (function () {
+      function run() {
+        var fb = window.__fb;
+        if (!fb) return;
+        var header = document.querySelector('header');
+        if (!header) return;
+
+        // The bordered "Talk to Sales" — same one on every marketing page.
+        var secondary = header.querySelector(
+          'a[href$="talk-to-sales.html"]:not(.btn-primary)'
+        );
+        // The primary "Try for free" button.
+        var primary = header.querySelector(
+          'a[href$="signup.html"].btn-primary, ' +
+          'a[href$="signup.html"][class*="btn-primary"]'
+        );
+        var login = header.querySelector('a[href$="login.html"]');
+        if (!primary) return;
+
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduce) {
+          [login, primary, secondary].forEach(function (el) {
+            if (el) el.style.transition = 'opacity .2s ease';
+          });
+        }
+
+        function hide(el, ms) {
+          if (!el || el.dataset.authHidden) return;
+          el.dataset.authHidden = '1';
+          if (reduce) { el.style.display = 'none'; return; }
+          el.style.opacity = '0';
+          setTimeout(function () { el.style.display = 'none'; }, ms || 200);
+        }
+
+        function swapPrimary(text, href) {
+          if (!primary || primary.dataset.authSwapped) return;
+          primary.dataset.authSwapped = '1';
+          var apply = function () {
+            primary.textContent = text;
+            primary.setAttribute('href', href);
+            // Keep it looking like the current primary button.
+            primary.classList.add('btn-primary');
+            primary.classList.remove('border', 'border-neutral-200', 'text-neutral-800');
+          };
+          if (reduce) { apply(); return; }
+          primary.style.opacity = '0';
+          setTimeout(function () { apply(); primary.style.opacity = '1'; }, 180);
+        }
+
+        // -------- Default (signed out): relabel primary to Talk to Sales ----
+        // Do this immediately, before auth resolves, so the button is never
+        // "Try for free" for signed-out visitors.
+        swapPrimary('Talk to Sales', 'Pages/talk-to-sales.html');
+        // Now there are two Talk to Sales; keep the bordered one visible.
+
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) return;
+
+          // Signed in: hide Sign in, hide the bordered duplicate, and
+          // relabel the primary to Dashboard.
+          hide(login, 200);
+          hide(secondary, 200);
+
+          // Undo the swap flag so we can change the label again.
+          if (primary) primary.dataset.authSwapped = '';
+          swapPrimary('Dashboard', 'Pages/dashboard.html');
+        });
+      }
+
+      if (window.__fb) run();
+      else window.addEventListener('firebase-ready', run, { once: true });
+    })();
+  </script>
+'''
+
+_prev_render_header_swap__u2 = render_header
+
+def render_header(ctx, current_page=""):
+    html = _prev_render_header_swap__u2(ctx, current_page)
+    html = _HEADER_SWAP_RE.sub('', html)
+    if "</header>" in html:
+        html = html.replace("</header>", _NEW_HEADER_SWAP + "\n</header>", 1)
+    return html
+
+# --- end edit.py: header auth swap (Talk to Sales / Dashboard) ---
+
+
+
+
+# --- edit.py: hero Talk to Sales + auth swap ---
+
+# 1. Hero: "See the dashboard" -> "Talk to Sales", pointing at talk-to-sales.html
+
+_HERO_BTN_OLD = (
+    '                <a href="{ctx.u(\'Pages/dashboard.html\')}" '
+    'class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl '
+    'font-bold text-[16px] tracking-[-0.01em] border border-neutral-200 '
+    'text-neutral-800 hover:bg-neutral-50 transition">\n'
+    "                  See the dashboard\n"
+    "                </a>\n"
+)
+_HERO_BTN_NEW = (
+    '                <a href="{ctx.u(\'Pages/talk-to-sales.html\')}" '
+    'class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl '
+    'font-bold text-[16px] tracking-[-0.01em] border border-neutral-200 '
+    'text-neutral-800 hover:bg-neutral-50 transition">\n'
+    "                  Talk to Sales\n"
+    "                </a>\n"
+)
+
+# Also catch the alternative hero form (in case a prior edit changed it)
+_HERO_BTN_ALT = (
+    'href="{ctx.u(\'Pages/dashboard.html\')}" class="inline-flex items-center '
+    'justify-center px-7 py-3.5 rounded-xl font-bold text-[16px] '
+    'tracking-[-0.01em] border border-neutral-200 text-neutral-800 '
+    'hover:bg-neutral-50 transition">\n'
+    "                  See the dashboard\n"
+)
+
+_prev_page_index = page_index
+
+def page_index(ctx):
+    title, desc, content, main = _prev_page_index(ctx)
+    if "See the dashboard" in content:
+        if _HERO_BTN_OLD in content:
+            content = content.replace(_HERO_BTN_OLD, _HERO_BTN_NEW, 1)
+        else:
+            # Fallback: swap just the label + target string if exact markup drifted
+            content = content.replace(
+                "Pages/dashboard.html')}\" class=\"inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-bold text-[16px] tracking-[-0.01em] border border-neutral-200 text-neutral-800 hover:bg-neutral-50 transition\">\n                  See the dashboard",
+                "Pages/talk-to-sales.html')}\" class=\"inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-bold text-[16px] tracking-[-0.01em] border border-neutral-200 text-neutral-800 hover:bg-neutral-50 transition\">\n                  Talk to Sales",
+                1,
+            )
+            # Last-resort: just relabel
+            content = content.replace("See the dashboard", "Talk to Sales")
+    return title, desc, content, main
+
+
+# 2. Header: remove any previous swap script that relabeled the primary button
+
+_HEADER_SWAP_RE = re.compile(
+    r'\s*<script>\s*(?:/\* header-auth-swap \*/|\s*window\.whenFirebase && window\.whenFirebase).*?</script>',
+    re.DOTALL,
+)
+
+# 3. New script: leaves "Try for free" alone; swaps every "Talk to Sales"
+#    link to "Dashboard" when the user is signed in.
+
+_NEW_SWAP_SCRIPT = '''
+  <script>
+    /* talk-to-sales-auth-swap */
+    (function () {
+      function run() {
+        var fb = window.__fb;
+        if (!fb) return;
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        // Every "Talk to Sales" link on the page (header + hero).
+        function talkButtons() {
+          return Array.prototype.slice.call(
+            document.querySelectorAll('a[href$="talk-to-sales.html"]')
+          );
+        }
+
+        // Also the small bordered header button is an <a>; both get swapped.
+        var targets = talkButtons();
+        if (!targets.length) return;
+
+        if (!reduce) {
+          targets.forEach(function (el) { el.style.transition = 'opacity .2s ease'; });
+        }
+
+        function applySwap() {
+          targets.forEach(function (el) {
+            if (el.dataset.authSwapped) return;
+            el.dataset.authSwapped = '1';
+            var doIt = function () {
+              el.textContent = 'Dashboard';
+              el.setAttribute('href', 'Pages/dashboard.html');
+            };
+            if (reduce) { doIt(); return; }
+            el.style.opacity = '0';
+            setTimeout(function () { doIt(); el.style.opacity = '1'; }, 180);
+          });
+        }
+
+        // Also hide the small "Sign in" link when signed in (unchanged behavior).
+        var login = document.querySelector('header a[href$="login.html"]');
+        function hideLogin() {
+          if (!login || login.dataset.authHidden) return;
+          login.dataset.authHidden = '1';
+          if (reduce) { login.style.display = 'none'; return; }
+          login.style.opacity = '0';
+          setTimeout(function () { login.style.display = 'none'; }, 200);
+        }
+
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) return;
+          applySwap();
+          hideLogin();
+        });
+      }
+
+      if (window.__fb) run();
+      else window.addEventListener('firebase-ready', run, { once: true });
+    })();
+  </script>
+'''
+
+_prev_render_header_swap__u1 = render_header
+
+def render_header(ctx, current_page=""):
+    html = _prev_render_header_swap__u1(ctx, current_page)
+    html = _HEADER_SWAP_RE.sub('', html)
+    if "</header>" in html:
+        html = html.replace("</header>", _NEW_SWAP_SCRIPT + "\n</header>", 1)
+    # Also handle Talk to Sales buttons in the body (the hero one). Inject
+    # the same script near the end of <body> so it can find them after render.
+    return html
+
+
+# Body-level copy of the same swap (for the hero button)
+_BODY_SWAP_SCRIPT = '''
+  <script>
+    /* talk-to-sales-auth-swap-body */
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        var btns = document.querySelectorAll('main a[href$="talk-to-sales.html"]');
+        btns.forEach(function (el) {
+          if (el.dataset.authSwapped) return;
+          el.dataset.authSwapped = '1';
+          var doIt = function () {
+            el.textContent = 'Dashboard';
+            el.setAttribute('href', 'Pages/dashboard.html');
+          };
+          if (reduce) { doIt(); return; }
+          el.style.transition = 'opacity .2s ease';
+          el.style.opacity = '0';
+          setTimeout(function () { doIt(); el.style.opacity = '1'; }, 180);
+        });
+      });
+    });
+  </script>
+'''
+
+_prev_rp_hero = render_page
+
+def render_page(path, builder):
+    html = _prev_rp_hero(path, builder)
+    name = Path(path).name
+    # Only marketing pages that contain a hero "Talk to Sales" need this.
+    if name in ("index.html",) and "talk-to-sales-auth-swap-body" not in html:
+        if "</body>" in html:
+            html = html.replace("</body>", _BODY_SWAP_SCRIPT + "\n</body>", 1)
+    return html
+
+# --- end edit.py: hero Talk to Sales + auth swap ---
+
+
+
+
+# --- deepseek_python.py: header/hero auth buttons ---
+import re as _re_auth
+
+_AUTH_BTN_JS = """
+  <script type="module">
+    /* AUTH_BTN_MARKER */
+    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const cfg = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b"
+    };
+    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
+
+    // Remember the signed-out look so we can restore it on sign out.
+    document.querySelectorAll('[data-auth-swap]').forEach(a => {
+      a.dataset.label = a.textContent.trim();
+      a.dataset.href0 = a.getAttribute('href');
+      a.dataset.cls0 = a.className;
+    });
+
+    onAuthStateChanged(getAuth(app), (user) => {
+      document.querySelectorAll('[data-auth-swap]').forEach(a => {
+        if (user) {
+          a.textContent = 'Dashboard';
+          a.setAttribute('href', a.dataset.dash);
+          a.classList.remove('hidden');          // show on phones too
+          a.classList.add('inline-flex');
+        } else {
+          a.textContent = a.dataset.label;
+          a.setAttribute('href', a.dataset.href0);
+          a.className = a.dataset.cls0;
+        }
+      });
+      document.querySelectorAll('[data-auth-hide]').forEach(el => {
+        el.style.display = user ? 'none' : '';
+      });
+    });
+  </script>
+"""
+
+_APP_NAMES_AUTH = {"dashboard.html", "solana.html", "calendar.html", "history.html"}
+_prev_rp_authbtn = render_page
+
+
+def render_page(path, builder):
+    html = _prev_rp_authbtn(path, builder)
+    if Path(path).name in _APP_NAMES_AUTH:
+        return html
+
+    # Hero: "See the dashboard" -> "Talk to Sales" (becomes "Dashboard" when signed in)
+    html = _re_auth.sub(
+        r'<a href="([^"]*)Pages/dashboard\.html" class="([^"]*px-7[^"]*)">\s*See the dashboard\s*</a>',
+        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" class="\2">Talk to Sales</a>',
+        html)
+    # Hero main button text
+    html = html.replace('Get started today', 'Try for free')
+
+    # Header: Sign in (hidden when signed in)
+    html = _re_auth.sub(
+        r'<a href="([^"]*)Pages/login\.html" class="px-2 py-1\.5',
+        r'<a href="\1Pages/login.html" data-auth-hide class="px-2 py-1.5',
+        html)
+    # Header: Talk to Sales -> Dashboard when signed in
+    html = _re_auth.sub(
+        r'<a href="([^"]*)Pages/talk-to-sales\.html" class="hidden sm:inline-flex',
+        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" class="hidden sm:inline-flex',
+        html)
+    # Header: Try for free (hidden when signed in)
+    html = _re_auth.sub(
+        r'<a href="([^"]*)Pages/signup\.html" class="btn-primary inline-flex items-center justify-center px-5 py-2',
+        r'<a href="\1Pages/signup.html" data-auth-hide class="btn-primary inline-flex items-center justify-center px-5 py-2',
+        html)
+
+    if "AUTH_BTN_MARKER" not in html and "</body>" in html:
+        html = html.replace("</body>", _AUTH_BTN_JS + "\n</body>", 1)
+    return html
+
+# --- end deepseek_python.py ---
 
 
 if __name__ == "__main__":

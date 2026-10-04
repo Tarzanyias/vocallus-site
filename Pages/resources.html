@@ -234,34 +234,79 @@
       </div>
 
       <div class="flex items-center gap-3 sm:gap-4 text-[15px] font-medium">
-        <a href="../Pages/login.html" class="px-2 py-1.5 text-neutral-700 hover:text-black transition">
+        <a href="../Pages/login.html" data-auth-hide class="px-2 py-1.5 text-neutral-700 hover:text-black transition">
           Sign in
         </a>
-        <a href="../Pages/talk-to-sales.html" class="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-neutral-200/90 rounded-xl text-neutral-800 font-medium hover:bg-neutral-50 transition shadow-xs">
+        <a href="../Pages/talk-to-sales.html" data-auth-swap data-dash="../Pages/dashboard.html" class="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-neutral-200/90 rounded-xl text-neutral-800 font-medium hover:bg-neutral-50 transition shadow-xs">
           Talk to Sales
         </a>
-        <a href="../Pages/signup.html" class="btn-primary inline-flex items-center justify-center px-5 py-2 rounded-xl font-semibold shadow-sm">
+        <a href="../Pages/signup.html" data-auth-hide class="btn-primary inline-flex items-center justify-center px-5 py-2 rounded-xl font-semibold shadow-sm">
           Try for free
         </a>
       </div>
 
     </div>
-  
-    <script>
-      window.whenFirebase && window.whenFirebase(function (fb) {
+
+
+  <script>
+    /* talk-to-sales-auth-swap */
+    (function () {
+      function run() {
+        var fb = window.__fb;
+        if (!fb) return;
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        // Every "Talk to Sales" link on the page (header + hero).
+        function talkButtons() {
+          return Array.prototype.slice.call(
+            document.querySelectorAll('a[href$="talk-to-sales.html"]')
+          );
+        }
+
+        // Also the small bordered header button is an <a>; both get swapped.
+        var targets = talkButtons();
+        if (!targets.length) return;
+
+        if (!reduce) {
+          targets.forEach(function (el) { el.style.transition = 'opacity .2s ease'; });
+        }
+
+        function applySwap() {
+          targets.forEach(function (el) {
+            if (el.dataset.authSwapped) return;
+            el.dataset.authSwapped = '1';
+            var doIt = function () {
+              el.textContent = 'Dashboard';
+              el.setAttribute('href', 'Pages/dashboard.html');
+            };
+            if (reduce) { doIt(); return; }
+            el.style.opacity = '0';
+            setTimeout(function () { doIt(); el.style.opacity = '1'; }, 180);
+          });
+        }
+
+        // Also hide the small "Sign in" link when signed in (unchanged behavior).
+        var login = document.querySelector('header a[href$="login.html"]');
+        function hideLogin() {
+          if (!login || login.dataset.authHidden) return;
+          login.dataset.authHidden = '1';
+          if (reduce) { login.style.display = 'none'; return; }
+          login.style.opacity = '0';
+          setTimeout(function () { login.style.display = 'none'; }, 200);
+        }
+
         fb.onAuthStateChanged(fb.auth, function (user) {
-          var login  = document.querySelector('a[href$="login.html"].px-2');
-          var signup = document.querySelector('a[href$="signup.html"].btn-primary, a[href$="signup.html"][class*="btn-primary"]');
-          if (user) {
-            if (login)  login.style.display = 'none';
-            if (signup) {
-              signup.textContent = 'Dashboard';
-              signup.setAttribute('href', 'Pages/dashboard.html');
-            }
-          }
+          if (!user) return;
+          applySwap();
+          hideLogin();
         });
-      });
-    </script>
+      }
+
+      if (window.__fb) run();
+      else window.addEventListener('firebase-ready', run, { once: true });
+    })();
+  </script>
+
 </header>
 
   <main class="flex-1 ">
@@ -439,6 +484,48 @@
     })();
   </script>
 
+
+
+  <script type="module">
+    /* AUTH_BTN_MARKER */
+    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const cfg = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b"
+    };
+    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
+
+    // Remember the signed-out look so we can restore it on sign out.
+    document.querySelectorAll('[data-auth-swap]').forEach(a => {
+      a.dataset.label = a.textContent.trim();
+      a.dataset.href0 = a.getAttribute('href');
+      a.dataset.cls0 = a.className;
+    });
+
+    onAuthStateChanged(getAuth(app), (user) => {
+      document.querySelectorAll('[data-auth-swap]').forEach(a => {
+        if (user) {
+          a.textContent = 'Dashboard';
+          a.setAttribute('href', a.dataset.dash);
+          a.classList.remove('hidden');          // show on phones too
+          a.classList.add('inline-flex');
+        } else {
+          a.textContent = a.dataset.label;
+          a.setAttribute('href', a.dataset.href0);
+          a.className = a.dataset.cls0;
+        }
+      });
+      document.querySelectorAll('[data-auth-hide]').forEach(el => {
+        el.style.display = user ? 'none' : '';
+      });
+    });
+  </script>
 
 </body>
 </html>
