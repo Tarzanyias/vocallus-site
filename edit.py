@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-deepseek_python.py - homepage + header buttons that change when you're signed in.
+deepseek_python.py (v2) - signed-in buttons, smooth, solid black Dashboard.
 
 Run from the VP folder:
 
     python deepseek_python.py
 
-Signed OUT (anyone visiting):
+Signed OUT:
   Header:  Sign in | Talk to Sales | Try for free
-  Hero:    [Try for free]  [Talk to Sales]        (replaces "See the dashboard")
-
+  Hero:    [Try for free]  [Talk to Sales]
 Signed IN:
-  Header:  Dashboard                               (Sign in + Try for free hidden)
-  Hero:    [Try for free]  [Dashboard]
+  Header:  [Dashboard]                      (solid black, like Try for free)
+  Hero:    [Try for free]  [Dashboard]      (Dashboard solid black)
 
-Safe to run twice. Undo with:  git checkout -- .
+The auth buttons stay invisible for a split second until Firebase knows if
+you're signed in, then fade in - so nothing flashes or jumps.
+
+Replaces the v1 block if you ran the old script. Undo with:  git checkout -- .
 """
 
 import subprocess
@@ -25,43 +27,49 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 BUILD_PY = ROOT / "build.py"
 MARKER = "# --- deepseek_python.py: header/hero auth buttons ---"
+END_MARKER = "# --- end deepseek_python.py ---"
 MAIN_GUARD = 'if __name__ == "__main__":'
+
+HEADER_DASH_CLS = "btn-primary inline-flex items-center justify-center px-5 py-2 rounded-xl font-semibold shadow-sm"
+HERO_DASH_CLS = ("btn-primary inline-flex items-center justify-center px-7 py-3.5 rounded-xl "
+                 "font-bold text-[16px] tracking-[-0.01em] shadow-sm hover:shadow-md")
 
 OVERRIDE = r'''
 
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
+_AUTH_BTN_CSS = """
+  <style>
+    /* AUTH_BTN_CSS_MARKER */
+    [data-auth-swap], [data-auth-hide] { opacity: 0; transition: opacity .25s ease; }
+    html.auth-ready [data-auth-swap], html.auth-ready [data-auth-hide] { opacity: 1; }
+    .auth-gone { display: none !important; }
+    @media (prefers-reduced-motion: reduce) {
+      [data-auth-swap], [data-auth-hide] { transition: none; }
+    }
+  </style>
+"""
+
 _AUTH_BTN_JS = """
   <script type="module">
     /* AUTH_BTN_MARKER */
-    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    const root = document.documentElement;
+    // Safety net: if Firebase is slow or blocked, show the signed-out buttons anyway.
+    const fallback = setTimeout(() => root.classList.add('auth-ready'), 2500);
 
-    const cfg = {
-      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-      authDomain: "vocallus-aa81e.firebaseapp.com",
-      projectId: "vocallus-aa81e",
-      storageBucket: "vocallus-aa81e.firebasestorage.app",
-      messagingSenderId: "997486177218",
-      appId: "1:997486177218:web:7c4741dbd450549140845b"
-    };
-    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
-
-    // Remember the signed-out look so we can restore it on sign out.
     document.querySelectorAll('[data-auth-swap]').forEach(a => {
       a.dataset.label = a.textContent.trim();
       a.dataset.href0 = a.getAttribute('href');
       a.dataset.cls0 = a.className;
     });
 
-    onAuthStateChanged(getAuth(app), (user) => {
+    function apply(user) {
       document.querySelectorAll('[data-auth-swap]').forEach(a => {
         if (user) {
           a.textContent = 'Dashboard';
           a.setAttribute('href', a.dataset.dash);
-          a.classList.remove('hidden');          // show on phones too
-          a.classList.add('inline-flex');
+          a.className = a.dataset.dashCls;
         } else {
           a.textContent = a.dataset.label;
           a.setAttribute('href', a.dataset.href0);
@@ -69,9 +77,27 @@ _AUTH_BTN_JS = """
         }
       });
       document.querySelectorAll('[data-auth-hide]').forEach(el => {
-        el.style.display = user ? 'none' : '';
+        el.classList.toggle('auth-gone', !!user);
       });
-    });
+      clearTimeout(fallback);
+      requestAnimationFrame(() => root.classList.add('auth-ready'));
+    }
+
+    try {
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+      onAuthStateChanged(getAuth(app), apply);
+    } catch (e) {
+      apply(null);
+    }
   </script>
 """
 
@@ -84,36 +110,37 @@ def render_page(path, builder):
     if Path(path).name in _APP_NAMES_AUTH:
         return html
 
-    # Hero: "See the dashboard" -> "Talk to Sales" (becomes "Dashboard" when signed in)
+    # Hero: "See the dashboard" -> "Talk to Sales" (solid black "Dashboard" when signed in)
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/dashboard\.html" class="([^"]*px-7[^"]*)">\s*See the dashboard\s*</a>',
-        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" class="\2">Talk to Sales</a>',
+        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" data-dash-cls="__HERO_DASH_CLS__" class="\2">Talk to Sales</a>',
         html)
-    # Hero main button text
     html = html.replace('Get started today', 'Try for free')
 
-    # Header: Sign in (hidden when signed in)
+    # Header: Sign in (removed when signed in)
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/login\.html" class="px-2 py-1\.5',
         r'<a href="\1Pages/login.html" data-auth-hide class="px-2 py-1.5',
         html)
-    # Header: Talk to Sales -> Dashboard when signed in
+    # Header: Talk to Sales -> solid black Dashboard when signed in
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/talk-to-sales\.html" class="hidden sm:inline-flex',
-        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" class="hidden sm:inline-flex',
+        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" data-dash-cls="__HEADER_DASH_CLS__" class="hidden sm:inline-flex',
         html)
-    # Header: Try for free (hidden when signed in)
+    # Header: Try for free (removed when signed in)
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/signup\.html" class="btn-primary inline-flex items-center justify-center px-5 py-2',
         r'<a href="\1Pages/signup.html" data-auth-hide class="btn-primary inline-flex items-center justify-center px-5 py-2',
         html)
 
+    if "AUTH_BTN_CSS_MARKER" not in html and "</head>" in html:
+        html = html.replace("</head>", _AUTH_BTN_CSS + "\n</head>", 1)
     if "AUTH_BTN_MARKER" not in html and "</body>" in html:
         html = html.replace("</body>", _AUTH_BTN_JS + "\n</body>", 1)
     return html
 
 # --- end deepseek_python.py ---
-'''
+'''.replace("__HERO_DASH_CLS__", HERO_DASH_CLS).replace("__HEADER_DASH_CLS__", HEADER_DASH_CLS)
 
 
 def main() -> int:
@@ -123,24 +150,34 @@ def main() -> int:
         return 1
 
     src = BUILD_PY.read_text(encoding="utf-8")
+
+    # Remove the old (v1) block if it's there.
     if MARKER in src:
-        print("[skip] already added")
-    elif MAIN_GUARD not in src:
+        start = src.index(MARKER)
+        end = src.find(END_MARKER, start)
+        if end == -1:
+            print("error: found the old block but not its end marker - run  git checkout -- build.py  and try again")
+            return 1
+        src = src[:start] + src[end + len(END_MARKER):]
+        print("[ok] removed old version")
+
+    if MAIN_GUARD not in src:
         print('error: could not find  if __name__ == "__main__":  in build.py')
         return 1
-    else:
-        BUILD_PY.write_text(src.replace(MAIN_GUARD, OVERRIDE + "\n\n" + MAIN_GUARD, 1), encoding="utf-8")
-        print("[ok] added signed-in / signed-out buttons")
+
+    src = src.replace(MAIN_GUARD, OVERRIDE.lstrip("\n") + "\n\n" + MAIN_GUARD, 1)
+    BUILD_PY.write_text(src, encoding="utf-8")
+    print("[ok] added smooth signed-in buttons (solid black Dashboard)")
 
     print("\nRunning build.py ...\n")
     rc = subprocess.run([sys.executable, "build.py"], cwd=ROOT).returncode
 
-    index = (ROOT / "index.html").read_text(encoding="utf-8") if (ROOT / "index.html").exists() else ""
-    if "data-auth-swap" in index:
+    index = ROOT / "index.html"
+    html = index.read_text(encoding="utf-8") if index.exists() else ""
+    if "data-auth-swap" in html:
         print("\n[ok] index.html has the new buttons")
     else:
-        print("\n[warn] couldn't find the buttons in index.html - your builder may have changed them.")
-        print("       Send me index.html and I'll adjust the script.")
+        print("\n[warn] couldn't find the buttons in index.html - send me index.html and I'll adjust.")
     return rc
 
 

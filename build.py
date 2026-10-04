@@ -5629,39 +5629,43 @@ def render_page(path, builder):
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
+
+_AUTH_BTN_CSS = """
+  <style>
+    /* AUTH_BTN_CSS_MARKER */
+    [data-auth-swap], [data-auth-hide] { opacity: 0; transition: opacity .25s ease; }
+    html.auth-ready [data-auth-swap], html.auth-ready [data-auth-hide] { opacity: 1; }
+    .auth-gone { display: none !important; }
+    @media (prefers-reduced-motion: reduce) {
+      [data-auth-swap], [data-auth-hide] { transition: none; }
+    }
+  </style>
+"""
 
 _AUTH_BTN_JS = """
   <script type="module">
     /* AUTH_BTN_MARKER */
-    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    const root = document.documentElement;
+    // Safety net: if Firebase is slow or blocked, show the signed-out buttons anyway.
+    const fallback = setTimeout(() => root.classList.add('auth-ready'), 2500);
 
-    const cfg = {
-      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-      authDomain: "vocallus-aa81e.firebaseapp.com",
-      projectId: "vocallus-aa81e",
-      storageBucket: "vocallus-aa81e.firebasestorage.app",
-      messagingSenderId: "997486177218",
-      appId: "1:997486177218:web:7c4741dbd450549140845b"
-    };
-    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
-
-    // Remember the signed-out look so we can restore it on sign out.
     document.querySelectorAll('[data-auth-swap]').forEach(a => {
       a.dataset.label = a.textContent.trim();
       a.dataset.href0 = a.getAttribute('href');
       a.dataset.cls0 = a.className;
     });
 
-    onAuthStateChanged(getAuth(app), (user) => {
+    function apply(user) {
       document.querySelectorAll('[data-auth-swap]').forEach(a => {
         if (user) {
           a.textContent = 'Dashboard';
           a.setAttribute('href', a.dataset.dash);
-          a.classList.remove('hidden');          // show on phones too
-          a.classList.add('inline-flex');
+          a.className = a.dataset.dashCls;
         } else {
           a.textContent = a.dataset.label;
           a.setAttribute('href', a.dataset.href0);
@@ -5669,9 +5673,27 @@ _AUTH_BTN_JS = """
         }
       });
       document.querySelectorAll('[data-auth-hide]').forEach(el => {
-        el.style.display = user ? 'none' : '';
+        el.classList.toggle('auth-gone', !!user);
       });
-    });
+      clearTimeout(fallback);
+      requestAnimationFrame(() => root.classList.add('auth-ready'));
+    }
+
+    try {
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+      onAuthStateChanged(getAuth(app), apply);
+    } catch (e) {
+      apply(null);
+    }
   </script>
 """
 
@@ -5684,30 +5706,31 @@ def render_page(path, builder):
     if Path(path).name in _APP_NAMES_AUTH:
         return html
 
-    # Hero: "See the dashboard" -> "Talk to Sales" (becomes "Dashboard" when signed in)
+    # Hero: "See the dashboard" -> "Talk to Sales" (solid black "Dashboard" when signed in)
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/dashboard\.html" class="([^"]*px-7[^"]*)">\s*See the dashboard\s*</a>',
-        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" class="\2">Talk to Sales</a>',
+        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" data-dash-cls="btn-primary inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-bold text-[16px] tracking-[-0.01em] shadow-sm hover:shadow-md" class="\2">Talk to Sales</a>',
         html)
-    # Hero main button text
     html = html.replace('Get started today', 'Try for free')
 
-    # Header: Sign in (hidden when signed in)
+    # Header: Sign in (removed when signed in)
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/login\.html" class="px-2 py-1\.5',
         r'<a href="\1Pages/login.html" data-auth-hide class="px-2 py-1.5',
         html)
-    # Header: Talk to Sales -> Dashboard when signed in
+    # Header: Talk to Sales -> solid black Dashboard when signed in
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/talk-to-sales\.html" class="hidden sm:inline-flex',
-        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" class="hidden sm:inline-flex',
+        r'<a href="\1Pages/talk-to-sales.html" data-auth-swap data-dash="\1Pages/dashboard.html" data-dash-cls="btn-primary inline-flex items-center justify-center px-5 py-2 rounded-xl font-semibold shadow-sm" class="hidden sm:inline-flex',
         html)
-    # Header: Try for free (hidden when signed in)
+    # Header: Try for free (removed when signed in)
     html = _re_auth.sub(
         r'<a href="([^"]*)Pages/signup\.html" class="btn-primary inline-flex items-center justify-center px-5 py-2',
         r'<a href="\1Pages/signup.html" data-auth-hide class="btn-primary inline-flex items-center justify-center px-5 py-2',
         html)
 
+    if "AUTH_BTN_CSS_MARKER" not in html and "</head>" in html:
+        html = html.replace("</head>", _AUTH_BTN_CSS + "\n</head>", 1)
     if "AUTH_BTN_MARKER" not in html and "</body>" in html:
         html = html.replace("</body>", _AUTH_BTN_JS + "\n</body>", 1)
     return html
