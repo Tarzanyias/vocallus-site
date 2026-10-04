@@ -168,6 +168,25 @@
     };
   </script>
 
+
+  <script>
+    window.bridgeFetch = async function (path, opts) {
+      if (!window.__fb) throw new Error('Firebase not ready');
+      var user = window.__fb.auth.currentUser;
+      if (!user) throw new Error('Not signed in');
+      var token = await user.getIdToken();
+      opts = opts || {};
+      opts.headers = Object.assign({}, opts.headers || {}, {
+        'Authorization': 'Bearer ' + token
+      });
+      if (opts.body && typeof opts.body === 'object') {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+      }
+      return fetch('https://vocallus-bridge-production.up.railway.app' + path, opts);
+    };
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
 

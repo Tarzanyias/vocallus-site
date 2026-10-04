@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>History</title>
-  <meta name="description" content="Every call and text Solana has handled.">
+  <meta name="description" content="Every call Solana has handled.">
   <link rel="icon" type="image/png" href="../Images/favicon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -168,6 +168,25 @@
     };
   </script>
 
+
+  <script>
+    window.bridgeFetch = async function (path, opts) {
+      if (!window.__fb) throw new Error('Firebase not ready');
+      var user = window.__fb.auth.currentUser;
+      if (!user) throw new Error('Not signed in');
+      var token = await user.getIdToken();
+      opts = opts || {};
+      opts.headers = Object.assign({}, opts.headers || {}, {
+        'Authorization': 'Bearer ' + token
+      });
+      if (opts.body && typeof opts.body === 'object') {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+      }
+      return fetch('https://vocallus-bridge-production.up.railway.app' + path, opts);
+    };
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
 
@@ -226,21 +245,19 @@
             </button>
         </div>
     </nav>
-    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl shadow-[-5px_0_15px_-3px_rgba(0,0,0,0.1)]">
+    <main class="flex-1 overflow-y-auto custom-scrollbar bg-white relative rounded-tl-3xl border-l border-gray-200">
         <div class="max-w-[1100px] mx-auto px-8 py-8">
-
             <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
                 <div>
                     <h1 class="text-[28px] font-semibold text-gray-900">History</h1>
-                    <p class="text-gray-500 text-[14px] mt-0.5">Every call and text Solana has handled.</p>
+                    <p class="text-gray-500 text-[14px] mt-0.5">Every call Solana has handled.</p>
                 </div>
                 <div class="flex bg-gray-100 rounded-full p-1">
-                    <button data-filter="all" class="hist-filter px-5 py-2 rounded-full text-[14px] font-semibold bg-white shadow-sm text-gray-900">All</button>
-                    <button data-filter="call" class="hist-filter px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">Calls</button>
-                    <button data-filter="text" class="hist-filter px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">Texts</button>
+                    <button data-range="all" class="hist-filter px-5 py-2 rounded-full text-[14px] font-semibold bg-white shadow-sm text-gray-900">All</button>
+                    <button data-range="today" class="hist-filter px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">Today</button>
+                    <button data-range="week" class="hist-filter px-5 py-2 rounded-full text-[14px] font-medium text-gray-500">This week</button>
                 </div>
             </div>
-
             <div id="history-list" class="space-y-3"></div>
         </div>
     </main>
@@ -438,6 +455,101 @@
 
       render();
     })();
+  </script>
+
+
+  <script>
+    window.requireAuth && window.requireAuth();
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var uid = null, calls = [], range = 'all';
+      var $ = function (id) { return document.getElementById(id); };
+
+      function asDate(ts) { return ts && ts.toDate ? ts.toDate() : (ts ? new Date(ts) : null); }
+      function fmtPhone(n) {
+        if (!n) return '';
+        var d = String(n).replace(/\D/g, '');
+        if (d.length === 11 && d[0] === '1') d = d.slice(1);
+        if (d.length === 10) return '(' + d.slice(0,3) + ') ' + d.slice(3,6) + '-' + d.slice(6);
+        return n;
+      }
+      function fmtDur(sec) {
+        sec = sec || 0; var m = Math.floor(sec/60), s = sec % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+      }
+      function startOfDay(d) { var x = new Date(d); x.setHours(0,0,0,0); return x; }
+      function startOfWeek(d) {
+        var x = startOfDay(d); var day = x.getDay();
+        var diff = day === 0 ? -6 : 1 - day;
+        x.setDate(x.getDate() + diff); return x;
+      }
+
+      function render() {
+        var list = $('history-list');
+        var now = new Date();
+        var dayStart = startOfDay(now).getTime();
+        var weekStart = startOfWeek(now).getTime();
+        var filtered = calls.slice().sort(function (a, b) {
+          var ta = asDate(a.startedAt), tb = asDate(b.startedAt);
+          return (tb ? tb.getTime() : 0) - (ta ? ta.getTime() : 0);
+        }).filter(function (c) {
+          var t = asDate(c.startedAt); if (!t) return false;
+          if (range === 'today') return t.getTime() >= dayStart;
+          if (range === 'week') return t.getTime() >= weekStart;
+          return true;
+        });
+
+        if (!filtered.length) {
+          list.innerHTML = '<div class="py-20 text-center"><div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><svg class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><p class="text-[16px] font-medium text-gray-700">No calls in this range</p><p class="text-[13.5px] text-gray-400 mt-1">Call your Solana number to test it.</p></div>';
+          return;
+        }
+
+        list.innerHTML = '';
+        filtered.forEach(function (c) {
+          var t = asDate(c.startedAt);
+          var row = document.createElement('div');
+          row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm transition';
+          row.innerHTML =
+            '<div class="flex items-start gap-4">' +
+              '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0"><svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>' +
+              '<div class="flex-1 min-w-0">' +
+                '<div class="flex items-center gap-2 flex-wrap">' +
+                  '<div class="font-semibold text-[15px] text-gray-900">' + (fmtPhone(c.from) || 'Unknown') + '</div>' +
+                  '<div class="text-[12px] text-gray-400 ml-auto">' + (t ? t.toLocaleString() : '') + '</div>' +
+                '</div>' +
+                '<div class="text-[13px] text-gray-500 mt-1">Duration: ' + fmtDur(c.durationSec) + ' · Status: ' + ((c.status || 'completed').replace('_',' ')) + '</div>' +
+              '</div>' +
+            '</div>';
+          list.appendChild(row);
+        });
+      }
+
+      document.querySelectorAll('.hist-filter').forEach(function (b) {
+        b.addEventListener('click', function () {
+          document.querySelectorAll('.hist-filter').forEach(function (x) {
+            var on = x === b;
+            x.classList.toggle('bg-white', on); x.classList.toggle('shadow-sm', on);
+            x.classList.toggle('text-gray-900', on); x.classList.toggle('font-semibold', on);
+            x.classList.toggle('text-gray-500', !on); x.classList.toggle('font-medium', !on);
+          });
+          range = b.dataset.range;
+          render();
+        });
+      });
+
+      fb.onAuthStateChanged(fb.auth, function (u) {
+        if (!u) return;
+        uid = u.uid;
+        fb.onSnapshot(fb.collection(fb.db, 'users', uid, 'calls'), function (s) {
+          calls = [];
+          s.forEach(function (d) { var x = d.data(); x.id = d.id; calls.push(x); });
+          render();
+        });
+        var so = document.getElementById('signout-btn');
+        if (so) so.addEventListener('click', function () {
+          fb.signOut(fb.auth).then(function () { window.location.href = 'login.html'; });
+        });
+      });
+    });
   </script>
 
 </body>
