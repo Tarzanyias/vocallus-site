@@ -106,87 +106,6 @@
       html { scroll-behavior: auto; }
     }
 </style>
-
-  <!-- Firebase v10 modular SDK + helpers -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import {
-      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      signOut, updateProfile, sendPasswordResetEmail
-    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import {
-      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
-    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-      authDomain: "vocallus-aa81e.firebaseapp.com",
-      projectId: "vocallus-aa81e",
-      storageBucket: "vocallus-aa81e.firebasestorage.app",
-      messagingSenderId: "997486177218",
-      appId: "1:997486177218:web:7c4741dbd450549140845b",
-      measurementId: "G-XXWMQ90D50"
-    };
-
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-
-    window.__fb = {
-      app, auth, db,
-      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      signOut, updateProfile, sendPasswordResetEmail,
-      doc, getDoc, setDoc, updateDoc, deleteDoc,
-      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
-    };
-
-    window.dispatchEvent(new Event('firebase-ready'));
-  </script>
-  <script>
-    // Tiny helper every page script uses to wait for the module above.
-    window.whenFirebase = function (cb) {
-      if (window.__fb) return cb(window.__fb);
-      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
-    };
-    // Auth guards
-    window.requireAuth = function () {
-      window.whenFirebase(function (fb) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          if (!user) { window.location.replace('login.html'); }
-        });
-      });
-    };
-    window.redirectIfAuthed = function (dest) {
-      window.whenFirebase(function (fb) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          if (user) { window.location.replace(dest || 'dashboard.html'); }
-        });
-      });
-    };
-  </script>
-
-
-  <script>
-    window.bridgeFetch = async function (path, opts) {
-      if (!window.__fb) throw new Error('Firebase not ready');
-      var user = window.__fb.auth.currentUser;
-      if (!user) throw new Error('Not signed in');
-      var token = await user.getIdToken();
-      opts = opts || {};
-      opts.headers = Object.assign({}, opts.headers || {}, {
-        'Authorization': 'Bearer ' + token
-      });
-      if (opts.body && typeof opts.body === 'object') {
-        opts.headers['Content-Type'] = 'application/json';
-        opts.body = JSON.stringify(opts.body);
-      }
-      return fetch('https://vocallus-bridge-production.up.railway.app' + path, opts);
-    };
-  </script>
-
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
 
@@ -639,43 +558,6 @@
     });
   </script>
 
-  <script>
-    (function () {
-      if (window.__vocallusProviderSelect) return;
-      window.__vocallusProviderSelect = true;
-
-      // Inject the CSS once. .selected is a plain class, so Tailwind
-      // doesn't need to know about it — the browser applies it directly.
-      var style = document.createElement('style');
-      style.textContent =
-        '.provider-card{position:relative;transition:border-color .15s ease,box-shadow .15s ease;}' +
-        '.provider-card.selected{border-color:#111111 !important;box-shadow:0 0 0 3px rgba(17,17,17,.10) !important;}' +
-        '.provider-card .selected-badge{display:none !important;}' +
-        '.provider-card.selected .selected-badge{display:inline-flex !important;}';
-      document.head.appendChild(style);
-
-      // Event delegation in the capture phase, so nothing else can stop
-      // the click before we see it.
-      document.addEventListener('click', function (e) {
-        var card = e.target && e.target.closest ? e.target.closest('.provider-card') : null;
-        if (!card) return;
-        var cards = document.querySelectorAll('.provider-card');
-        for (var i = 0; i < cards.length; i++) {
-          cards[i].classList.toggle('selected', cards[i] === card);
-        }
-      }, true);
-
-      // If a provider was already saved, mark it selected on load.
-      try {
-        var saved = JSON.parse(localStorage.getItem('vocallus_ai') || 'null');
-        if (saved && saved.provider) {
-          var match = document.querySelector('.provider-card[data-provider="' + saved.provider + '"]');
-          if (match) match.classList.add('selected');
-        }
-      } catch (e) {}
-    })();
-  </script>
-
 
   <script>
     // Hide main until Firebase auth resolves; then fade in.
@@ -749,99 +631,94 @@
 
 
   <script>
+    /* SOLANA_KEY_FIX_MARKER */
     window.whenFirebase && window.whenFirebase(function (fb) {
       var $ = function (id) { return document.getElementById(id); };
-      var DEFAULT_TPL = "You are {NAME}, the friendly receptionist for {BUSINESS}. Greet callers warmly, ask how you can help, and keep every reply short and natural, like a real person on the phone. If they want an appointment, find a day and time that works, get their name, and confirm the day and time back to them. If you can't help with something, offer to take a message and say someone will call them back.";
-      var uid = null, business = 'our business', prevName = 'Solana';
-      var nameInput = $('agent-name'), promptArea = $('system-prompt');
-      if (!nameInput || !promptArea) return;
+      var keyInput = $('api-key');
+      var saveBtn  = $('save-key');
+      var savedBox = $('key-saved');
+      var masked   = $('key-masked');
+      var replaceBtn = $('key-replace');
+      if (!keyInput || !saveBtn || !savedBox) return;
 
-      function buildDefault(name, biz) {
-        return DEFAULT_TPL.replace('{NAME}', name || 'Solana').replace('{BUSINESS}', biz || 'our business');
-      }
-
-      function applyUser(d) {
-        business = (d && d.company) || 'our business';
-        var name = (d && d.agentName) || 'Solana';
-        var prompt = (d && d.systemPrompt) || buildDefault(name, business);
-        if (!nameInput.value) nameInput.value = name;
-        if (!promptArea.value) promptArea.value = prompt;
-        prevName = name;
-        var disp = $('agent-name-display');
-        if (disp) disp.textContent = name;
-      }
-
-      fb.onAuthStateChanged(fb.auth, function (u) {
-        if (!u) return;
-        uid = u.uid;
-        fb.getDoc(fb.doc(fb.db, 'users', uid)).then(function (snap) {
-          if (snap.exists()) applyUser(snap.data());
-          else applyUser({});
+      var keyDocRef = null;
+      fb.onAuthStateChanged(fb.auth, function (user) {
+        if (!user) return;
+        keyDocRef = fb.doc(fb.db, 'users', user.uid, 'private', 'ai');
+        // Load existing
+        fb.getDoc(keyDocRef).then(function (snap) {
+          if (snap.exists()) {
+            var d = snap.data();
+            var k = d.apiKey || '';
+            masked.textContent = k.slice(0, 4) + '\u2026' + k.slice(-4);
+            savedBox.classList.remove('hidden');
+            keyInput.style.display = 'none';
+            saveBtn.style.display = 'none';
+          }
         });
       });
 
-      // Live name -> prompt swap + sidebar card
-      nameInput.addEventListener('input', function () {
-        var oldName = prevName;
-        var newName = nameInput.value || 'Solana';
-        // Replace whole-word occurrences of oldName in the prompt
-        if (oldName && oldName.length >= 2) {
-          var re = new RegExp('\\b' + oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-          promptArea.value = promptArea.value.replace(re, newName);
+      replaceBtn.addEventListener('click', function () {
+        savedBox.classList.add('hidden');
+        keyInput.value = '';
+        keyInput.style.display = '';
+        saveBtn.style.display = '';
+        keyInput.focus();
+      });
+
+      // NOTE: the original save-key listener still fires too, but our new
+      // listener (added later) will handle the same click. To avoid double
+      // handling, capture the click in a capture-phase listener and stop
+      // propagation before the old one runs.
+      saveBtn.addEventListener('click', async function (e) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        var errBox = $('api-error'), errTitle = $('api-error-title'), errMsg = $('api-error-msg');
+        function showErr(t, m) { errTitle.textContent = t; errMsg.textContent = m; errBox.classList.remove('hidden'); }
+        function hideErr() { errBox.classList.add('hidden'); }
+        hideErr();
+
+        var user = fb.auth.currentUser;
+        if (!user) { showErr('Not signed in', 'Please sign in again.'); return; }
+
+        // Provider detection: whichever .provider-card has the black ring
+        var active = document.querySelector('.provider-card.border-black, .provider-card.selected');
+        var provider = active ? active.dataset.provider : null;
+        if (!provider) { showErr('No provider selected', 'Pick a provider above.'); return; }
+
+        var key = keyInput.value.trim();
+        if (!key) { showErr('API key required', 'Paste a key from your ' + provider + ' account.'); return; }
+
+        var orig = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Checking key\u2026';
+        try {
+          if (provider === 'gemini') {
+            var r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key));
+            if (!r.ok) throw new Error("That key didn't work. Check it and try again.");
+          } else if (provider === 'openai') {
+            if (key.indexOf('sk-') !== 0) throw new Error('OpenAI keys start with "sk-".');
+          } else if (provider === 'claude') {
+            if (key.indexOf('sk-ant-') !== 0) throw new Error('Claude keys start with "sk-ant-".');
+          }
+          var model = provider === 'gemini' ? 'gemini-2.5-flash'
+                    : provider === 'openai' ? 'gpt-4o-mini'
+                    : 'claude-3-5-haiku-20241022';
+          await fb.setDoc(fb.doc(fb.db, 'users', user.uid, 'private', 'ai'), {
+            provider: provider, apiKey: key, model: model
+          });
+          masked.textContent = key.slice(0, 4) + '\u2026' + key.slice(-4);
+          savedBox.classList.remove('hidden');
+          keyInput.value = '';
+          keyInput.style.display = 'none';
+          saveBtn.style.display = 'none';
+        } catch (err) {
+          showErr('Key check failed', err.message || String(err));
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = orig;
         }
-        prevName = newName;
-        var disp = $('agent-name-display');
-        if (disp) disp.textContent = newName;
-      });
-
-      // Reset to default
-      var resetLink = document.createElement('button');
-      resetLink.type = 'button';
-      resetLink.className = 'mt-2 text-[12.5px] font-medium text-gray-500 hover:text-black underline';
-      resetLink.textContent = 'Reset to default';
-      resetLink.addEventListener('click', function () {
-        promptArea.value = buildDefault(nameInput.value || 'Solana', business);
-      });
-      promptArea.parentNode.appendChild(resetLink);
-
-      // Save both
-      var saveBtn = $('save-prompt');
-      if (saveBtn) {
-        saveBtn.addEventListener('click', function () {
-          if (!uid) return;
-          var btn = this; btn.textContent = 'Saving…';
-          fb.updateDoc(fb.doc(fb.db, 'users', uid), {
-            agentName: nameInput.value.trim() || 'Solana',
-            systemPrompt: promptArea.value.trim()
-          }).then(function () {
-            btn.textContent = 'Saved';
-            setTimeout(function () { btn.textContent = 'Save changes'; }, 1200);
-          }).catch(function () { btn.textContent = 'Save changes'; });
-        });
-      }
-
-      // Presets use current agent name
-      var PRESETS = {
-        voice: 'You are {NAME}, a warm and friendly AI receptionist. Greet callers by name when possible, use natural conversational language, and always confirm the reason for the call before wrapping up.',
-        booking: 'You are {NAME}, a booking-focused AI receptionist. Capture the caller\'s name, preferred date, preferred time, and reason for visit, then confirm the appointment slot back to them.',
-        support: 'You are {NAME}, a helpful support agent. Answer common questions clearly and briefly. If something is outside your knowledge, offer to take a callback message.'
-      };
-      document.querySelectorAll('.preset-btn').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var tpl = PRESETS[b.dataset.preset] || '';
-          promptArea.value = tpl.replace(/\{NAME\}/g, nameInput.value || 'Solana');
-        });
-      });
-
-      // Default Gemini selected if no saved key
-      fb.getDoc(fb.doc(fb.db, 'users', uid, 'private', 'ai')).then(function (snap) {
-        var provider = snap.exists() ? (snap.data().provider || 'gemini') : 'gemini';
-        var card = document.querySelector('.provider-card[data-provider="' + provider + '"]');
-        if (card) card.click();
-      }).catch(function () {
-        var card = document.querySelector('.provider-card[data-provider="gemini"]');
-        if (card) card.click();
-      });
+      }, true);  // capture phase: runs before the old listener
     });
   </script>
 

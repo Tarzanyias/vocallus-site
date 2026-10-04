@@ -106,87 +106,6 @@
       html { scroll-behavior: auto; }
     }
 </style>
-
-  <!-- Firebase v10 modular SDK + helpers -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import {
-      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      signOut, updateProfile, sendPasswordResetEmail
-    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import {
-      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
-    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-      authDomain: "vocallus-aa81e.firebaseapp.com",
-      projectId: "vocallus-aa81e",
-      storageBucket: "vocallus-aa81e.firebasestorage.app",
-      messagingSenderId: "997486177218",
-      appId: "1:997486177218:web:7c4741dbd450549140845b",
-      measurementId: "G-XXWMQ90D50"
-    };
-
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-
-    window.__fb = {
-      app, auth, db,
-      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      signOut, updateProfile, sendPasswordResetEmail,
-      doc, getDoc, setDoc, updateDoc, deleteDoc,
-      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
-    };
-
-    window.dispatchEvent(new Event('firebase-ready'));
-  </script>
-  <script>
-    // Tiny helper every page script uses to wait for the module above.
-    window.whenFirebase = function (cb) {
-      if (window.__fb) return cb(window.__fb);
-      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
-    };
-    // Auth guards
-    window.requireAuth = function () {
-      window.whenFirebase(function (fb) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          if (!user) { window.location.replace('login.html'); }
-        });
-      });
-    };
-    window.redirectIfAuthed = function (dest) {
-      window.whenFirebase(function (fb) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          if (user) { window.location.replace(dest || 'dashboard.html'); }
-        });
-      });
-    };
-  </script>
-
-
-  <script>
-    window.bridgeFetch = async function (path, opts) {
-      if (!window.__fb) throw new Error('Firebase not ready');
-      var user = window.__fb.auth.currentUser;
-      if (!user) throw new Error('Not signed in');
-      var token = await user.getIdToken();
-      opts = opts || {};
-      opts.headers = Object.assign({}, opts.headers || {}, {
-        'Authorization': 'Bearer ' + token
-      });
-      if (opts.body && typeof opts.body === 'object') {
-        opts.headers['Content-Type'] = 'application/json';
-        opts.body = JSON.stringify(opts.body);
-      }
-      return fetch('https://vocallus-bridge-production.up.railway.app' + path, opts);
-    };
-  </script>
-
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
 
@@ -534,294 +453,6 @@
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     })();
   </script>
-
-  <script>
-    // ============================================================
-    // SIMULATED DATA — swap each block for a Firebase read when ready.
-    // ============================================================
-    // TODO: getAuth().currentUser
-    const mockUser = { displayName: 'Taymoor A.' };
-
-    // TODO: Firestore query on `calls` ordered by createdAt desc.
-    const mockCalls = [
-        { id: 'c1', type: 'answered', caller: 'Maya R.', phone: '(415) 555-0128',
-          postedAt: '6 hours ago', duration: '2:47',
-          summary: 'Reschedule her Thursday appointment to Friday at 10am.',
-          tags: ['Appointment', 'Reschedule'],
-          action: { label: 'Moved to Fri 10:00', kind: 'booked' }, verified: true },
-        { id: 'c2', type: 'answered', caller: 'Unknown', phone: '(628) 555-0114',
-          postedAt: '5 hours ago', duration: '0:52',
-          summary: 'Asked whether you offer emergency after-hours service. Said Solana would have someone call back within the hour.',
-          tags: ['After hours', 'FAQ'],
-          action: { label: 'Callback queued', kind: 'transfer' }, verified: true },
-        { id: 'c3', type: 'missed', caller: 'Daniel K.', phone: '(510) 555-0177',
-          postedAt: '4 hours ago', duration: '—',
-          summary: 'Caller hung up before Solana finished the greeting.',
-          tags: ['Missed'], action: null, verified: false },
-        { id: 'c4', type: 'appointment', caller: 'Patricia L.', phone: '(650) 555-0142',
-          postedAt: '3 hours ago', duration: '3:12',
-          summary: 'Booked a new consultation for Tuesday at 2:15pm and confirmed by text.',
-          tags: ['Booked', 'New client'],
-          action: { label: 'Tue 14:15 confirmed', kind: 'booked' }, verified: true },
-        { id: 'c5', type: 'answered', caller: 'Marcus B.', phone: '(415) 555-0199',
-          postedAt: '2 hours ago', duration: '1:35',
-          summary: 'Wants a quote for a recurring monthly service. Left email and asked for a call back tomorrow morning.',
-          tags: ['Quote', 'Sales'],
-          action: { label: 'Callback requested', kind: 'transfer' }, verified: true },
-        { id: 'c6', type: 'transferred', caller: 'Nina S.', phone: '(925) 555-0101',
-          postedAt: '48 min ago', duration: '0:38',
-          summary: 'Urgent — water heater leaking. Warm-transferred to your on-call line.',
-          tags: ['Urgent', 'Transfer'],
-          action: { label: 'Rang on-call', kind: 'transfer' }, verified: true },
-    ];
-
-    // TODO: aggregated rollup doc.
-    const mockStats = { answered: 14, messages: 9, appointments: 6, duration: '2:11' };
-
-    // TODO: 7-day aggregation query.
-    const mockChart = [
-        { day: 'Mon', answered: 9, missed: 1 },
-        { day: 'Tue', answered: 12, missed: 2 },
-        { day: 'Wed', answered: 15, missed: 0 },
-        { day: 'Thu', answered: 11, missed: 3 },
-        { day: 'Fri', answered: 18, missed: 1 },
-        { day: 'Sat', answered: 14, missed: 2 },
-        { day: 'Sun', answered: 16, missed: 1 },
-    ];
-
-    // TODO: Firestore onSnapshot on tenant activity.
-    const mockActivity = [
-        { time: 'Just now', text: 'Solana answered a call from Maya R.', kind: 'call' },
-        { time: '3 min ago', text: 'New appointment booked for Tuesday.', kind: 'booking' },
-        { time: '12 min ago', text: 'Text confirmation sent to Nina S.', kind: 'sms' },
-        { time: '1 hr ago', text: 'Missed call logged from Daniel K.', kind: 'missed' },
-        { time: '2 hr ago', text: 'Message captured from Marcus B.', kind: 'message' },
-    ];
-
-    // ============================================================
-    // RENDER
-    // ============================================================
-    document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {
-        weekday: 'long', month: 'long', day: 'numeric'
-    });
-    document.getElementById('user-name').textContent = mockUser.displayName;
-    document.getElementById('banner-calls').textContent = mockStats.answered;
-
-    function countUp(el, target) {
-        const start = performance.now(), duration = 700;
-        function tick(t) {
-            const p = Math.min((t - start) / duration, 1);
-            const eased = 1 - Math.pow(1 - p, 3);
-            el.textContent = Math.round(target * eased);
-            if (p < 1) requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
-    }
-    countUp(document.querySelector('[data-stat="answered"]'), mockStats.answered);
-    countUp(document.querySelector('[data-stat="messages"]'), mockStats.messages);
-    countUp(document.querySelector('[data-stat="appointments"]'), mockStats.appointments);
-    document.querySelector('[data-stat="duration"]').textContent = mockStats.duration;
-
-    (function renderChart() {
-        const chart = document.getElementById('chart');
-        const labels = document.getElementById('chart-labels');
-        const max = Math.max(...mockChart.map(d => d.answered + d.missed));
-        mockChart.forEach(d => {
-            const total = d.answered + d.missed;
-            const h = (total / max) * 100;
-            const ap = total === 0 ? 0 : (d.answered / total) * 100;
-            const col = document.createElement('div');
-            col.className = 'flex-1 h-full flex flex-col justify-end gap-0.5';
-            col.innerHTML = `
-                <div class="spark-bar rounded-t-md bg-gray-300" style="height: ${h * (1 - ap/100)}%"></div>
-                <div class="spark-bar rounded-b-md bg-black" style="height: ${h * (ap/100)}%"></div>
-            `;
-            chart.appendChild(col);
-            const lbl = document.createElement('div');
-            lbl.className = 'flex-1 text-center';
-            lbl.textContent = d.day;
-            labels.appendChild(lbl);
-        });
-    })();
-
-    const callList = document.getElementById('call-list');
-    let currentFilter = 'all';
-    let currentSearch = '';
-
-    function renderCalls() {
-        callList.innerHTML = '';
-        const filtered = mockCalls.filter(c => {
-            const matchesTab = currentFilter === 'all' || c.type === currentFilter;
-            const n = currentSearch.toLowerCase();
-            const matchesSearch = !n
-                || c.caller.toLowerCase().includes(n)
-                || c.phone.toLowerCase().includes(n)
-                || c.summary.toLowerCase().includes(n)
-                || c.tags.some(t => t.toLowerCase().includes(n));
-            return matchesTab && matchesSearch;
-        });
-
-        if (!filtered.length) {
-            callList.innerHTML = `<div class="py-16 text-center"><p class="text-gray-400 text-[15px]">No calls match your filters.</p></div>`;
-            return;
-        }
-
-        const tagClass = 'bg-[#f2f2f2] text-gray-600 text-[13px] px-3 py-1 rounded-full font-medium';
-        filtered.forEach(c => {
-            const actionHtml = c.action
-                ? `<span class="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full">
-                       <span class="w-1.5 h-1.5 rounded-full ${c.action.kind === 'booked' ? 'bg-green-500' : 'bg-orange-500'}"></span>
-                       ${c.action.label}
-                   </span>` : '';
-            const row = document.createElement('div');
-            row.className = 'bg-white p-6 pb-8 border-b border-gray-200 relative group';
-            row.innerHTML = `
-                <div class="absolute right-6 top-6 flex space-x-2">
-                    <button class="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors border border-transparent hover:border-gray-200"><i data-lucide="thumbs-down" class="w-[18px] h-[18px]"></i></button>
-                    <button class="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors border border-transparent hover:border-gray-200"><i data-lucide="heart" class="w-[18px] h-[18px]"></i></button>
-                </div>
-                <div class="text-[13px] text-gray-500 mb-2">${c.postedAt} <span class="mx-1">•</span> Duration: ${c.duration}</div>
-                <h2 class="text-xl font-medium text-gray-900 mb-2 hover:text-black cursor-pointer w-4/5">${c.caller}<span class="text-[13px] font-normal text-gray-400 ml-2">${c.phone}</span></h2>
-                <p class="text-[15px] text-gray-800 mb-4 leading-[1.6]">${c.summary}</p>
-                <div class="flex flex-wrap gap-2 mb-4">${c.tags.map(t => `<span class="${tagClass}">${t}</span>`).join('')}</div>
-                <div class="flex items-center justify-between gap-4 flex-wrap">
-                    <div class="flex items-center text-[13px] text-gray-600 space-x-4">
-                        ${c.verified
-                            ? `<div class="flex items-center text-gray-800 font-medium"><svg class="w-4 h-4 mr-1 text-blue-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Verified caller</div>`
-                            : `<div class="flex items-center text-gray-500 font-medium"><svg class="w-4 h-4 mr-1 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>Unverified</div>`}
-                    </div>
-                    ${actionHtml}
-                </div>
-            `;
-            callList.appendChild(row);
-        });
-        if (window.lucide) lucide.createIcons();
-    }
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => {
-                b.classList.remove('text-black', 'border-b-2', 'border-black');
-                b.classList.add('text-gray-600');
-            });
-            btn.classList.remove('text-gray-600');
-            btn.classList.add('text-black', 'border-b-2', 'border-black');
-            currentFilter = btn.dataset.tab;
-            renderCalls();
-        });
-    });
-    document.getElementById('call-search').addEventListener('input', e => {
-        currentSearch = e.target.value.trim();
-        renderCalls();
-    });
-    renderCalls();
-
-    (function renderActivity() {
-        const feed = document.getElementById('activity-feed');
-        const iconMap = {
-            call:    { icon: 'phone',         bg: 'bg-black' },
-            booking: { icon: 'calendar',      bg: 'bg-black' },
-            sms:     { icon: 'message-circle', bg: 'bg-gray-700' },
-            missed:  { icon: 'phone-missed',  bg: 'bg-gray-400' },
-            message: { icon: 'mail',          bg: 'bg-gray-700' },
-        };
-        mockActivity.forEach(a => {
-            const conf = iconMap[a.kind] || iconMap.call;
-            const el = document.createElement('div');
-            el.className = 'flex items-start gap-3';
-            el.innerHTML = `
-                <div class="w-8 h-8 rounded-full ${conf.bg} flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <i data-lucide="${conf.icon}" class="w-4 h-4 text-white"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-[14px] text-gray-800 leading-[1.5]">${a.text}</p>
-                    <p class="text-[12px] text-gray-400 mt-0.5">${a.time}</p>
-                </div>
-            `;
-            feed.appendChild(el);
-        });
-        if (window.lucide) lucide.createIcons();
-    })();
-
-    document.getElementById('signout-btn').addEventListener('click', () => {
-        try { localStorage.removeItem('vocallus_user'); } catch (e) {}
-        window.location.href = 'login.html';
-    });
-
-    // Sidebar tab switching — swap panels, no reload.
-    (function () {
-        var tabs = document.querySelectorAll('.dash-tab');
-        var panels = document.querySelectorAll('.panel');
-
-        function activate(name) {
-            tabs.forEach(function (t) {
-                var on = t.dataset.panel === name;
-                t.classList.toggle('bg-gray-200/80', on);
-                t.classList.toggle('text-gray-900', on);
-                t.classList.toggle('text-gray-500', !on);
-                var bar = t.querySelector('.dash-bar');
-                if (bar) {
-                    bar.classList.toggle('opacity-100', on);
-                    bar.classList.toggle('opacity-0', !on);
-                }
-            });
-            panels.forEach(function (p) {
-                p.classList.toggle('hidden', p.id !== 'panel-' + name);
-            });
-        }
-
-        tabs.forEach(function (t) {
-            t.addEventListener('click', function (e) {
-                var href = t.getAttribute('href') || '';
-                // Real navigation links (solana.html, history.html) let the
-                // browser handle it — only intercept in-page tab links.
-                if (href.indexOf('#') === -1) return;
-                e.preventDefault();
-                activate(t.dataset.panel);
-                if (history.replaceState) {
-                    history.replaceState(null, '', '#' + t.dataset.panel);
-                }
-            });
-        });
-
-        // Activate the panel matching the URL hash on load.
-        var initialHash = (window.location.hash || '').replace('#', '');
-        if (initialHash && document.getElementById('panel-' + initialHash)) {
-            activate(initialHash);
-        }
-    })();
-  </script>
-
-
-  <script>
-    window.requireAuth && window.requireAuth();
-    window.whenFirebase && window.whenFirebase(function (fb) {
-      fb.onAuthStateChanged(fb.auth, function (user) {
-        if (!user) return;
-        var nameEl = document.getElementById('user-name');
-        if (nameEl) nameEl.textContent = user.displayName || (user.email || '').split('@')[0] || 'there';
-        fb.getDoc(fb.doc(fb.db, 'users', user.uid)).then(function (snap) {
-          if (!snap.exists()) return;
-          var d = snap.data();
-          // Update any element that shows plan or current number.
-          document.querySelectorAll('[data-bind="plan"]').forEach(function (el) {
-            el.textContent = (d.plan && d.plan !== 'none') ? d.plan[0].toUpperCase() + d.plan.slice(1) : 'None';
-          });
-          document.querySelectorAll('[data-bind="number"]').forEach(function (el) {
-            el.textContent = d.phoneNumber || 'None';
-          });
-          document.querySelectorAll('[data-bind="agentName"]').forEach(function (el) {
-            el.textContent = d.agentName || 'Solana';
-          });
-        });
-        var so = document.getElementById('signout-btn');
-        if (so) so.addEventListener('click', function () {
-          fb.signOut(fb.auth).then(function () { window.location.href = 'login.html'; });
-        });
-      });
-    });
-  </script>
-
 
   <script>
     window.requireAuth && window.requireAuth();
@@ -1206,6 +837,120 @@
       if (initial && document.getElementById('panel-' + initial)) activate(initial);
       else activate('home');
     })();
+  </script>
+
+
+  <script>
+    /* PANEL_FIX_MARKER */
+    (function () {
+      var path = window.location.pathname.replace(/\\/g, '/');
+      if (!/dashboard\.html$/.test(path)) return;
+
+      function activate(name) {
+        document.querySelectorAll('.panel').forEach(function (p) {
+          p.classList.toggle('hidden', p.id !== 'panel-' + name);
+        });
+        document.querySelectorAll('.app-tab[data-nav]').forEach(function (t) {
+          var on = t.dataset.nav === name;
+          t.classList.toggle('bg-gray-200/80', on);
+          t.classList.toggle('text-gray-900', on);
+          t.classList.toggle('text-gray-500', !on);
+          var bar = t.querySelector('.app-bar');
+          if (bar) {
+            bar.classList.toggle('opacity-100', on);
+            bar.classList.toggle('opacity-0', !on);
+          }
+        });
+      }
+
+      document.querySelectorAll('.app-tab[data-nav]').forEach(function (t) {
+        t.addEventListener('click', function (e) {
+          var href = t.getAttribute('href') || '';
+          var i = href.indexOf('#');
+          if (i === -1) return;
+          var target = href.slice(0, i);
+          if (target && target !== 'dashboard.html') return;
+          var panel = href.slice(i + 1);
+          if (!document.getElementById('panel-' + panel)) return;
+          e.preventDefault();
+          activate(panel);
+          if (history.replaceState) history.replaceState(null, '', '#' + panel);
+        });
+      });
+
+      var initial = (location.hash || '').replace('#', '') || 'home';
+      if (!document.getElementById('panel-' + initial)) initial = 'home';
+      activate(initial);
+
+      window.addEventListener('hashchange', function () {
+        var h = (location.hash || '').replace('#', '') || 'home';
+        if (document.getElementById('panel-' + h)) activate(h);
+      });
+    })();
+  </script>
+
+  <script>
+    /* NUMBER_BUY_FIX_MARKER */
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var $ = function (id) { return document.getElementById(id); };
+      var searchBtn = $('search-numbers');
+      if (!searchBtn) return;
+
+      searchBtn.addEventListener('click', async function () {
+        var ac = ($('area-code').value || '').trim();
+        var status = $('search-status');
+        var results = $('search-results');
+        results.innerHTML = '';
+        if (!/^\d{3}$/.test(ac)) { status.textContent = 'Enter a 3-digit area code.'; return; }
+        status.textContent = 'Searching…';
+        searchBtn.disabled = true;
+        try {
+          var r = await window.bridgeFetch('/api/numbers/search?areaCode=' + ac);
+          var data = await r.json();
+          if (!r.ok) throw new Error(data.error || ('Search failed (' + r.status + ')'));
+          var list = (data && data.numbers) ? data.numbers : [];
+          if (!list.length) {
+            status.textContent = 'No numbers in that area code, try another.';
+            return;
+          }
+          status.textContent = list.length + ' number' + (list.length === 1 ? '' : 's') + ' available';
+          list.forEach(function (item) {
+            var row = document.createElement('div');
+            row.className = 'flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3';
+            row.innerHTML =
+              '<div>' +
+                '<div class="font-semibold text-[15px] text-gray-900">' + (item.friendlyName || item.phoneNumber) + '</div>' +
+                '<div class="text-[12px] text-gray-500">' + ((item.locality || '') + (item.region ? ', ' + item.region : '')) + '</div>' +
+              '</div>' +
+              '<button class="choose-btn btn-primary px-4 py-2 rounded-lg font-semibold text-[13px]">Choose</button>';
+            var btn = row.querySelector('.choose-btn');
+            btn.addEventListener('click', async function () {
+              if (!confirm('Assign ' + (item.friendlyName || item.phoneNumber) + ' to your account?')) return;
+              var allBtns = document.querySelectorAll('.choose-btn');
+              allBtns.forEach(function (b) { b.disabled = true; b.style.opacity = '0.5'; });
+              status.textContent = 'Setting up your number…';
+              try {
+                var resp = await window.bridgeFetch('/api/numbers/buy', {
+                  method: 'POST',
+                  body: { phoneNumber: item.phoneNumber }
+                });
+                var j = await resp.json();
+                if (!resp.ok) throw new Error(j.error || ('Purchase failed (' + resp.status + ')'));
+                status.textContent = 'Number assigned!';
+              } catch (err) {
+                status.textContent = err.message || String(err);
+                allBtns.forEach(function (b) { b.disabled = false; b.style.opacity = ''; });
+              }
+            });
+            results.appendChild(row);
+          });
+        } catch (err) {
+          status.textContent = err.message || String(err);
+        } finally {
+          searchBtn.disabled = false;
+        }
+      });
+    });
   </script>
 
 </body>

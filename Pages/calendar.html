@@ -106,165 +106,9 @@
       html { scroll-behavior: auto; }
     }
 </style>
-
-  <!-- Firebase v10 modular SDK + helpers -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import {
-      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      signOut, updateProfile, sendPasswordResetEmail
-    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import {
-      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
-    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-      authDomain: "vocallus-aa81e.firebaseapp.com",
-      projectId: "vocallus-aa81e",
-      storageBucket: "vocallus-aa81e.firebasestorage.app",
-      messagingSenderId: "997486177218",
-      appId: "1:997486177218:web:7c4741dbd450549140845b",
-      measurementId: "G-XXWMQ90D50"
-    };
-
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-
-    window.__fb = {
-      app, auth, db,
-      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      signOut, updateProfile, sendPasswordResetEmail,
-      doc, getDoc, setDoc, updateDoc, deleteDoc,
-      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
-    };
-
-    window.dispatchEvent(new Event('firebase-ready'));
-  </script>
-  <script>
-    // Tiny helper every page script uses to wait for the module above.
-    window.whenFirebase = function (cb) {
-      if (window.__fb) return cb(window.__fb);
-      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
-    };
-    // Auth guards
-    window.requireAuth = function () {
-      window.whenFirebase(function (fb) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          if (!user) { window.location.replace('login.html'); }
-        });
-      });
-    };
-    window.redirectIfAuthed = function (dest) {
-      window.whenFirebase(function (fb) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          if (user) { window.location.replace(dest || 'dashboard.html'); }
-        });
-      });
-    };
-  </script>
-
-
-  <script>
-    window.bridgeFetch = async function (path, opts) {
-      if (!window.__fb) throw new Error('Firebase not ready');
-      var user = window.__fb.auth.currentUser;
-      if (!user) throw new Error('Not signed in');
-      var token = await user.getIdToken();
-      opts = opts || {};
-      opts.headers = Object.assign({}, opts.headers || {}, {
-        'Authorization': 'Bearer ' + token
-      });
-      if (opts.body && typeof opts.body === 'object') {
-        opts.headers['Content-Type'] = 'application/json';
-        opts.body = JSON.stringify(opts.body);
-      }
-      return fetch('https://vocallus-bridge-production.up.railway.app' + path, opts);
-    };
-  </script>
-
 </head>
-<body class="bg-white text-neutral-900 min-h-screen flex flex-col justify-between">
+<body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
 
-  <header class="w-full bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-neutral-100">
-    <div class="max-w-[1400px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
-
-      <div class="flex items-center gap-10">
-        <a href="../index.html" class="flex items-center gap-2.5 select-none hover:opacity-90 transition">
-          <img src="../Images/logo.png" alt="" class="h-9 w-9" />
-          <span class="font-extrabold text-2xl tracking-tighter text-black">Vocallus</span>
-        </a>
-
-        <nav class="hidden md:flex items-center gap-1 text-[15px] font-medium text-[#111111]">
-          <div class="nav-dropdown relative" data-dropdown>
-            <button type="button" aria-haspopup="true" aria-expanded="false" class="nav-trigger inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">
-              <span>Products</span>
-              <svg class="nav-chevron w-3.5 h-3.5 text-neutral-400 stroke-[2.5] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-            </button>
-            <div class="nav-menu" role="menu">
-              <div class="nav-menu-inner rounded-2xl border border-neutral-100 bg-white p-2 shadow-lg shadow-neutral-200/60">
-              <a href="../Pages/products.html" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Overview</a>
-              <a href="../Pages/products.html#answering" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Call answering</a>
-              <a href="../Pages/products.html#messages" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Message capture</a>
-              <a href="../Pages/products.html#summaries" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Call summaries</a>
-              </div>
-            </div>
-          </div>
-          <div class="nav-dropdown relative" data-dropdown>
-            <button type="button" aria-haspopup="true" aria-expanded="false" class="nav-trigger inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">
-              <span>Solutions</span>
-              <svg class="nav-chevron w-3.5 h-3.5 text-neutral-400 stroke-[2.5] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-            </button>
-            <div class="nav-menu" role="menu">
-              <div class="nav-menu-inner rounded-2xl border border-neutral-100 bg-white p-2 shadow-lg shadow-neutral-200/60">
-              <a href="../Pages/solutions.html#healthcare" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Healthcare & dental</a>
-              <a href="../Pages/solutions.html#home-services" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Home services</a>
-              <a href="../Pages/solutions.html#legal" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Legal & professional</a>
-              <a href="../Pages/solutions.html#salons" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Salons & spas</a>
-              <a href="../Pages/solutions.html#property" class="block rounded-lg px-3.5 py-2 text-[14.5px] font-medium transition-colors text-neutral-700 hover:bg-neutral-50 hover:text-[#111111]">Property management</a>
-              </div>
-            </div>
-          </div>
-          <a href="../Pages/pricing.html" class="rounded-lg px-3 py-2 transition-colors text-[#111111] hover:bg-neutral-50 hover:text-neutral-600">Pricing</a>
-        </nav>
-      </div>
-
-      <div class="flex items-center gap-3 sm:gap-4 text-[15px] font-medium">
-        <a href="../Pages/login.html" class="px-2 py-1.5 text-neutral-700 hover:text-black transition">
-          Sign in
-        </a>
-        <a href="../Pages/talk-to-sales.html" class="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-neutral-200/90 rounded-xl text-neutral-800 font-medium hover:bg-neutral-50 transition shadow-xs">
-          Talk to Sales
-        </a>
-        <a href="../Pages/signup.html" class="btn-primary inline-flex items-center justify-center px-5 py-2 rounded-xl font-semibold shadow-sm">
-          Try for free
-        </a>
-      </div>
-
-    </div>
-  
-    <script>
-      window.whenFirebase && window.whenFirebase(function (fb) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          var login  = document.querySelector('a[href$="login.html"].px-2');
-          var signup = document.querySelector('a[href$="signup.html"].btn-primary, a[href$="signup.html"][class*="btn-primary"]');
-          if (user) {
-            if (login)  login.style.display = 'none';
-            if (signup) {
-              signup.textContent = 'Dashboard';
-              signup.setAttribute('href', 'Pages/dashboard.html');
-            }
-          }
-        });
-      });
-    </script>
-</header>
-
-  <main class="flex-1 ">
     <nav class="w-[88px] bg-[#f2f2f2] border-r border-gray-200 flex flex-col justify-between items-center py-6 flex-shrink-0 z-10">
         <div class="flex flex-col items-center w-full space-y-4">
             <a href="../index.html" class="mb-2 select-none">
@@ -399,63 +243,6 @@
             </form>
         </div>
     </div>
-  </main>
-
-  <footer class="border-t border-neutral-100 bg-white">
-    <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-16">
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-10">
-
-        <div class="md:col-span-5">
-          <a href="../index.html" class="flex items-center gap-2.5 select-none">
-            <img src="../Images/logo.png" alt="" class="h-8 w-8" />
-            <span class="font-extrabold text-xl tracking-tighter text-black">Vocallus</span>
-          </a>
-          <p class="mt-4 text-[14.5px] leading-[1.65] text-neutral-500 max-w-[340px]">
-            Answer every call, 24/7, with Solana — the AI receptionist built
-            directly into your business phone system.
-          </p>
-        </div>
-
-        <div class="md:col-span-3">
-          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Product</p>
-          <ul class="mt-5 space-y-3.5">
-              <li><a href="../Pages/products.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Products</a></li>
-              <li><a href="../Pages/solutions.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Solutions</a></li>
-              <li><a href="../Pages/pricing.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Pricing</a></li>
-              <li><a href="../Pages/resources.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Resources</a></li>
-          </ul>
-        </div>
-
-        <div class="md:col-span-2">
-          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Company</p>
-          <ul class="mt-5 space-y-3.5">
-              <li><a href="../Pages/dashboard.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Dashboard</a></li>
-              <li><a href="../Pages/talk-to-sales.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Talk to Sales</a></li>
-              <li><a href="../Pages/signup.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign up</a></li>
-              <li><a href="../Pages/login.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign in</a></li>
-          </ul>
-        </div>
-
-        <div class="md:col-span-2">
-          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Contact</p>
-          <ul class="mt-5 space-y-3.5">
-            <li><a href="mailto:hello@vocallus.example" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">hello@vocallus.example</a></li>
-            <li><a href="tel:+15550000000" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">(555) 000-0000</a></li>
-          </ul>
-        </div>
-
-      </div>
-
-      <div class="mt-14 pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <p class="text-[13px] text-neutral-400">&copy; 2026 Vocallus. All rights reserved.</p>
-        <div class="flex items-center gap-5 text-[13px] text-neutral-400">
-          <a href="#" class="hover:text-[#111111] transition-colors">Privacy</a>
-          <a href="#" class="hover:text-[#111111] transition-colors">Terms</a>
-          <a href="#" class="hover:text-[#111111] transition-colors">Security</a>
-        </div>
-      </div>
-    </div>
-  </footer>
 
 
   <script>
@@ -544,8 +331,6 @@
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     })();
   </script>
-
-
 
   <script>
     window.requireAuth && window.requireAuth();
