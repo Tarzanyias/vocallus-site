@@ -2,6 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 deepseek_python.py (v7) - one script for all the site polish.
+  v11: Voices: Solana (default, free) + Female and Male with a PRO tag. Demo accounts that pick
+       a Pro voice get an Upgrade box -> pricing page (with a Back button). Samples come from
+       make_voices.py (Audio/solana.mp3, pfmale.mp3, pmale.mp3); pictures Images/pfmale.png, pmale.png.
+  v10: Voice picker (Female / Male with Play) under the system prompt; labels in normal case;
+       provider badge just says "Connected". First run asks for a Gemini API key once to make
+       Audio/pfemale.mp3 + Audio/pmale.mp3 ("Hello, I'm a voice on Vocallus.") and
+       Images/pfemale.png + Images/pmale.png.
   v9.2: Pro bullet with the two key links no longer splits into columns.
   v9.1: Pricing/checkout: "Bring your own Google API key or OpenAI API key" (both linked).
   v9: Dashboard scrolls; AI provider = Gemini (Google) or ChatGPT (OpenAI), Claude removed (icon deleted);
@@ -1911,7 +1918,7 @@ _DP_PROVIDER_JS = """
         $('vp-link').href = p.link;
         const pill = $('vp-pill');
         const connected = !!(saved && saved.apiKey);
-        pill.textContent = connected ? 'Connected · ' + P[saved.provider === 'openai' ? 'openai' : 'gemini'].label : 'Not connected';
+        pill.textContent = connected ? 'Connected' : 'Not connected';
         pill.className = 'text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ' + (connected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600');
         const note = $('vp-note');
         const msg = plan === 'max' ? 'Your Max plan includes AI, so no key is needed. Add one only if you want to use your own.'
@@ -1965,6 +1972,149 @@ _DP_PROVIDER_JS = """
         });
       } catch (e) { console.error('AI provider card:', e); }
     }
+  </script>
+"""
+
+# ======================= Solana page: voice (male / female) =======================
+
+_DP_VOICE_JS = """
+  <script type="module">
+    /* VV_VOICE_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const saveBtn = $('save-prompt');
+    if (saveBtn) {
+      // tier: 'free' | 'pro' (Max voices can be added later with tier 'max')
+      const V = [
+        { id: 'default', label: 'Solana', sub: 'Default voice', tier: 'free', imgs: ['logo.png'], audio: 'solana' },
+        { id: 'female', label: 'Female', sub: 'Pro voice', tier: 'pro', imgs: ['pfmale.png', 'pfemale.png', 'pfmales.png'], audio: 'pfmale' },
+        { id: 'male', label: 'Male', sub: 'Pro voice', tier: 'pro', imgs: ['pmale.png'], audio: 'pmale' }
+      ];
+      const RANK = { free: 0, pro: 1, max: 2 };
+      const planRank = (p) => p === 'max' ? 2 : p === 'pro' ? 1 : 0;
+      const PLAY = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+      const STOP = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+      const wrap = document.createElement('div');
+      wrap.innerHTML =
+        '<label class="block text-[13px] font-semibold text-gray-700 mb-1.5">Voice</label>' +
+        '<div id="vv-list" class="space-y-2"></div>' +
+        '<div id="vv-up" class="hidden mt-2 rounded-xl bg-black text-white p-3.5" style="transition:opacity .15s ease">' +
+          '<div class="text-[13px] font-semibold">Pro voices come with Pro and Max</div>' +
+          '<div class="text-[12px] text-white/70 mt-0.5">Upgrade to use this voice on your calls.</div>' +
+          '<a href="pricing.html?back=solana" class="mt-2.5 inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-white text-black text-[12.5px] font-semibold hover:bg-gray-100">Upgrade</a>' +
+        '</div>' +
+        '<p id="vv-note" class="text-[12px] text-gray-400 mt-2">Press play to hear a voice.</p>';
+      saveBtn.parentNode.insertBefore(wrap, saveBtn);
+
+      let voice = 'default', plan = 'none', uid = null, fs = null, db = null, audio = null, playing = null;
+      const allowed = (v) => planRank(plan) >= RANK[v.tier];
+
+      function render() {
+        $('vv-list').innerHTML = V.map(v => {
+          const on = v.id === voice;
+          const tag = v.tier === 'free' ? '' :
+            '<span class="ml-1.5 inline-flex items-center rounded-full bg-black text-white px-1.5 py-[1px] text-[10px] font-bold uppercase tracking-wide">' + v.tier + '</span>';
+          return '<div role="button" tabindex="0" data-v="' + v.id + '" class="vv-row flex items-center gap-3 rounded-xl border-2 bg-white px-3 py-2.5 cursor-pointer transition ' +
+              (on ? 'border-black ring-2 ring-black/10' : 'border-gray-200 hover:border-gray-300') + '">' +
+            '<img data-i="0" alt="" class="w-9 h-9 rounded-full object-cover bg-gray-100 flex-shrink-0">' +
+            '<div class="flex-1 min-w-0"><div class="flex items-center text-[13.5px] font-semibold text-gray-900">' + v.label + tag + '</div>' +
+              '<div class="text-[12px] text-gray-500">' + v.sub + '</div></div>' +
+            '<button type="button" data-play="' + v.id + '" aria-label="Play ' + v.label + '" ' +
+              'class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-800 hover:bg-gray-50 flex-shrink-0">' +
+              (playing === v.id ? STOP : PLAY) + '</button>' +
+          '</div>';
+        }).join('');
+        // pictures: try each file name in order (pfmale.png, then pfemale.png, ...)
+        $('vv-list').querySelectorAll('.vv-row').forEach(row => {
+          const v = V.find(x => x.id === row.dataset.v), img = row.querySelector('img');
+          let i = 0;
+          img.addEventListener('error', () => { i++; if (i < v.imgs.length) img.src = '../Images/' + v.imgs[i]; else img.style.visibility = 'hidden'; });
+          img.src = '../Images/' + v.imgs[0];
+        });
+      }
+      render();
+
+      const up = $('vv-up');
+      function showUpgrade(show) { up.classList.toggle('hidden', !show); }
+
+      function stop() { if (audio) { audio.pause(); audio = null; } playing = null; render(); }
+      function play(id) {
+        if (playing === id) return stop();
+        stop();
+        const v = V.find(x => x.id === id);
+        const tryPlay = (ext, next) => {
+          const a = new Audio('../Audio/' + v.audio + '.' + ext);
+          a.addEventListener('ended', stop);
+          a.addEventListener('error', () => { if (next) next(); else { stop(); $('vv-note').textContent = 'That voice sample is not uploaded yet.'; } }, { once: true });
+          audio = a; playing = id; render();
+          a.play().catch(() => {});
+        };
+        tryPlay('mp3', () => tryPlay('wav', null));
+      }
+
+      async function choose(id) {
+        const v = V.find(x => x.id === id);
+        if (!allowed(v)) { showUpgrade(true); $('vv-note').textContent = ''; return; }
+        showUpgrade(false);
+        if (id === voice) return;
+        voice = id; render();
+        if (uid && fs) {
+          try { await fs.updateDoc(fs.doc(db, 'users', uid), { voice: id }); $('vv-note').textContent = 'Saved. Used on your next call.'; }
+          catch (err) { $('vv-note').textContent = 'Could not save: ' + err.message; }
+        }
+      }
+
+      $('vv-list').addEventListener('click', (e) => {
+        const p = e.target.closest('[data-play]');
+        if (p) { e.stopPropagation(); return play(p.dataset.play); }
+        const r = e.target.closest('[data-v]');
+        if (r) choose(r.dataset.v);
+      });
+      $('vv-list').addEventListener('keydown', (e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.v) { e.preventDefault(); choose(e.target.dataset.v); }
+      });
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        db = fs.getFirestore(app);
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
+            const d = s.exists() ? s.data() : {};
+            plan = d.plan || 'none';
+            const want = V.find(x => x.id === d.voice) || V[0];
+            voice = allowed(want) ? want.id : 'default';
+            if (allowed(want)) showUpgrade(false);
+            render();
+          }, () => {});
+        });
+      } catch (e) { console.error('Voice picker:', e); }
+    }
+  </script>
+"""
+
+# ======================= Pricing page: Back button when coming from the app =======================
+
+_DP_PRICING_BACK_JS = """
+  <script>
+    /* VB_BACK_MARKER */
+    (function () {
+      var from = new URLSearchParams(location.search).get('back');
+      if (!from) return;
+      var h2 = [].slice.call(document.querySelectorAll('h2')).find(function (h) { return /Simple pricing/.test(h.textContent); });
+      var box = h2 ? h2.parentElement : null;
+      if (!box || !box.parentElement) return;
+      var row = document.createElement('div');
+      row.className = 'max-w-[900px] mx-auto mb-8';
+      row.innerHTML = '<a href="' + (/^[a-z-]+$/.test(from) ? from : 'solana') + '.html" class="inline-flex items-center gap-1.5 text-[14px] font-medium text-neutral-500 hover:text-black transition">' +
+        '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>Back</a>';
+      row.querySelector('a').addEventListener('click', function (e) {
+        if (document.referrer && document.referrer.indexOf(location.host) !== -1 && history.length > 1) { e.preventDefault(); history.back(); }
+      });
+      box.parentElement.insertBefore(row, box);
+    })();
   </script>
 """
 
@@ -2025,6 +2175,10 @@ def render_page(path, builder):
             html = _dp_add(html, "VS_SOLANA_MARKER", "</body>", _DP_SOLANA_JS)
             html = _dp_add(html, "VD_DEMO_MARKER", "</body>", _DP_DEMO_JS)
             html = _dp_add(html, "VP_PROVIDER_MARKER", "</body>", _DP_PROVIDER_JS)
+            html = _dp_add(html, "VV_VOICE_MARKER", "</body>", _DP_VOICE_JS)
+            # "AGENT NAME" / "SYSTEM PROMPT" -> "Agent name" / "System prompt"
+            html = html.replace('block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2',
+                                'block text-[13px] font-semibold text-gray-700 mb-1.5')
             # Claude isn't offered any more (its icon is deleted)
             html = _re_auth.sub(r'\s*<button data-provider="claude".*?</button>', '', html, flags=_re_auth.S)
             html = html.replace('Gemini is required for phone calls.', 'Pick the AI behind your agent.')
@@ -2057,6 +2211,8 @@ def render_page(path, builder):
     html = _dp_add(html, "AUTH_BTN_MARKER", "</body>", _AUTH_BTN_JS)
     if name in ("login.html", "signup.html"):
         html = _dp_add(html, "SF_LOGIN_MARKER", "</body>", _DP_LOGIN_JS)
+    if name == "pricing.html":
+        html = _dp_add(html, "VB_BACK_MARKER", "</body>", _DP_PRICING_BACK_JS)
     return html
 
 # --- end deepseek_python.py ---
@@ -2091,7 +2247,10 @@ def main() -> int:
 
     src = src.replace(MAIN_GUARD, OVERRIDE + "\n\n" + MAIN_GUARD, 1)
     BUILD_PY.write_text(src, encoding="utf-8")
-    print("[ok] added deepseek_python.py v9")
+    print("[ok] added deepseek_python.py v11")
+    for f in ("Audio/solana.mp3", "Audio/pfmale.mp3", "Audio/pmale.mp3", "Images/pmale.png"):
+        if not (ROOT / f).exists() and not (ROOT / f.replace(".mp3", ".wav")).exists():
+            print(f"[note] {f} not found yet" + (" - run make_voices.py" if f.endswith(".mp3") else ""))
     (ROOT / "firebase-messaging-sw.js").write_text(SW_FILE, encoding="utf-8")
     print("[ok] wrote firebase-messaging-sw.js (call alerts)")
 
@@ -2122,11 +2281,13 @@ def main() -> int:
         ("Pages/solana.html", "VP_PROVIDER_MARKER", "AI provider: Gemini or ChatGPT"),
         ("Pages/checkout.html", "Secure payment", "Checkout says Secure payment"),
         ("Pages/pricing.html", "platform.openai.com/api-keys", "Pricing: Google or OpenAI key links"),
+        ("Pages/solana.html", "VV_VOICE_MARKER", "Voice picker (male / female)"),
+        ("Pages/pricing.html", "VB_BACK_MARKER", "Pricing Back button"),
     ]
     print()
     for rel, marker, label in checks:
         f = ROOT / rel
-        ok = f.exists() and marker in f.read_text(encoding="utf-8")
+        ok = f.exists() and (not marker or marker in f.read_text(encoding="utf-8"))
         print(f"[{'ok' if ok else 'warn'}] {label}{'' if ok else ' - not found in ' + rel}")
     return rc
 
