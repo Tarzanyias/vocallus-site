@@ -6044,6 +6044,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6871,8 +6874,8 @@ _DP_SOLANA_JS = """
 
       // Helper row under the prompt: status + "Reset to default"
       const row = document.createElement('div');
-      row.className = 'flex items-center justify-between mt-2 text-[12px]';
-      row.innerHTML = '<span id="vs-state" class="text-gray-400"></span>' +
+      row.className = 'flex items-center justify-end mt-2 text-[12px]';
+      row.innerHTML = '<span id="vs-state" hidden></span>' +
         '<button type="button" id="vs-reset" class="font-semibold text-gray-600 hover:text-black underline underline-offset-2">Reset to default</button>';
       promptIn.insertAdjacentElement('afterend', row);
       const state = $('vs-state');
@@ -6882,7 +6885,7 @@ _DP_SOLANA_JS = """
       let lastDefault = '';
       const refreshState = () => {
         const n = promptIn.value.length;
-        state.textContent = (promptIn.value.trim() === lastDefault.trim() ? 'Default prompt · ' : 'Custom prompt · ') + n + ' characters';
+        state.textContent = '';
       };
 
       function fill(d) {
