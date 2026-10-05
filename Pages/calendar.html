@@ -114,6 +114,68 @@
     #panel-home, #panel-number, #panel-finances { padding-bottom: 6rem; }
   </style>
 
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import {
+      getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    let db; try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
   <div id="demo-banner" class="hidden w-full bg-black text-white text-[13.5px] py-2.5 px-4 items-center justify-center gap-3 z-50">
@@ -750,7 +812,7 @@
       card.id = 'vk-card';
       card.className = 'mb-8 rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.04)]';
       card.style.opacity = '0';
-      card.style.transition = 'opacity .3s ease';
+      card.style.transition = 'opacity .15s ease';
       const sel = 'rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[13px] focus:outline-none focus:border-gray-400';
       card.innerHTML =
         '<div class="flex items-start justify-between gap-4 flex-wrap mb-5">' +
@@ -766,7 +828,6 @@
         '<div class="grid lg:grid-cols-2 gap-6">' +
           '<div>' +
             '<div id="vk-days" class="divide-y divide-gray-100 rounded-2xl border border-gray-100"></div>' +
-            '<button id="vk-copy" type="button" class="mt-2 text-[12.5px] font-semibold text-gray-600 hover:text-black underline underline-offset-2">Copy Monday to all weekdays</button>' +
           '</div>' +
           '<div>' +
             '<div class="text-[13px] font-semibold text-gray-900 mb-2">When you are closed</div>' +
@@ -802,26 +863,39 @@
         box.innerHTML = '';
         DAYS.forEach(([k, label]) => {
           const h = hours[k];
-          const open = !h.closed;
           const row = document.createElement('div');
           row.className = 'flex items-center gap-3 px-4 py-2.5';
           row.innerHTML =
             '<div class="w-24 text-[13.5px] font-medium text-gray-900">' + label + '</div>' +
-            '<button type="button" data-k="' + k + '" class="vk-tog relative w-10 h-6 rounded-full transition-colors ' + (open ? 'bg-black' : 'bg-gray-200') + '" aria-label="Open on ' + label + '">' +
-              '<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform" style="transform:translateX(' + (open ? '16px' : '0') + ')"></span></button>' +
-            (open
-              ? '<input type="time" data-k="' + k + '" data-f="open" value="' + h.open + '" class="vk-t ' + sel + '">' +
+            '<button type="button" role="switch" class="vk-tog relative w-10 h-6 rounded-full flex-shrink-0" aria-label="Open on ' + label + '" ' +
+              'style="transition:background-color .2s ease">' +
+              '<span class="vk-knob absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow" ' +
+              'style="transition:transform .2s cubic-bezier(.4,0,.2,1)"></span></button>' +
+            '<div class="vk-times relative flex-1 h-8">' +
+              '<div class="vk-open absolute inset-0 flex items-center gap-2" style="transition:opacity .15s ease">' +
+                '<input type="time" data-f="open" value="' + h.open + '" class="vk-t ' + sel + '">' +
                 '<span class="text-[12px] text-gray-400">to</span>' +
-                '<input type="time" data-k="' + k + '" data-f="close" value="' + h.close + '" class="vk-t ' + sel + '">'
-              : '<span class="text-[13px] text-gray-400">Closed</span>');
+                '<input type="time" data-f="close" value="' + h.close + '" class="vk-t ' + sel + '">' +
+              '</div>' +
+              '<div class="vk-closed absolute inset-0 flex items-center text-[13px] text-gray-400" style="transition:opacity .15s ease">Closed</div>' +
+            '</div>';
           box.appendChild(row);
+
+          const tog = row.querySelector('.vk-tog'), knob = row.querySelector('.vk-knob');
+          const openBox = row.querySelector('.vk-open'), closedBox = row.querySelector('.vk-closed');
+          const paint = () => {
+            const open = !hours[k].closed;
+            tog.setAttribute('aria-checked', String(open));
+            tog.style.backgroundColor = open ? '#000' : '#e5e7eb';
+            knob.style.transform = 'translateX(' + (open ? '16px' : '0') + ')';
+            openBox.style.opacity = open ? '1' : '0';
+            openBox.style.pointerEvents = open ? 'auto' : 'none';
+            closedBox.style.opacity = open ? '0' : '1';
+          };
+          paint();
+          tog.addEventListener('click', () => { hours[k].closed = !hours[k].closed; paint(); dirty(); });
+          row.querySelectorAll('.vk-t').forEach(i => i.addEventListener('change', () => { hours[k][i.dataset.f] = i.value; dirty(); }));
         });
-        box.querySelectorAll('.vk-tog').forEach(b => b.addEventListener('click', () => {
-          hours[b.dataset.k].closed = !hours[b.dataset.k].closed; renderDays(); dirty();
-        }));
-        box.querySelectorAll('.vk-t').forEach(i => i.addEventListener('change', () => {
-          hours[i.dataset.k][i.dataset.f] = i.value; dirty();
-        }));
       }
       function renderModes() {
         $('vk-modes').innerHTML = MODES.map(([k, t, d]) =>
@@ -871,10 +945,6 @@
 
       tzSel.addEventListener('change', () => { tz = tzSel.value; dirty(); });
       $('vk-len').addEventListener('change', dirty);
-      $('vk-copy').addEventListener('click', () => {
-        ['tue','wed','thu','fri'].forEach(k => { hours[k] = Object.assign({}, hours.mon); });
-        renderDays(); dirty();
-      });
 
       try {
 
@@ -889,7 +959,9 @@
       });
 
         const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-        const { getFirestore, doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const { getFirestore, doc, onSnapshot, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const firstSnap = (ref) => new Promise((res) => { let un = null; un = onSnapshot(ref, (x) => { res(x.exists() ? x.data() : {}); setTimeout(() => un && un(), 0); }, () => res({})); });
+
         const auth = getAuth(app), db = getFirestore(app);
         let uid = null, myNumber = '';
 
@@ -897,7 +969,7 @@
           if (!user) return;
           uid = user.uid;
           let d = {};
-          try { const s = await getDoc(doc(db, 'users', uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          try { d = await firstSnap(doc(db, 'users', uid)); } catch (e) {}
           const saved = d.hours || {};
           DAYS.forEach(([k]) => {
             const h = saved[k];
@@ -940,7 +1012,9 @@
             const sl = $('slot-length'); if (sl) sl.textContent = $('vk-len').value;
           } catch (e) {
             status.className = 'text-[13px] text-red-600';
-            status.textContent = 'Could not save: ' + e.message;
+            status.textContent = (e.code === 'permission-denied')
+              ? 'Could not save: your Firestore rules are blocking it. Publish the new rules, then try again.'
+              : 'Could not save: ' + e.message;
           }
           btn.disabled = false; btn.textContent = 'Save hours';
         });

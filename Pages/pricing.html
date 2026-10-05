@@ -190,7 +190,7 @@
 
   <style>
     /* AUTH_BTN_CSS_MARKER */
-    [data-auth-swap], [data-auth-hide], [data-auth-logout] { opacity: 0; transition: opacity .25s ease; }
+    [data-auth-swap], [data-auth-hide], [data-auth-logout] { opacity: 0; transition: opacity .12s ease; }
     html.auth-ready [data-auth-swap], html.auth-ready [data-auth-hide], html.auth-ready [data-auth-logout] { opacity: 1; }
     .auth-gone { display: none !important; }
     @media (prefers-reduced-motion: reduce) {
@@ -556,7 +556,7 @@
   <script type="module">
     /* AUTH_BTN_MARKER */
     const root = document.documentElement;
-    const fallback = setTimeout(() => root.classList.add('auth-ready'), 2500);
+    const fallback = setTimeout(() => root.classList.add('auth-ready'), 1200);
 
     document.querySelectorAll('[data-auth-swap], [data-auth-logout]').forEach(a => {
       a.dataset.label = a.textContent.trim();

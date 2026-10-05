@@ -6032,6 +6032,12 @@ PAGES = [
 
 
 
+
+
+
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6052,7 +6058,7 @@ _DP_FB = """
 _AUTH_BTN_CSS = """
   <style>
     /* AUTH_BTN_CSS_MARKER */
-    [data-auth-swap], [data-auth-hide], [data-auth-logout] { opacity: 0; transition: opacity .25s ease; }
+    [data-auth-swap], [data-auth-hide], [data-auth-logout] { opacity: 0; transition: opacity .12s ease; }
     html.auth-ready [data-auth-swap], html.auth-ready [data-auth-hide], html.auth-ready [data-auth-logout] { opacity: 1; }
     .auth-gone { display: none !important; }
     @media (prefers-reduced-motion: reduce) {
@@ -6065,7 +6071,7 @@ _AUTH_BTN_JS = """
   <script type="module">
     /* AUTH_BTN_MARKER */
     const root = document.documentElement;
-    const fallback = setTimeout(() => root.classList.add('auth-ready'), 2500);
+    const fallback = setTimeout(() => root.classList.add('auth-ready'), 1200);
 
     document.querySelectorAll('[data-auth-swap], [data-auth-logout]').forEach(a => {
       a.dataset.label = a.textContent.trim();
@@ -6141,9 +6147,9 @@ _DP_DASH_HEAD = """
   <script>document.documentElement.classList.add('dash-loading');</script>
   <style>
     /* SF_DASH_CSS */
-    main > * { transition: opacity .3s ease; }
+    main > * { transition: opacity .15s ease; }
     html.dash-loading main > * { opacity: 0; }
-    #panel-home h1, #banner-line { opacity: 0 !important; transition: opacity .4s ease !important; }
+    #panel-home h1, #banner-line { opacity: 0 !important; transition: opacity .2s ease !important; }
     html.greet-ready #panel-home h1, html.greet-ready #banner-line { opacity: 1 !important; }
     @media (prefers-reduced-motion: reduce) {
       main > *, #panel-home h1, #banner-line { transition: none !important; }
@@ -6157,7 +6163,7 @@ _DP_DASH_JS = """
     const root = document.documentElement;
     const reveal = () => root.classList.remove('dash-loading');
     const showGreeting = () => root.classList.add('greet-ready');
-    const fallback = setTimeout(() => { reveal(); showGreeting(); }, 4000);
+    const fallback = setTimeout(() => { reveal(); showGreeting(); }, 2000);
     const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
 
     try {
@@ -6172,31 +6178,31 @@ _DP_DASH_JS = """
         const h1 = document.querySelector('#panel-home h1');
         const banner = document.getElementById('banner-line');
 
+        const start = new Date(); start.setHours(0, 0, 0, 0);
+        const [userRes, callsRes] = await Promise.allSettled([
+          getDoc(doc(db, 'users', user.uid)),
+          getDocs(query(collection(db, 'users', user.uid, 'calls'), where('startedAt', '>=', Timestamp.fromDate(start))))
+        ]);
+
         let name = '';
-        try {
-          const snap = await getDoc(doc(db, 'users', user.uid));
-          if (snap.exists()) name = snap.data().name || '';
-        } catch (e) {
-          console.error('Vocallus user doc:', e);
-        }
+        if (userRes.status === 'fulfilled' && userRes.value.exists()) name = userRes.value.data().name || '';
         name = (name || user.displayName || (user.email || '').split('@')[0] || 'there').trim().split(' ')[0];
         if (h1) {
           h1.innerHTML = greet() + ', <span id="greeting-name"></span>';
           h1.querySelector('#greeting-name').textContent = name;
         }
 
-        try {
-          const start = new Date(); start.setHours(0, 0, 0, 0);
-          const qs = await getDocs(query(collection(db, 'users', user.uid, 'calls'),
-                                         where('startedAt', '>=', Timestamp.fromDate(start))));
-          const n = qs.size;
-          if (banner) banner.textContent = n ? ('Solana answered ' + n + ' call' + (n === 1 ? '' : 's') + ' today')
-                                             : 'No calls yet today';
-        } catch (e) {
-          console.error('Vocallus calls:', e);
-          if (banner) banner.textContent = (e.code === 'permission-denied')
-            ? 'Firestore rules are blocking call history - publish the rules that include "calls".'
-            : 'No calls yet today';
+        if (banner) {
+          if (callsRes.status === 'fulfilled') {
+            const n = callsRes.value.size;
+            banner.textContent = n ? ('Solana answered ' + n + ' call' + (n === 1 ? '' : 's') + ' today') : 'No calls yet today';
+          } else {
+            const e = callsRes.reason || {};
+            console.error('Vocallus calls:', e);
+            banner.textContent = (e.code === 'permission-denied')
+              ? 'Firestore rules are blocking call history - publish the rules that include "calls".'
+              : 'No calls yet today';
+          }
         }
 
         clearTimeout(fallback);
@@ -6238,7 +6244,7 @@ _DP_NUMBER_JS = """
       panel.innerHTML =
         '<div class="mb-8"><h1 class="text-[32px] font-semibold text-gray-900">Number</h1>' +
         '<p class="text-gray-500 text-[15px] mt-1">The phone number Solana answers.</p></div>' +
-        '<div id="vn-body" style="opacity:0;transition:opacity .3s ease"></div>' +
+        '<div id="vn-body" style="opacity:0;transition:opacity .15s ease"></div>' +
         '<div hidden>' + legacy + '</div>';
       const body = document.getElementById('vn-body');
       const show = () => requestAnimationFrame(() => { body.style.opacity = '1'; });
@@ -6500,7 +6506,7 @@ _DP_RECENT_JS = """
         });
       }
       if (search) search.addEventListener('input', render);
-      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 3000);
+      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 1500);
 
       try {
 """ + _DP_FB + """
@@ -6624,9 +6630,9 @@ _DP_HISTORY_JS = """
               list.appendChild(row);
             });
           }
-          list.style.transition = 'opacity .2s ease';
+          list.style.transition = 'opacity .1s ease';
           list.style.opacity = '1';
-        }, 120);
+        }, 60);
       }
 
       toggle.querySelectorAll('.vh-btn').forEach(b => b.addEventListener('click', () => {
@@ -6634,7 +6640,7 @@ _DP_HISTORY_JS = """
       }));
       requestAnimationFrame(() => movePill(false));
       window.addEventListener('resize', () => movePill(false));
-      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 3000);
+      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 1500);
 
       try {
 """ + _DP_FB + """
@@ -6690,7 +6696,7 @@ _DP_BILLING_JS = """
             '<div class="text-[13px] text-gray-500 font-medium mb-4">Minutes used this month</div>' +
             '<div class="text-[28px] font-semibold text-gray-900"><span id="vb-min">0</span>' +
             '<span class="text-[18px] text-gray-400 font-medium"> / <span id="vb-limit">0</span></span></div>' +
-            '<div class="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden"><div id="vb-bar" class="h-full bg-black rounded-full" style="width:0%;transition:width .4s ease"></div></div>' +
+            '<div class="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden"><div id="vb-bar" class="h-full bg-black rounded-full" style="width:0%;transition:width .2s ease"></div></div>' +
             '<p class="text-[13px] text-gray-500 mt-3">Resets on ' + next.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + '</p>' +
           '</div>' +
         '</div>' +
@@ -6891,12 +6897,14 @@ _DP_SOLANA_JS = """
       try {
 """ + _DP_FB + """
         const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-        const { getFirestore, doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const firstSnap = (ref) => new Promise((res) => { let un = null; un = onSnapshot(ref, (x) => { res(x.exists() ? x.data() : {}); setTimeout(() => un && un(), 0); }, () => res({})); });
+
         const auth = getAuth(app), db = getFirestore(app);
         onAuthStateChanged(auth, async (user) => {
           if (!user) return;
           let d = {};
-          try { const s = await getDoc(doc(db, 'users', user.uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          try { d = await firstSnap(doc(db, 'users', user.uid)); } catch (e) {}
           fill(d);
         });
       } catch (e) {
@@ -6937,7 +6945,7 @@ _DP_HOURS_JS = """
       card.id = 'vk-card';
       card.className = 'mb-8 rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.04)]';
       card.style.opacity = '0';
-      card.style.transition = 'opacity .3s ease';
+      card.style.transition = 'opacity .15s ease';
       const sel = 'rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[13px] focus:outline-none focus:border-gray-400';
       card.innerHTML =
         '<div class="flex items-start justify-between gap-4 flex-wrap mb-5">' +
@@ -6953,7 +6961,6 @@ _DP_HOURS_JS = """
         '<div class="grid lg:grid-cols-2 gap-6">' +
           '<div>' +
             '<div id="vk-days" class="divide-y divide-gray-100 rounded-2xl border border-gray-100"></div>' +
-            '<button id="vk-copy" type="button" class="mt-2 text-[12.5px] font-semibold text-gray-600 hover:text-black underline underline-offset-2">Copy Monday to all weekdays</button>' +
           '</div>' +
           '<div>' +
             '<div class="text-[13px] font-semibold text-gray-900 mb-2">When you are closed</div>' +
@@ -6989,26 +6996,39 @@ _DP_HOURS_JS = """
         box.innerHTML = '';
         DAYS.forEach(([k, label]) => {
           const h = hours[k];
-          const open = !h.closed;
           const row = document.createElement('div');
           row.className = 'flex items-center gap-3 px-4 py-2.5';
           row.innerHTML =
             '<div class="w-24 text-[13.5px] font-medium text-gray-900">' + label + '</div>' +
-            '<button type="button" data-k="' + k + '" class="vk-tog relative w-10 h-6 rounded-full transition-colors ' + (open ? 'bg-black' : 'bg-gray-200') + '" aria-label="Open on ' + label + '">' +
-              '<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform" style="transform:translateX(' + (open ? '16px' : '0') + ')"></span></button>' +
-            (open
-              ? '<input type="time" data-k="' + k + '" data-f="open" value="' + h.open + '" class="vk-t ' + sel + '">' +
+            '<button type="button" role="switch" class="vk-tog relative w-10 h-6 rounded-full flex-shrink-0" aria-label="Open on ' + label + '" ' +
+              'style="transition:background-color .2s ease">' +
+              '<span class="vk-knob absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow" ' +
+              'style="transition:transform .2s cubic-bezier(.4,0,.2,1)"></span></button>' +
+            '<div class="vk-times relative flex-1 h-8">' +
+              '<div class="vk-open absolute inset-0 flex items-center gap-2" style="transition:opacity .15s ease">' +
+                '<input type="time" data-f="open" value="' + h.open + '" class="vk-t ' + sel + '">' +
                 '<span class="text-[12px] text-gray-400">to</span>' +
-                '<input type="time" data-k="' + k + '" data-f="close" value="' + h.close + '" class="vk-t ' + sel + '">'
-              : '<span class="text-[13px] text-gray-400">Closed</span>');
+                '<input type="time" data-f="close" value="' + h.close + '" class="vk-t ' + sel + '">' +
+              '</div>' +
+              '<div class="vk-closed absolute inset-0 flex items-center text-[13px] text-gray-400" style="transition:opacity .15s ease">Closed</div>' +
+            '</div>';
           box.appendChild(row);
+
+          const tog = row.querySelector('.vk-tog'), knob = row.querySelector('.vk-knob');
+          const openBox = row.querySelector('.vk-open'), closedBox = row.querySelector('.vk-closed');
+          const paint = () => {
+            const open = !hours[k].closed;
+            tog.setAttribute('aria-checked', String(open));
+            tog.style.backgroundColor = open ? '#000' : '#e5e7eb';
+            knob.style.transform = 'translateX(' + (open ? '16px' : '0') + ')';
+            openBox.style.opacity = open ? '1' : '0';
+            openBox.style.pointerEvents = open ? 'auto' : 'none';
+            closedBox.style.opacity = open ? '0' : '1';
+          };
+          paint();
+          tog.addEventListener('click', () => { hours[k].closed = !hours[k].closed; paint(); dirty(); });
+          row.querySelectorAll('.vk-t').forEach(i => i.addEventListener('change', () => { hours[k][i.dataset.f] = i.value; dirty(); }));
         });
-        box.querySelectorAll('.vk-tog').forEach(b => b.addEventListener('click', () => {
-          hours[b.dataset.k].closed = !hours[b.dataset.k].closed; renderDays(); dirty();
-        }));
-        box.querySelectorAll('.vk-t').forEach(i => i.addEventListener('change', () => {
-          hours[i.dataset.k][i.dataset.f] = i.value; dirty();
-        }));
       }
       function renderModes() {
         $('vk-modes').innerHTML = MODES.map(([k, t, d]) =>
@@ -7058,15 +7078,13 @@ _DP_HOURS_JS = """
 
       tzSel.addEventListener('change', () => { tz = tzSel.value; dirty(); });
       $('vk-len').addEventListener('change', dirty);
-      $('vk-copy').addEventListener('click', () => {
-        ['tue','wed','thu','fri'].forEach(k => { hours[k] = Object.assign({}, hours.mon); });
-        renderDays(); dirty();
-      });
 
       try {
 """ + _DP_FB + """
         const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-        const { getFirestore, doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const { getFirestore, doc, onSnapshot, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const firstSnap = (ref) => new Promise((res) => { let un = null; un = onSnapshot(ref, (x) => { res(x.exists() ? x.data() : {}); setTimeout(() => un && un(), 0); }, () => res({})); });
+
         const auth = getAuth(app), db = getFirestore(app);
         let uid = null, myNumber = '';
 
@@ -7074,7 +7092,7 @@ _DP_HOURS_JS = """
           if (!user) return;
           uid = user.uid;
           let d = {};
-          try { const s = await getDoc(doc(db, 'users', uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          try { d = await firstSnap(doc(db, 'users', uid)); } catch (e) {}
           const saved = d.hours || {};
           DAYS.forEach(([k]) => {
             const h = saved[k];
@@ -7117,7 +7135,9 @@ _DP_HOURS_JS = """
             const sl = $('slot-length'); if (sl) sl.textContent = $('vk-len').value;
           } catch (e) {
             status.className = 'text-[13px] text-red-600';
-            status.textContent = 'Could not save: ' + e.message;
+            status.textContent = (e.code === 'permission-denied')
+              ? 'Could not save: your Firestore rules are blocking it. Publish the new rules, then try again.'
+              : 'Could not save: ' + e.message;
           }
           btn.disabled = false; btn.textContent = 'Save hours';
         });
@@ -7149,6 +7169,17 @@ def render_page(path, builder):
         # Sidebar: "Finances" -> "Billing" on every app page
         html = _re_auth.sub(r'>\s*Finances\s*<', '>Billing<', html)
         html = _dp_add(html, "DP_SCROLL_CSS", "</head>", _DP_SCROLL_CSS)
+        # The builder's Firebase helper (window.whenFirebase) was missing on the app pages,
+        # so its Save buttons, calendar and demo banner never ran. Put it back.
+        _fbs = globals().get("FIREBASE_SCRIPT", "")
+        if _fbs and "<!-- Firebase v10 modular SDK" not in html:
+            _fbs = _fbs.replace("10.12.0", "10.12.2")
+            _fbs = _fbs.replace("getFirestore, doc,",
+                                "getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc,", 1)
+            _fbs = _fbs.replace("const db   = getFirestore(app);",
+                                "let db; try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }"
+                                " catch (e) { db = getFirestore(app); }", 1)
+            html = html.replace("</head>", _fbs + "\n</head>", 1)
         # Netlify serves /Pages/dashboard (no .html) - make the old checks accept both.
         html = html.replace('/dashboard\\.html$/', '/dashboard(\\.html)?$/')
         if name == "dashboard.html":

@@ -115,12 +115,74 @@
   </style>
 
 
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import {
+      getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    let db; try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
+
   <script>document.documentElement.classList.add('dash-loading');</script>
   <style>
     /* SF_DASH_CSS */
-    main > * { transition: opacity .3s ease; }
+    main > * { transition: opacity .15s ease; }
     html.dash-loading main > * { opacity: 0; }
-    #panel-home h1, #banner-line { opacity: 0 !important; transition: opacity .4s ease !important; }
+    #panel-home h1, #banner-line { opacity: 0 !important; transition: opacity .2s ease !important; }
     html.greet-ready #panel-home h1, html.greet-ready #banner-line { opacity: 1 !important; }
     @media (prefers-reduced-motion: reduce) {
       main > *, #panel-home h1, #banner-line { transition: none !important; }
@@ -1018,7 +1080,7 @@
     const root = document.documentElement;
     const reveal = () => root.classList.remove('dash-loading');
     const showGreeting = () => root.classList.add('greet-ready');
-    const fallback = setTimeout(() => { reveal(); showGreeting(); }, 4000);
+    const fallback = setTimeout(() => { reveal(); showGreeting(); }, 2000);
     const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
 
     try {
@@ -1043,31 +1105,31 @@
         const h1 = document.querySelector('#panel-home h1');
         const banner = document.getElementById('banner-line');
 
+        const start = new Date(); start.setHours(0, 0, 0, 0);
+        const [userRes, callsRes] = await Promise.allSettled([
+          getDoc(doc(db, 'users', user.uid)),
+          getDocs(query(collection(db, 'users', user.uid, 'calls'), where('startedAt', '>=', Timestamp.fromDate(start))))
+        ]);
+
         let name = '';
-        try {
-          const snap = await getDoc(doc(db, 'users', user.uid));
-          if (snap.exists()) name = snap.data().name || '';
-        } catch (e) {
-          console.error('Vocallus user doc:', e);
-        }
+        if (userRes.status === 'fulfilled' && userRes.value.exists()) name = userRes.value.data().name || '';
         name = (name || user.displayName || (user.email || '').split('@')[0] || 'there').trim().split(' ')[0];
         if (h1) {
           h1.innerHTML = greet() + ', <span id="greeting-name"></span>';
           h1.querySelector('#greeting-name').textContent = name;
         }
 
-        try {
-          const start = new Date(); start.setHours(0, 0, 0, 0);
-          const qs = await getDocs(query(collection(db, 'users', user.uid, 'calls'),
-                                         where('startedAt', '>=', Timestamp.fromDate(start))));
-          const n = qs.size;
-          if (banner) banner.textContent = n ? ('Solana answered ' + n + ' call' + (n === 1 ? '' : 's') + ' today')
-                                             : 'No calls yet today';
-        } catch (e) {
-          console.error('Vocallus calls:', e);
-          if (banner) banner.textContent = (e.code === 'permission-denied')
-            ? 'Firestore rules are blocking call history - publish the rules that include "calls".'
-            : 'No calls yet today';
+        if (banner) {
+          if (callsRes.status === 'fulfilled') {
+            const n = callsRes.value.size;
+            banner.textContent = n ? ('Solana answered ' + n + ' call' + (n === 1 ? '' : 's') + ' today') : 'No calls yet today';
+          } else {
+            const e = callsRes.reason || {};
+            console.error('Vocallus calls:', e);
+            banner.textContent = (e.code === 'permission-denied')
+              ? 'Firestore rules are blocking call history - publish the rules that include "calls".'
+              : 'No calls yet today';
+          }
         }
 
         clearTimeout(fallback);
@@ -1106,7 +1168,7 @@
       panel.innerHTML =
         '<div class="mb-8"><h1 class="text-[32px] font-semibold text-gray-900">Number</h1>' +
         '<p class="text-gray-500 text-[15px] mt-1">The phone number Solana answers.</p></div>' +
-        '<div id="vn-body" style="opacity:0;transition:opacity .3s ease"></div>' +
+        '<div id="vn-body" style="opacity:0;transition:opacity .15s ease"></div>' +
         '<div hidden>' + legacy + '</div>';
       const body = document.getElementById('vn-body');
       const show = () => requestAnimationFrame(() => { body.style.opacity = '1'; });
@@ -1371,7 +1433,7 @@
         });
       }
       if (search) search.addEventListener('input', render);
-      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 3000);
+      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 1500);
 
       try {
 
@@ -1434,7 +1496,7 @@
             '<div class="text-[13px] text-gray-500 font-medium mb-4">Minutes used this month</div>' +
             '<div class="text-[28px] font-semibold text-gray-900"><span id="vb-min">0</span>' +
             '<span class="text-[18px] text-gray-400 font-medium"> / <span id="vb-limit">0</span></span></div>' +
-            '<div class="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden"><div id="vb-bar" class="h-full bg-black rounded-full" style="width:0%;transition:width .4s ease"></div></div>' +
+            '<div class="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden"><div id="vb-bar" class="h-full bg-black rounded-full" style="width:0%;transition:width .2s ease"></div></div>' +
             '<p class="text-[13px] text-gray-500 mt-3">Resets on ' + next.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + '</p>' +
           '</div>' +
         '</div>' +

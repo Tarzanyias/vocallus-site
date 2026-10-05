@@ -114,6 +114,68 @@
     #panel-home, #panel-number, #panel-finances { padding-bottom: 6rem; }
   </style>
 
+
+  <!-- Firebase v10 modular SDK + helpers -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import {
+      getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+      authDomain: "vocallus-aa81e.firebaseapp.com",
+      projectId: "vocallus-aa81e",
+      storageBucket: "vocallus-aa81e.firebasestorage.app",
+      messagingSenderId: "997486177218",
+      appId: "1:997486177218:web:7c4741dbd450549140845b",
+      measurementId: "G-XXWMQ90D50"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    let db; try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
+
+    window.__fb = {
+      app, auth, db,
+      onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      signOut, updateProfile, sendPasswordResetEmail,
+      doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp
+    };
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+  <script>
+    // Tiny helper every page script uses to wait for the module above.
+    window.whenFirebase = function (cb) {
+      if (window.__fb) return cb(window.__fb);
+      window.addEventListener('firebase-ready', function () { cb(window.__fb); }, { once: true });
+    };
+    // Auth guards
+    window.requireAuth = function () {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (!user) { window.location.replace('login.html'); }
+        });
+      });
+    };
+    window.redirectIfAuthed = function (dest) {
+      window.whenFirebase(function (fb) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
+          if (user) { window.location.replace(dest || 'dashboard.html'); }
+        });
+      });
+    };
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
   <div id="demo-banner" class="hidden w-full bg-black text-white text-[13.5px] py-2.5 px-4 items-center justify-center gap-3 z-50">
@@ -843,12 +905,14 @@
       });
 
         const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-        const { getFirestore, doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const { getFirestore, doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const firstSnap = (ref) => new Promise((res) => { let un = null; un = onSnapshot(ref, (x) => { res(x.exists() ? x.data() : {}); setTimeout(() => un && un(), 0); }, () => res({})); });
+
         const auth = getAuth(app), db = getFirestore(app);
         onAuthStateChanged(auth, async (user) => {
           if (!user) return;
           let d = {};
-          try { const s = await getDoc(doc(db, 'users', user.uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          try { d = await firstSnap(doc(db, 'users', user.uid)); } catch (e) {}
           fill(d);
         });
       } catch (e) {
