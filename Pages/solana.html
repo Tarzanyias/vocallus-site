@@ -1431,7 +1431,10 @@
       const V = [
         { id: 'default', label: 'Solana', sub: 'Default voice', tier: 'free', imgs: ['logo.png'], audio: 'solana' },
         { id: 'female', label: 'Female', sub: 'Pro voice', tier: 'pro', imgs: ['pfmale.png', 'pfemale.png', 'pfmales.png'], audio: 'pfmale' },
-        { id: 'male', label: 'Male', sub: 'Pro voice', tier: 'pro', imgs: ['pmale.png'], audio: 'pmale' }
+        { id: 'male', label: 'Male', sub: 'Pro voice', tier: 'pro', imgs: ['pmale.png'], audio: 'pmale' },
+        { id: 'mmale', label: 'Professional Male', sub: 'Max voice', tier: 'max', imgs: ['mmale.png'], audio: 'mmale' },
+        { id: 'mfmale', label: 'Professional Female', sub: 'Max voice', tier: 'max', imgs: ['mfmale.png', 'mfemale.png'], audio: 'mfmale' },
+        { id: 'rmale', label: 'Rustic Male', sub: 'Max voice', tier: 'max', imgs: ['rmale.png'], audio: 'rmale' }
       ];
       const RANK = { free: 0, pro: 1, max: 2 };
       const planRank = (p) => p === 'max' ? 2 : p === 'pro' ? 1 : 0;
@@ -1444,12 +1447,13 @@
         '<div id="vv-up" aria-hidden="true" style="overflow:hidden;max-height:0;opacity:0;margin-top:0;transform:translateY(-6px);' +
             'transition:max-height .3s cubic-bezier(.4,0,.2,1), opacity .25s ease, transform .3s cubic-bezier(.4,0,.2,1), margin-top .3s cubic-bezier(.4,0,.2,1)">' +
           '<div class="rounded-xl bg-black text-white p-3.5">' +
-            '<div class="text-[13px] font-semibold">Pro voices come with Pro and Max</div>' +
+            '<div id="vv-up-title" class="text-[13px] font-semibold">Pro voices come with Pro and Max</div>' +
             '<div class="text-[12px] text-white/70 mt-0.5">Upgrade to use this voice on your calls.</div>' +
             '<a href="pricing.html?back=solana" tabindex="-1" class="mt-2.5 inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-white text-black text-[12.5px] font-semibold hover:bg-gray-100">Upgrade</a>' +
           '</div>' +
         '</div>' +
-        '<p id="vv-note" class="text-[12px] text-gray-400 mt-2">Press play to hear a voice.</p>';
+        '<p class="text-[12px] text-gray-500 mt-2">More voices coming soon.</p>' +
+        '<p id="vv-note" class="text-[12px] text-gray-400 mt-1">Press play to hear a voice.</p>';
       saveBtn.parentNode.insertBefore(wrap, saveBtn);
 
       let voice = 'default', plan = 'none', uid = null, fs = null, db = null, audio = null, playing = null;
@@ -1511,7 +1515,14 @@
 
       async function choose(id) {
         const v = V.find(x => x.id === id);
-        if (!allowed(v)) { showUpgrade(true); $('vv-note').textContent = ''; return; }
+        if (!allowed(v)) {
+          const t = v.tier === 'max' ? 'Max voices come with the Max plan' : 'Pro voices come with Pro and Max';
+          if (upOpen && $('vv-up-title').textContent !== t) {   // switch message with a quick fade
+            up.style.opacity = '0';
+            setTimeout(() => { $('vv-up-title').textContent = t; up.style.opacity = '1'; }, 150);
+          } else { $('vv-up-title').textContent = t; }
+          showUpgrade(true); $('vv-note').textContent = ''; return;
+        }
         showUpgrade(false);
         if (id === voice) return;
         voice = id; render();

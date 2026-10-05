@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 deepseek_python.py (v7) - one script for all the site polish.
+  v12: Max voices (Professional Male, Professional Female, Rustic Male) with a MAX tag + 'More voices coming soon'.
   v11.1: Pro upgrade box slides + fades in smoothly.
   v11: Voices: Solana (default, free) + Female and Male with a PRO tag. Demo accounts that pick
        a Pro voice get an Upgrade box -> pricing page (with a Back button). Samples come from
@@ -1988,7 +1989,10 @@ _DP_VOICE_JS = """
       const V = [
         { id: 'default', label: 'Solana', sub: 'Default voice', tier: 'free', imgs: ['logo.png'], audio: 'solana' },
         { id: 'female', label: 'Female', sub: 'Pro voice', tier: 'pro', imgs: ['pfmale.png', 'pfemale.png', 'pfmales.png'], audio: 'pfmale' },
-        { id: 'male', label: 'Male', sub: 'Pro voice', tier: 'pro', imgs: ['pmale.png'], audio: 'pmale' }
+        { id: 'male', label: 'Male', sub: 'Pro voice', tier: 'pro', imgs: ['pmale.png'], audio: 'pmale' },
+        { id: 'mmale', label: 'Professional Male', sub: 'Max voice', tier: 'max', imgs: ['mmale.png'], audio: 'mmale' },
+        { id: 'mfmale', label: 'Professional Female', sub: 'Max voice', tier: 'max', imgs: ['mfmale.png', 'mfemale.png'], audio: 'mfmale' },
+        { id: 'rmale', label: 'Rustic Male', sub: 'Max voice', tier: 'max', imgs: ['rmale.png'], audio: 'rmale' }
       ];
       const RANK = { free: 0, pro: 1, max: 2 };
       const planRank = (p) => p === 'max' ? 2 : p === 'pro' ? 1 : 0;
@@ -2001,12 +2005,13 @@ _DP_VOICE_JS = """
         '<div id="vv-up" aria-hidden="true" style="overflow:hidden;max-height:0;opacity:0;margin-top:0;transform:translateY(-6px);' +
             'transition:max-height .3s cubic-bezier(.4,0,.2,1), opacity .25s ease, transform .3s cubic-bezier(.4,0,.2,1), margin-top .3s cubic-bezier(.4,0,.2,1)">' +
           '<div class="rounded-xl bg-black text-white p-3.5">' +
-            '<div class="text-[13px] font-semibold">Pro voices come with Pro and Max</div>' +
+            '<div id="vv-up-title" class="text-[13px] font-semibold">Pro voices come with Pro and Max</div>' +
             '<div class="text-[12px] text-white/70 mt-0.5">Upgrade to use this voice on your calls.</div>' +
             '<a href="pricing.html?back=solana" tabindex="-1" class="mt-2.5 inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-white text-black text-[12.5px] font-semibold hover:bg-gray-100">Upgrade</a>' +
           '</div>' +
         '</div>' +
-        '<p id="vv-note" class="text-[12px] text-gray-400 mt-2">Press play to hear a voice.</p>';
+        '<p class="text-[12px] text-gray-500 mt-2">More voices coming soon.</p>' +
+        '<p id="vv-note" class="text-[12px] text-gray-400 mt-1">Press play to hear a voice.</p>';
       saveBtn.parentNode.insertBefore(wrap, saveBtn);
 
       let voice = 'default', plan = 'none', uid = null, fs = null, db = null, audio = null, playing = null;
@@ -2068,7 +2073,14 @@ _DP_VOICE_JS = """
 
       async function choose(id) {
         const v = V.find(x => x.id === id);
-        if (!allowed(v)) { showUpgrade(true); $('vv-note').textContent = ''; return; }
+        if (!allowed(v)) {
+          const t = v.tier === 'max' ? 'Max voices come with the Max plan' : 'Pro voices come with Pro and Max';
+          if (upOpen && $('vv-up-title').textContent !== t) {   // switch message with a quick fade
+            up.style.opacity = '0';
+            setTimeout(() => { $('vv-up-title').textContent = t; up.style.opacity = '1'; }, 150);
+          } else { $('vv-up-title').textContent = t; }
+          showUpgrade(true); $('vv-note').textContent = ''; return;
+        }
         showUpgrade(false);
         if (id === voice) return;
         voice = id; render();
@@ -2262,10 +2274,12 @@ def main() -> int:
 
     src = src.replace(MAIN_GUARD, OVERRIDE + "\n\n" + MAIN_GUARD, 1)
     BUILD_PY.write_text(src, encoding="utf-8")
-    print("[ok] added deepseek_python.py v11")
-    for f in ("Audio/solana.mp3", "Audio/pfmale.mp3", "Audio/pmale.mp3", "Images/pmale.png"):
+    print("[ok] added deepseek_python.py v12")
+    for f, how in (("Audio/solana.mp3", "make_voices.py"), ("Audio/pfmale.mp3", "make_voices.py"), ("Audio/pmale.mp3", "make_voices.py"),
+                   ("Audio/mmale.mp3", "make_max_voices.py"), ("Audio/mfmale.mp3", "make_max_voices.py"), ("Audio/rmale.mp3", "make_max_voices.py"),
+                   ("Images/pmale.png", ""), ("Images/pfmale.png", ""), ("Images/mmale.png", ""), ("Images/mfmale.png", ""), ("Images/rmale.png", "")):
         if not (ROOT / f).exists() and not (ROOT / f.replace(".mp3", ".wav")).exists():
-            print(f"[note] {f} not found yet" + (" - run make_voices.py" if f.endswith(".mp3") else ""))
+            print(f"[note] {f} not found yet" + (f" - run {how}" if how else " - add the picture"))
     (ROOT / "firebase-messaging-sw.js").write_text(SW_FILE, encoding="utf-8")
     print("[ok] wrote firebase-messaging-sw.js (call alerts)")
 
