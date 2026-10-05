@@ -5775,5 +5775,124 @@ def render_page(path, builder):
 # --- end deepseek_python.py ---
 
 
+# --- smooth_fix.py ---
+
+_SF_FIREBASE = """
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+"""
+
+_SF_DASH_HEAD = """
+  <script>document.documentElement.classList.add('dash-loading');</script>
+  <style>
+    /* SF_DASH_CSS */
+    main > * { transition: opacity .3s ease; }
+    html.dash-loading main > * { opacity: 0; }
+    @media (prefers-reduced-motion: reduce) { main > * { transition: none; } }
+  </style>
+"""
+
+_SF_DASH_JS = """
+  <script type="module">
+    /* SF_DASH_MARKER */
+    const root = document.documentElement;
+    const reveal = () => root.classList.remove('dash-loading');
+    const fallback = setTimeout(reveal, 3000);
+    const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
+
+    try {
+""" + _SF_FIREBASE + """
+      const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      const { getFirestore, doc, getDoc, collection, query, where, getDocs, Timestamp } =
+        await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      const auth = getAuth(app), db = getFirestore(app);
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) return;   // the page's own guard sends you to login
+        const h1 = document.querySelector('#panel-home h1');
+        const banner = document.getElementById('banner-line');
+
+        // ---- name ----
+        let name = '';
+        try {
+          const snap = await getDoc(doc(db, 'users', user.uid));
+          if (snap.exists()) name = snap.data().name || '';
+          else console.warn('Vocallus: no users/' + user.uid + ' document yet');
+        } catch (e) {
+          console.error('Vocallus user doc:', e);
+          if (banner) banner.textContent = (e.code === 'permission-denied')
+            ? 'Firestore rules are blocking your account data - publish the latest rules.'
+            : 'Could not load your account: ' + e.message;
+        }
+        name = (name || user.displayName || (user.email || '').split('@')[0] || 'there').trim().split(' ')[0];
+        if (h1) {
+          h1.innerHTML = greet() + ', <span id="greeting-name"></span>';
+          h1.querySelector('#greeting-name').textContent = name;
+        }
+
+        // ---- calls today ----
+        try {
+          const start = new Date(); start.setHours(0, 0, 0, 0);
+          const qs = await getDocs(query(collection(db, 'users', user.uid, 'calls'),
+                                         where('startedAt', '>=', Timestamp.fromDate(start))));
+          const n = qs.size;
+          if (banner) banner.textContent = n ? ('Solana answered ' + n + ' call' + (n === 1 ? '' : 's') + ' today')
+                                             : 'No calls yet today';
+        } catch (e) {
+          console.error('Vocallus calls:', e);
+          if (banner) banner.textContent = (e.code === 'permission-denied')
+            ? 'Firestore rules are blocking call history - publish the rules that include "calls".'
+            : 'Could not load calls: ' + e.message;
+        }
+
+        clearTimeout(fallback);
+        requestAnimationFrame(reveal);
+      });
+    } catch (e) {
+      console.error('Vocallus dashboard:', e);
+      reveal();
+    }
+  </script>
+"""
+
+_SF_LOGIN_JS = """
+  <script type="module">
+    /* SF_LOGIN_MARKER */
+    try {
+""" + _SF_FIREBASE + """
+      const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      onAuthStateChanged(getAuth(app), (user) => {
+        if (user) document.body.classList.add('is-leaving');   // fade out while redirecting
+      });
+    } catch (e) {}
+  </script>
+"""
+
+_prev_rp_smooth = render_page
+
+
+def render_page(path, builder):
+    html = _prev_rp_smooth(path, builder)
+    name = Path(path).name
+    if name == "dashboard.html":
+        if "SF_DASH_CSS" not in html:
+            html = html.replace("</head>", _SF_DASH_HEAD + "\n</head>", 1)
+        if "SF_DASH_MARKER" not in html:
+            html = html.replace("</body>", _SF_DASH_JS + "\n</body>", 1)
+    elif name in ("login.html", "signup.html"):
+        if "SF_LOGIN_MARKER" not in html:
+            html = html.replace("</body>", _SF_LOGIN_JS + "\n</body>", 1)
+    return html
+
+# --- end smooth_fix.py ---
+
+
 if __name__ == "__main__":
     build()
