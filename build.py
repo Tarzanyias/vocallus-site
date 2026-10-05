@@ -6053,6 +6053,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -7795,6 +7798,150 @@ _DP_DEMO_JS = """
   </script>
 """
 
+# ======================= dashboard: real scroll container =======================
+
+_DP_DASH_MAIN_JS = """
+  <script>
+    /* VM_MAIN_MARKER */
+    (function () {
+      if (document.querySelector('body > main')) return;
+      var panels = [].slice.call(document.querySelectorAll('body > .panel'));
+      if (!panels.length) return;
+      var main = document.createElement('main');
+      main.className = 'flex-1 min-w-0 h-screen overflow-y-auto';
+      panels[0].parentNode.insertBefore(main, panels[0]);
+      panels.forEach(function (p) { main.appendChild(p); });
+    })();
+  </script>
+"""
+
+# ======================= Solana page: AI provider (Gemini or ChatGPT) =======================
+
+_DP_PROVIDER_JS = """
+  <script type="module">
+    /* VP_PROVIDER_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const card = $('api-setup');
+    if (card) {
+      const P = {
+        gemini: { label: 'Gemini', sub: 'Google', img: '../Images/gem.png', prefixes: ['AIza', 'AQ.'],
+                  link: 'https://aistudio.google.com/api-keys', linkText: 'Get a Google API key', hint: 'Google keys start with "AIza".' },
+        openai: { label: 'ChatGPT', sub: 'OpenAI', img: '../Images/cha.png', prefixes: ['sk-'],
+                  link: 'https://platform.openai.com/api-keys', linkText: 'Get an OpenAI API key', hint: 'OpenAI keys start with "sk-".' }
+      };
+      const SPIN = '<svg class="vc-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
+      const CHECK = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+      // Old element ids stay (hidden) so the page's older scripts don't crash.
+      card.innerHTML =
+        '<div hidden><div id="provider-grid"></div><input id="api-key"><p id="key-hint"></p><div id="key-saved"></div>' +
+        '<div id="key-masked"></div><button id="key-replace"></button><div id="api-error"></div><div id="api-error-title"></div>' +
+        '<div id="api-error-msg"></div><button id="save-key"></button></div>' +
+        '<div class="flex items-start justify-between gap-4 flex-wrap mb-5">' +
+          '<div><h2 class="text-[18px] font-semibold text-gray-900">AI provider</h2>' +
+          '<p class="text-[14px] text-gray-500 mt-1">Pick the AI behind your agent. Your key is only used for your calls.</p></div>' +
+          '<span id="vp-pill" class="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">Not connected</span>' +
+        '</div>' +
+        '<div id="vp-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5"></div>' +
+        '<div id="vp-note" class="hidden mb-4 rounded-xl bg-white border border-gray-200 px-4 py-3 text-[13px] text-gray-600"></div>' +
+        '<div id="vp-saved" class="hidden mb-5 flex items-center justify-between rounded-xl bg-white border border-gray-200 px-4 py-3">' +
+          '<div><div class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide">Saved key</div>' +
+          '<div id="vp-masked" class="text-[14px] font-mono text-gray-900 mt-0.5"></div></div>' +
+          '<button id="vp-replace" class="text-[13px] font-semibold text-gray-700 underline underline-offset-2 hover:text-black">Replace key</button>' +
+        '</div>' +
+        '<div id="vp-entry" class="mb-5">' +
+          '<label class="block text-[13px] font-semibold text-gray-700 mb-2">API key</label>' +
+          '<input id="vp-key" type="password" autocomplete="off" placeholder="Paste your API key" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-400 bg-white">' +
+          '<p class="text-[12.5px] text-gray-500 mt-2"><span id="vp-hint"></span> ' +
+          '<a id="vp-link" target="_blank" rel="noopener" class="font-semibold text-gray-800 underline underline-offset-2 hover:text-black"></a></p>' +
+        '</div>' +
+        '<div id="vp-err" class="hidden mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[13px] text-red-700"></div>' +
+        '<button id="vp-save" class="btn-primary min-w-[130px] inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-[14px]">Save key</button>';
+
+      let selected = 'gemini', saved = null, plan = 'none', uid = null, fs = null, db = null, replacing = false;
+      const mask = (k) => k.slice(0, 4) + '••••••' + k.slice(-4);
+
+      function render() {
+        $('vp-grid').innerHTML = Object.keys(P).map(id => {
+          const p = P[id], on = id === selected;
+          return '<button data-p="' + id + '" class="vp-card rounded-2xl border-2 bg-white p-4 text-left transition ' +
+            (on ? 'border-black ring-2 ring-black/10' : 'border-gray-200 hover:border-gray-300') + '">' +
+            '<div class="flex items-center justify-between"><img src="' + p.img + '" alt="" class="w-8 h-8 rounded-lg">' +
+            (saved && saved.provider === id ? '<span class="text-[11px] font-semibold text-green-700">Connected</span>' : '') + '</div>' +
+            '<div class="text-[14px] font-semibold text-gray-900 mt-3">' + p.label + '</div>' +
+            '<div class="text-[12px] text-gray-500 mt-0.5">' + p.sub + '</div></button>';
+        }).join('');
+        $('vp-grid').querySelectorAll('.vp-card').forEach(b => b.addEventListener('click', () => {
+          selected = b.dataset.p; replacing = false; $('vp-err').classList.add('hidden'); render();
+        }));
+        const p = P[selected];
+        const hasSaved = !!(saved && saved.apiKey && saved.provider === selected);
+        $('vp-saved').classList.toggle('hidden', !hasSaved || replacing);
+        $('vp-entry').classList.toggle('hidden', hasSaved && !replacing);
+        $('vp-save').classList.toggle('hidden', hasSaved && !replacing);
+        if (hasSaved) $('vp-masked').textContent = mask(saved.apiKey);
+        $('vp-hint').textContent = p.hint;
+        $('vp-link').textContent = p.linkText;
+        $('vp-link').href = p.link;
+        const pill = $('vp-pill');
+        const connected = !!(saved && saved.apiKey);
+        pill.textContent = connected ? 'Connected · ' + P[saved.provider === 'openai' ? 'openai' : 'gemini'].label : 'Not connected';
+        pill.className = 'text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ' + (connected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600');
+        const note = $('vp-note');
+        const msg = plan === 'max' ? 'Your Max plan includes AI, so no key is needed. Add one only if you want to use your own.'
+                  : plan === 'pro' ? '' : 'You can test for free now. Your key is used for phone calls once you are on Pro.';
+        note.textContent = msg; note.classList.toggle('hidden', !msg);
+      }
+      render();
+      $('vp-replace').addEventListener('click', () => { replacing = true; render(); $('vp-key').focus(); });
+
+      $('vp-save').addEventListener('click', async () => {
+        const err = $('vp-err'), btn = $('vp-save'), key = $('vp-key').value.trim(), p = P[selected];
+        err.classList.add('hidden');
+        if (!uid || !fs) { err.textContent = 'Please sign in again.'; err.classList.remove('hidden'); return; }
+        if (key.length < 20 || !p.prefixes.some(x => key.indexOf(x) === 0)) {
+          err.textContent = "That doesn't look like a " + p.sub + ' key. ' + p.hint;
+          err.classList.remove('hidden'); return;
+        }
+        btn.disabled = true; btn.innerHTML = SPIN + 'Saving';
+        try {
+          await fs.setDoc(fs.doc(db, 'users', uid, 'private', 'ai'), {
+            provider: selected, apiKey: key,
+            model: selected === 'openai' ? 'gpt-realtime' : 'gemini-live',
+            updatedAt: fs.serverTimestamp()
+          });
+          saved = { provider: selected, apiKey: key }; replacing = false;
+          $('vp-key').value = '';
+          btn.innerHTML = CHECK + 'Saved';
+          setTimeout(() => { btn.disabled = false; btn.textContent = 'Save key'; render(); }, 1200);
+        } catch (e) {
+          btn.disabled = false; btn.textContent = 'Save key';
+          err.textContent = 'Could not save: ' + e.message; err.classList.remove('hidden');
+        }
+      });
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        db = fs.getFirestore(app);
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid, 'private', 'ai'), (s) => {
+            const d = s.exists() ? s.data() : null;
+            saved = d && d.apiKey && (d.provider === 'openai' || d.provider === 'gemini' || !d.provider)
+              ? { provider: d.provider === 'openai' ? 'openai' : 'gemini', apiKey: d.apiKey } : null;
+            if (saved && !replacing) selected = saved.provider;
+            render();
+          }, () => {});
+          fs.onSnapshot(fs.doc(db, 'users', uid), (s) => { plan = (s.exists() && s.data().plan) || 'none'; render(); }, () => {});
+        });
+      } catch (e) { console.error('AI provider card:', e); }
+    }
+  </script>
+"""
+
 _APP_NAMES_AUTH = {"dashboard.html", "solana.html", "calendar.html", "history.html"}
 _prev_rp_authbtn = render_page
 
@@ -7805,9 +7952,19 @@ def _dp_add(html, marker, where, snippet):
     return html.replace(where, snippet + "\n" + where, 1)
 
 
+_GOOGLE_KEY_LINK = ('Bring your own <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener" '
+                    'class="underline underline-offset-2 hover:text-black">Google API key</a>')
+
+
 def render_page(path, builder):
     html = _prev_rp_authbtn(path, builder)
     name = Path(path).name
+
+    # ---------- every page ----------
+    # Footer: drop the Contact column (placeholder email + phone)
+    html = _re_auth.sub(r'\s*<div class="md:col-span-2">\s*<p[^>]*>Contact</p>\s*<ul[^>]*>.*?</ul>\s*</div>', '', html, flags=_re_auth.S)
+    html = html.replace('Payments secured by Stripe', 'Secure payment')
+    html = html.replace('Bring your own Gemini API key', _GOOGLE_KEY_LINK)
 
     # ---------- app pages ----------
     if name in _APP_NAMES_AUTH:
@@ -7828,6 +7985,7 @@ def render_page(path, builder):
         # Netlify serves /Pages/dashboard (no .html) - make the old checks accept both.
         html = html.replace('/dashboard\\.html$/', '/dashboard(\\.html)?$/')
         if name == "dashboard.html":
+            html = _dp_add(html, "VM_MAIN_MARKER", "</body>", _DP_DASH_MAIN_JS)
             html = _dp_add(html, "SF_DASH_CSS", "</head>", _DP_DASH_HEAD)
             html = _dp_add(html, "SF_DASH_MARKER", "</body>", _DP_DASH_JS)
             html = _dp_add(html, "VN_NUMBER_MARKER", "</body>", _DP_NUMBER_JS)
@@ -7837,6 +7995,10 @@ def render_page(path, builder):
         if name == "solana.html":
             html = _dp_add(html, "VS_SOLANA_MARKER", "</body>", _DP_SOLANA_JS)
             html = _dp_add(html, "VD_DEMO_MARKER", "</body>", _DP_DEMO_JS)
+            html = _dp_add(html, "VP_PROVIDER_MARKER", "</body>", _DP_PROVIDER_JS)
+            # Claude isn't offered any more (its icon is deleted)
+            html = _re_auth.sub(r'\s*<button data-provider="claude".*?</button>', '', html, flags=_re_auth.S)
+            html = html.replace('Gemini is required for phone calls.', 'Pick the AI behind your agent.')
         html = _dp_add(html, "VA_ALERTS_MARKER", "</body>", _DP_ALERTS_JS)
         if name == "calendar.html":
             html = _dp_add(html, "VK_HOURS_MARKER", "</body>", _DP_HOURS_JS)

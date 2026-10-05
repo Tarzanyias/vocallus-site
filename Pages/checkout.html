@@ -347,7 +347,7 @@
               <button id="pay-btn" class="btn-primary w-full mt-6 inline-flex items-center justify-center px-6 py-4 rounded-xl font-bold text-[16px] tracking-[-0.01em] shadow-sm">Subscribe</button>
               <div class="mt-4 flex items-center justify-center gap-2 text-[12.5px] text-neutral-400">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                Payments secured by Stripe
+                Secure payment
               </div>
             </div>
             <div id="pay-status" class="hidden mt-6 rounded-2xl border p-5"></div>
@@ -389,14 +389,6 @@
               <li><a href="../Pages/talk-to-sales.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Talk to Sales</a></li>
               <li><a href="../Pages/signup.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign up</a></li>
               <li><a href="../Pages/login.html" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">Sign in</a></li>
-          </ul>
-        </div>
-
-        <div class="md:col-span-2">
-          <p class="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Contact</p>
-          <ul class="mt-5 space-y-3.5">
-            <li><a href="mailto:hello@vocallus.example" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">hello@vocallus.example</a></li>
-            <li><a href="tel:+15550000000" class="text-[14.5px] text-neutral-500 hover:text-[#111111] transition-colors">(555) 000-0000</a></li>
           </ul>
         </div>
 
@@ -512,7 +504,7 @@
       var PRICE = plan === 'pro' ? '$14.99/month' : '$99.99/month';
       var LABEL = plan === 'pro' ? 'Vocallus Pro' : 'Vocallus Max';
       var FEATS = plan === 'pro'
-        ? ['Bring your own Gemini API key','1 phone number','Calendar booking','Call history','Up to 300 minutes / month']
+        ? ['Bring your own <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-black">Google API key</a>','1 phone number','Calendar booking','Call history','Up to 300 minutes / month']
         : ['AI included (no API key)','1 phone number','Calendar booking','Call history','Up to 1,500 minutes / month','Priority support'];
       var st = document.getElementById('summary-title');
       var sp = document.getElementById('summary-price');

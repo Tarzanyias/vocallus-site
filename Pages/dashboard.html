@@ -1090,6 +1090,20 @@
   </script>
 
 
+  <script>
+    /* VM_MAIN_MARKER */
+    (function () {
+      if (document.querySelector('body > main')) return;
+      var panels = [].slice.call(document.querySelectorAll('body > .panel'));
+      if (!panels.length) return;
+      var main = document.createElement('main');
+      main.className = 'flex-1 min-w-0 h-screen overflow-y-auto';
+      panels[0].parentNode.insertBefore(main, panels[0]);
+      panels.forEach(function (p) { main.appendChild(p); });
+    })();
+  </script>
+
+
   <script type="module">
     /* SF_DASH_MARKER */
     const root = document.documentElement;
