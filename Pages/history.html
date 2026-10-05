@@ -106,6 +106,14 @@
       html { scroll-behavior: auto; }
     }
 </style>
+
+  <style>
+    /* DP_SCROLL_CSS */
+    body > * { min-height: 0; }
+    main { min-height: 0 !important; overflow-y: auto !important; }
+    #panel-home, #panel-number, #panel-finances { padding-bottom: 6rem; }
+  </style>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
   <div id="demo-banner" class="hidden w-full bg-black text-white text-[13.5px] py-2.5 px-4 items-center justify-center gap-3 z-50">
@@ -461,6 +469,34 @@
       var initial = (location.hash || '').replace('#', '');
       if (initial && document.getElementById('panel-' + initial)) activate(initial);
       else activate('home');
+    })();
+  </script>
+
+
+  <script>
+    /* VN_EMPTY_MARKER */
+    (function () {
+      var ICON = '<div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">' +
+        '<svg class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+        '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>';
+      function watch(id, test, html) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var fix = function () {
+          if (el.querySelector('[data-vempty]')) return;
+          if (test.test(el.textContent || '')) el.innerHTML = html;
+        };
+        new MutationObserver(fix).observe(el, { childList: true, subtree: true });
+        fix();
+      }
+      watch('call-list', /No calls/i,
+        '<div data-vempty class="py-16 text-center">' + ICON +
+        '<p class="text-[16px] font-medium text-gray-700">Your recent calls will show here</p>' +
+        '<p class="text-[13.5px] text-gray-400 mt-1">Call your Solana number to see it in action.</p></div>');
+      watch('history-list', /No calls|history will appear/i,
+        '<div data-vempty class="py-20 text-center">' + ICON +
+        '<p class="text-[16px] font-medium text-gray-700">This is where your call history shows</p>' +
+        '<p class="text-[13.5px] text-gray-400 mt-1">Every call Solana answers appears here with the caller, time, and length.</p></div>');
     })();
   </script>
 

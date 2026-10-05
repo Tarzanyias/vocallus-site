@@ -550,7 +550,6 @@
   <script type="module">
     /* AUTH_BTN_MARKER */
     const root = document.documentElement;
-    // Safety net: if Firebase is slow or blocked, show the signed-out buttons anyway.
     const fallback = setTimeout(() => root.classList.add('auth-ready'), 2500);
 
     document.querySelectorAll('[data-auth-swap], [data-auth-logout]').forEach(a => {
@@ -562,7 +561,7 @@
     let doSignOut = null;
     document.querySelectorAll('[data-auth-logout]').forEach(a => {
       a.addEventListener('click', async (e) => {
-        if (a.dataset.mode !== 'logout' || !doSignOut) return;   // signed out: normal "Sign in" link
+        if (a.dataset.mode !== 'logout' || !doSignOut) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         document.body.classList.add('is-leaving');
@@ -573,37 +572,21 @@
 
     function apply(user) {
       document.querySelectorAll('[data-auth-logout]').forEach(a => {
-        if (user) {
-          a.textContent = 'Log out';
-          a.setAttribute('href', '#');
-          a.dataset.mode = 'logout';
-        } else {
-          a.textContent = a.dataset.label;
-          a.setAttribute('href', a.dataset.href0);
-          a.dataset.mode = '';
-        }
+        if (user) { a.textContent = 'Log out'; a.setAttribute('href', '#'); a.dataset.mode = 'logout'; }
+        else { a.textContent = a.dataset.label; a.setAttribute('href', a.dataset.href0); a.dataset.mode = ''; }
       });
       document.querySelectorAll('[data-auth-swap]').forEach(a => {
-        if (user) {
-          a.textContent = 'Dashboard';
-          a.setAttribute('href', a.dataset.dash);
-          a.className = a.dataset.dashCls;
-        } else {
-          a.textContent = a.dataset.label;
-          a.setAttribute('href', a.dataset.href0);
-          a.className = a.dataset.cls0;
-        }
+        if (user) { a.textContent = 'Dashboard'; a.setAttribute('href', a.dataset.dash); a.className = a.dataset.dashCls; }
+        else { a.textContent = a.dataset.label; a.setAttribute('href', a.dataset.href0); a.className = a.dataset.cls0; }
       });
-      document.querySelectorAll('[data-auth-hide]').forEach(el => {
-        el.classList.toggle('auth-gone', !!user);
-      });
+      document.querySelectorAll('[data-auth-hide]').forEach(el => el.classList.toggle('auth-gone', !!user));
       clearTimeout(fallback);
       requestAnimationFrame(() => root.classList.add('auth-ready'));
     }
 
     try {
+
       const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-      const { getAuth, onAuthStateChanged, signOut } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
       const app = getApps().length ? getApps()[0] : initializeApp({
         apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
         authDomain: "vocallus-aa81e.firebaseapp.com",
@@ -612,6 +595,8 @@
         messagingSenderId: "997486177218",
         appId: "1:997486177218:web:7c4741dbd450549140845b"
       });
+
+      const { getAuth, onAuthStateChanged, signOut } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
       const auth = getAuth(app);
       doSignOut = () => signOut(auth);
       onAuthStateChanged(auth, apply);

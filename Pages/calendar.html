@@ -106,6 +106,14 @@
       html { scroll-behavior: auto; }
     }
 </style>
+
+  <style>
+    /* DP_SCROLL_CSS */
+    body > * { min-height: 0; }
+    main { min-height: 0 !important; overflow-y: auto !important; }
+    #panel-home, #panel-number, #panel-finances { padding-bottom: 6rem; }
+  </style>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
   <div id="demo-banner" class="hidden w-full bg-black text-white text-[13.5px] py-2.5 px-4 items-center justify-center gap-3 z-50">
