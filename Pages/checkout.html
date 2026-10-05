@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign up</title>
-  <meta name="description" content="Try Vocallus free.">
+  <title>Checkout</title>
+  <meta name="description" content="Complete your Vocallus subscription.">
   <link rel="icon" type="image/png" href="../Images/favicon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -322,48 +322,35 @@
 
   <main class="flex-1 ">
 
-      <div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-16 lg:py-24 w-full">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-          <div class="lg:col-span-6 flex flex-col justify-center">
-            <span class="inline-flex self-start items-center rounded-full bg-[#111111] border border-[#111111] px-3.5 py-1.5 text-[13px] font-semibold text-white">Free demo</span>
-            <h1 class="mt-5 text-4xl sm:text-5xl lg:text-[52px] font-bold leading-[1.08] tracking-[-0.035em] text-[#111111]">Try Vocallus free</h1>
-            <p class="mt-6 text-[17px] sm:text-[18px] leading-[1.58] text-[#55565B] max-w-[520px]">Set up Solana in minutes.</p>
-          </div>
-          <div class="lg:col-span-6 flex justify-center lg:justify-end">
-            <div class="w-full max-w-[460px] rounded-3xl border border-neutral-100 bg-white p-8 sm:p-10 shadow-sm">
-              <button type="button" id="google-signup" class="w-full inline-flex items-center justify-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-6 py-3.5 font-bold text-[16px] text-neutral-800 shadow-xs hover:bg-neutral-50 transition mb-5">
-                <img src="../Images/gicon.png" alt="" class="h-5 w-5">
-                Sign up with Google
-              </button>
-              <div class="flex items-center gap-3 mb-5">
-                <div class="flex-1 h-px bg-neutral-200"></div>
-                <span class="text-[12px] font-semibold text-neutral-400 uppercase tracking-wider">or</span>
-                <div class="flex-1 h-px bg-neutral-200"></div>
+      <div class="max-w-[1200px] mx-auto px-6 lg:px-12 py-16 w-full">
+        <div class="mb-10">
+          <a href="pricing.html" class="inline-flex items-center gap-1.5 text-[14px] font-medium text-neutral-500 hover:text-black transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            Back to pricing
+          </a>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+          <div class="lg:col-span-5">
+            <div class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs">
+              <div class="text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400 mb-3">Order summary</div>
+              <div id="summary-title" class="text-[24px] font-bold tracking-tight text-[#111111]">Vocallus</div>
+              <div id="summary-price" class="mt-1.5 text-[16px] font-medium text-neutral-500">—</div>
+              <ul id="summary-features" class="mt-6 space-y-2.5"></ul>
+              <div class="mt-6 pt-6 border-t border-neutral-100 text-[13px] text-neutral-500">
+                Billed monthly. Cancel anytime.
               </div>
-              <form id="signup-form" class="space-y-5" novalidate>
-                <label class="block">
-                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Full name</span>
-                  <input type="text" name="name" placeholder="Jordan Rivera" required autocomplete="name" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
-                </label>
-                <label class="block">
-                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Email</span>
-                  <input type="email" name="email" placeholder="you@company.com" required autocomplete="email" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
-                </label>
-                <label class="block">
-                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Company</span>
-                  <input type="text" name="company" placeholder="Acme Services" required autocomplete="organization" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
-                </label>
-                <label class="block">
-                  <span class="block text-[13.5px] font-semibold text-[#111111] mb-1.5">Password</span>
-                  <input type="password" name="password" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password" class="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-neutral-500 focus:ring-4 focus:ring-neutral-100">
-                </label>
-                <div id="signup-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-3.5 text-[13.5px] text-red-700"></div>
-                <button type="submit" class="btn-primary w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-bold text-[16px] shadow-sm">Create my account</button>
-              </form>
-              <p class="mt-6 text-center text-[13.5px] text-neutral-500">
-                Already have an account? <a href="login.html" class="font-semibold text-[#111111] hover:underline">Sign in</a>
-              </p>
             </div>
+          </div>
+          <div class="lg:col-span-7">
+            <div id="pay-wrap" class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs">
+              <div id="payment-element" class="min-h-[240px]"></div>
+              <button id="pay-btn" class="btn-primary w-full mt-6 inline-flex items-center justify-center px-6 py-4 rounded-xl font-bold text-[16px] tracking-[-0.01em] shadow-sm">Subscribe</button>
+              <div class="mt-4 flex items-center justify-center gap-2 text-[12.5px] text-neutral-400">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Payments secured by Stripe
+              </div>
+            </div>
+            <div id="pay-status" class="hidden mt-6 rounded-2xl border p-5"></div>
           </div>
         </div>
       </div>
@@ -516,61 +503,6 @@
 
 
 
-  <script>
-    window.redirectIfAuthed && window.redirectIfAuthed('dashboard.html');
-    window.whenFirebase && window.whenFirebase(function (fb) {
-      var errEl = document.getElementById('signup-error');
-      function showErr(m) { errEl.textContent = m; errEl.classList.remove('hidden'); }
-      function hideErr() { errEl.classList.add('hidden'); }
-      var plan = (new URLSearchParams(location.search).get('plan') || '').toLowerCase();
-      var DEST = (plan === 'pro' || plan === 'max') ? ('checkout.html?plan=' + plan) : 'dashboard.html';
-
-      function ensureUserDoc(user, extra) {
-        var ref = fb.doc(fb.db, 'users', user.uid);
-        return fb.getDoc(ref).then(function (snap) {
-          if (!snap.exists()) {
-            return fb.setDoc(ref, {
-              name: (extra && extra.name) || user.displayName || '',
-              email: user.email || '',
-              company: (extra && extra.company) || '',
-              plan: 'none',
-              agentName: 'Solana',
-              systemPrompt: 'You are Solana, the friendly receptionist for our business. Greet callers warmly, ask how you can help, and keep every reply short and natural, like a real person on the phone. If they want an appointment, find a day and time that works, get their name, and confirm the day and time back to them. If you can\'t help with something, offer to take a message and say someone will call them back.',
-              createdAt: fb.serverTimestamp()
-            });
-          }
-          return snap.data().name ? Promise.resolve() : fb.updateDoc(ref, { name: user.displayName || '' });
-        });
-      }
-
-      document.getElementById('google-signup').addEventListener('click', function () {
-        hideErr();
-        fb.signInWithPopup(fb.auth, new fb.GoogleAuthProvider())
-          .then(function (res) { return ensureUserDoc(res.user); })
-          .then(function () { window.location.href = DEST; })
-          .catch(function (e) { showErr(e.message || String(e)); });
-      });
-
-      document.getElementById('signup-form').addEventListener('submit', function (e) {
-        e.preventDefault();
-        hideErr();
-        var name = this.name.value.trim();
-        var email = this.email.value.trim();
-        var company = this.company.value.trim();
-        var pw = this.password.value;
-        if (pw.length < 6) { showErr('Password must be at least 6 characters.'); return; }
-        fb.createUserWithEmailAndPassword(fb.auth, email, pw)
-          .then(function (cred) {
-            return fb.updateProfile(cred.user, { displayName: name })
-              .then(function () { return ensureUserDoc(cred.user, { name: name, company: company }); });
-          })
-          .then(function () { window.location.href = DEST; })
-          .catch(function (e) { showErr(e.message || String(e)); });
-      });
-    });
-  </script>
-
-
   <script type="module">
     /* AUTH_BTN_MARKER */
     const root = document.documentElement;
@@ -645,25 +577,92 @@
   </script>
 
 
-  <script type="module">
-    /* SF_LOGIN_MARKER */
-    try {
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    window.requireAuth && window.requireAuth();
+    (function () {
+      var plan = (new URLSearchParams(location.search).get('plan') || '').toLowerCase();
+      if (plan !== 'pro' && plan !== 'max') { location.replace('pricing.html'); return; }
+      var PRICE = plan === 'pro' ? '$14.99/month' : '$99.99/month';
+      var LABEL = plan === 'pro' ? 'Vocallus Pro' : 'Vocallus Max';
+      var FEATS = plan === 'pro'
+        ? ['Bring your own Gemini API key','1 phone number','Calendar booking','Call history','Up to 300 minutes / month']
+        : ['AI included (no API key)','1 phone number','Calendar booking','Call history','Up to 1,500 minutes / month','Priority support'];
+      var st = document.getElementById('summary-title');
+      var sp = document.getElementById('summary-price');
+      var su = document.getElementById('summary-features');
+      if (st) st.textContent = LABEL;
+      if (sp) sp.textContent = PRICE;
+      if (su) {
+        su.innerHTML = '';
+        FEATS.forEach(function (f) {
+          var li = document.createElement('li');
+          li.className = 'flex items-start gap-2.5 text-[15px] text-[#55565B]';
+          li.innerHTML = '<span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>' + f;
+          su.appendChild(li);
+        });
+      }
+      var pb = document.getElementById('pay-btn');
+      if (pb) pb.textContent = 'Subscribe — ' + PRICE;
 
-      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-      const app = getApps().length ? getApps()[0] : initializeApp({
-        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-        authDomain: "vocallus-aa81e.firebaseapp.com",
-        projectId: "vocallus-aa81e",
-        storageBucket: "vocallus-aa81e.firebasestorage.app",
-        messagingSenderId: "997486177218",
-        appId: "1:997486177218:web:7c4741dbd450549140845b"
-      });
+      function setStatus(kind, html) {
+        var el = document.getElementById('pay-status');
+        if (!el) return;
+        el.classList.remove('hidden','border-green-200','bg-green-50','text-green-800','border-red-200','bg-red-50','text-red-800');
+        if (kind === 'ok') el.classList.add('border-green-200','bg-green-50','text-green-800');
+        if (kind === 'err') el.classList.add('border-red-200','bg-red-50','text-red-800');
+        el.innerHTML = html;
+      }
 
-      const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-      onAuthStateChanged(getAuth(app), (user) => {
-        if (user) document.body.classList.add('is-leaving');   // fade out while redirecting
+      window.whenFirebase && window.whenFirebase(async function (fb) {
+        var user = fb.auth.currentUser;
+        if (!user) return;
+        var token = await user.getIdToken();
+        var stripe = Stripe('pk_live_51UMzQBBlomEBThpkMWidPnPgr0j25tV3TpUb15xe3IqzicOUhqiNiGycJqaO3VBzBYSVna4QBmRI5GlS7e8Qx8nZ00yQhomtn9');
+        var r = await fetch('https://vocallus-bridge-production.up.railway.app/api/billing/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ plan: plan })
+        });
+        var data = await r.json().catch(function () { return {}; });
+        if (!r.ok) { setStatus('err', 'Error: ' + (data.error || r.status)); return; }
+        if (data.updated) {
+          var pw = document.getElementById('pay-wrap');
+          if (pw) pw.classList.add('hidden');
+          setStatus('ok', '<div class="font-semibold">Your plan was changed to ' + (plan === 'pro' ? 'Pro' : 'Max') + '.</div><a href="dashboard.html" class="inline-block mt-3 font-semibold underline">Go to dashboard</a>');
+          return;
+        }
+        if (!data.clientSecret) { setStatus('err', 'Error: ' + (data.error || 'Missing client secret')); return; }
+        var elements = stripe.elements({
+          clientSecret: data.clientSecret,
+          appearance: {
+            theme: 'stripe',
+            variables: { colorPrimary: '#111111', colorText: '#111111', fontFamily: 'Plus Jakarta Sans, sans-serif', borderRadius: '12px' }
+          },
+          fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600' }]
+        });
+        var payment = elements.create('payment', { layout: 'tabs' });
+        payment.mount('#payment-element');
+        var btn = document.getElementById('pay-btn');
+        btn.addEventListener('click', async function () {
+          btn.disabled = true;
+          var orig = btn.textContent;
+          btn.textContent = 'Processing…';
+          var res = await stripe.confirmPayment({
+            elements: elements,
+            redirect: 'if_required',
+            confirmParams: { return_url: 'https://vocallus.netlify.app/Pages/dashboard.html?paid=1' }
+          });
+          if (res.error) {
+            setStatus('err', res.error.message || 'Payment failed');
+            btn.disabled = false;
+            btn.textContent = orig;
+          } else {
+            location.href = 'dashboard.html?paid=1';
+          }
+        });
       });
-    } catch (e) {}
+    })();
   </script>
 
 </body>

@@ -108,6 +108,44 @@
 </style>
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
+  <div id="demo-banner" class="hidden w-full bg-black text-white text-[13.5px] py-2.5 px-4 items-center justify-center gap-3 z-50">
+    <span>Demo mode — Upgrade for phone calls</span>
+    <a href="pricing.html" class="font-semibold underline decoration-white/60 underline-offset-2 hover:decoration-white">Upgrade</a>
+  </div>
+  <div id="paid-banner" class="hidden w-full bg-green-600 text-white text-[13.5px] py-2.5 px-4 text-center z-50"></div>
+  <script>
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      fb.onAuthStateChanged(fb.auth, function (u) {
+        if (!u) return;
+        fb.onSnapshot(fb.doc(fb.db, 'users', u.uid), function (snap) {
+          var plan = snap.exists() ? (snap.data().plan || 'none') : 'none';
+          var active = (plan === 'pro' || plan === 'max');
+          var d = document.getElementById('demo-banner');
+          if (d) {
+            d.classList.toggle('hidden', active);
+            d.classList.toggle('flex', !active);
+          }
+          var params = new URLSearchParams(location.search);
+          if (params.get('paid') === '1') {
+            var p = document.getElementById('paid-banner');
+            if (p) {
+              p.classList.remove('hidden');
+              if (active) {
+                p.textContent = "You're on " + (plan === 'pro' ? 'Pro' : 'Max') + '!';
+                setTimeout(function () { p.classList.add('hidden'); }, 4000);
+                if (history.replaceState) {
+                  history.replaceState(null, '', location.pathname + location.hash);
+                }
+              } else {
+                p.textContent = 'Payment received — activating your plan…';
+              }
+            }
+          }
+        });
+      });
+    });
+  </script>
+
 
     <nav class="w-[88px] bg-[#f2f2f2] border-r border-gray-200 flex flex-col justify-between items-center py-6 flex-shrink-0 z-10">
         <div class="flex flex-col items-center w-full space-y-4">

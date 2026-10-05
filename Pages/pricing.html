@@ -330,7 +330,7 @@
           <h2 class="mt-5 text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.12] tracking-[-0.03em] text-[#111111]">Simple pricing that scales</h2>
           <p class="mt-5 text-[17px] leading-[1.6] text-[#55565B]">Two plans. Cancel anytime.</p>
         </div>
-        <div class="mt-20 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start max-w-[900px] mx-auto" id="pricing-cards">
+        <div class="mt-20 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start max-w-[900px] mx-auto">
           <div class="rounded-3xl border border-gray-300 ring-2 ring-black/5 bg-white p-8 shadow-xs flex flex-col">
             <div class="flex items-center justify-between gap-3">
               <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Pro</h3>
@@ -338,7 +338,7 @@
             </div>
             <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">Bring your own Gemini API key.</p>
             <div class="mt-6 flex items-end gap-1.5">
-              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$15</span>
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$14.99</span>
               <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
             </div>
             <ul class="mt-7 space-y-3 flex-1">
@@ -349,14 +349,14 @@
               <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Up to 300 minutes / month</li>
             </ul>
             <div class="mt-8">
-              <button data-plan="pro" class="plan-btn btn-primary inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] shadow-xs">Choose Pro</button>
+              <a href="#" data-plan-btn="pro" class="plan-btn btn-primary inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] tracking-[-0.01em] shadow-xs">Choose Pro</a>
             </div>
           </div>
           <div class="rounded-3xl border border-neutral-100 bg-white p-8 shadow-xs flex flex-col">
             <h3 class="text-[19px] font-bold tracking-tight text-[#111111]">Max</h3>
             <p class="mt-2.5 text-[15.5px] leading-[1.6] text-[#55565B]">AI included — no API key needed.</p>
             <div class="mt-6 flex items-end gap-1.5">
-              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$99</span>
+              <span class="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-[#111111]">$99.99</span>
               <span class="pb-1 text-[14px] font-medium text-neutral-500">/ month</span>
             </div>
             <ul class="mt-7 space-y-3 flex-1">
@@ -368,31 +368,42 @@
               <li class="flex items-start gap-2.5 text-[15px] text-[#55565B]"><span class="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>Priority support</li>
             </ul>
             <div class="mt-8">
-              <button data-plan="max" class="plan-btn inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] border border-neutral-200 text-neutral-800 hover:bg-neutral-50 transition shadow-xs">Choose Max</button>
+              <a href="#" data-plan-btn="max" class="plan-btn inline-flex w-full items-center justify-center px-6 py-3 rounded-xl font-bold text-[15.5px] border border-neutral-200 text-neutral-800 hover:bg-neutral-50 transition shadow-xs">Choose Max</a>
             </div>
           </div>
         </div>
-        <script>
-          window.STRIPE_PRO_LINK = "";
-          window.STRIPE_MAX_LINK = "";
-          window.whenFirebase && window.whenFirebase(function (fb) {
-            document.querySelectorAll('.plan-btn').forEach(function (btn) {
-              btn.addEventListener('click', function () {
-                var plan = btn.dataset.plan;
-                var user = fb.auth.currentUser;
-                if (!user) { window.location.href = 'signup.html?plan=' + plan; return; }
-                var link = plan === 'pro' ? window.STRIPE_PRO_LINK : window.STRIPE_MAX_LINK;
-                if (!link) { alert('Checkout coming soon'); return; }
-                var u = encodeURIComponent(user.uid);
-                var e = encodeURIComponent(user.email || '');
-                window.location.href = link + '?client_reference_id=' + u + '&prefilled_email=' + e;
-              });
-            });
-          });
-        </script>
 
       </div>
     </section>
+
+  <script>
+    window.whenFirebase && window.whenFirebase(function (fb) {
+      var plan = 'none', user = fb.auth.currentUser;
+      function paint() {
+        document.querySelectorAll('.plan-btn').forEach(function (b) {
+          var p = b.dataset.planBtn;
+          var lbl = p === 'pro' ? 'Choose Pro' : 'Choose Max';
+          if (user && plan === p) {
+            b.textContent = 'Current plan';
+            b.classList.add('opacity-60','pointer-events-none');
+            b.setAttribute('href','#');
+          } else {
+            b.textContent = lbl;
+            b.classList.remove('opacity-60','pointer-events-none');
+            b.setAttribute('href', user ? ('checkout.html?plan=' + p) : ('signup.html?plan=' + p));
+          }
+        });
+      }
+      fb.onAuthStateChanged(fb.auth, function (u) {
+        user = u;
+        if (!u) { plan = 'none'; paint(); return; }
+        fb.onSnapshot(fb.doc(fb.db, 'users', u.uid), function (s) {
+          plan = s.exists() ? (s.data().plan || 'none') : 'none';
+          paint();
+        });
+      });
+    });
+  </script>
 
   </main>
 
