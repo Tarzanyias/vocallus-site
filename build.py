@@ -6068,6 +6068,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -7976,10 +7979,13 @@ _DP_VOICE_JS = """
       wrap.innerHTML =
         '<label class="block text-[13px] font-semibold text-gray-700 mb-1.5">Voice</label>' +
         '<div id="vv-list" class="space-y-2"></div>' +
-        '<div id="vv-up" class="hidden mt-2 rounded-xl bg-black text-white p-3.5" style="transition:opacity .15s ease">' +
-          '<div class="text-[13px] font-semibold">Pro voices come with Pro and Max</div>' +
-          '<div class="text-[12px] text-white/70 mt-0.5">Upgrade to use this voice on your calls.</div>' +
-          '<a href="pricing.html?back=solana" class="mt-2.5 inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-white text-black text-[12.5px] font-semibold hover:bg-gray-100">Upgrade</a>' +
+        '<div id="vv-up" aria-hidden="true" style="overflow:hidden;max-height:0;opacity:0;margin-top:0;transform:translateY(-6px);' +
+            'transition:max-height .3s cubic-bezier(.4,0,.2,1), opacity .25s ease, transform .3s cubic-bezier(.4,0,.2,1), margin-top .3s cubic-bezier(.4,0,.2,1)">' +
+          '<div class="rounded-xl bg-black text-white p-3.5">' +
+            '<div class="text-[13px] font-semibold">Pro voices come with Pro and Max</div>' +
+            '<div class="text-[12px] text-white/70 mt-0.5">Upgrade to use this voice on your calls.</div>' +
+            '<a href="pricing.html?back=solana" tabindex="-1" class="mt-2.5 inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-white text-black text-[12.5px] font-semibold hover:bg-gray-100">Upgrade</a>' +
+          '</div>' +
         '</div>' +
         '<p id="vv-note" class="text-[12px] text-gray-400 mt-2">Press play to hear a voice.</p>';
       saveBtn.parentNode.insertBefore(wrap, saveBtn);
@@ -8013,7 +8019,18 @@ _DP_VOICE_JS = """
       render();
 
       const up = $('vv-up');
-      function showUpgrade(show) { up.classList.toggle('hidden', !show); }
+      let upOpen = false;
+      // Slide + fade open/closed
+      function showUpgrade(show) {
+        if (show === upOpen) return;
+        upOpen = show;
+        up.setAttribute('aria-hidden', show ? 'false' : 'true');
+        up.querySelector('a').tabIndex = show ? 0 : -1;
+        up.style.maxHeight = show ? up.scrollHeight + 'px' : '0';
+        up.style.opacity = show ? '1' : '0';
+        up.style.transform = show ? 'none' : 'translateY(-6px)';
+        up.style.marginTop = show ? '8px' : '0';
+      }
 
       function stop() { if (audio) { audio.pause(); audio = null; } playing = null; render(); }
       function play(id) {
