@@ -6056,6 +6056,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -7953,7 +7956,9 @@ def _dp_add(html, marker, where, snippet):
 
 
 _GOOGLE_KEY_LINK = ('Bring your own <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener" '
-                    'class="underline underline-offset-2 hover:text-black">Google API key</a>')
+                    'class="underline underline-offset-2 hover:text-black">Google API key</a> or '
+                    '<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" '
+                    'class="underline underline-offset-2 hover:text-black">OpenAI API key</a>')
 
 
 def render_page(path, builder):

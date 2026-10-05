@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 deepseek_python.py (v7) - one script for all the site polish.
+  v9.1: Pricing/checkout: "Bring your own Google API key or OpenAI API key" (both linked).
   v9: Dashboard scrolls; AI provider = Gemini (Google) or ChatGPT (OpenAI), Claude removed (icon deleted);
       "Bring your own Google API key" links to AI Studio; checkout says "Secure payment";
       footer Contact column removed.
@@ -1977,7 +1978,9 @@ def _dp_add(html, marker, where, snippet):
 
 
 _GOOGLE_KEY_LINK = ('Bring your own <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener" '
-                    'class="underline underline-offset-2 hover:text-black">Google API key</a>')
+                    'class="underline underline-offset-2 hover:text-black">Google API key</a> or '
+                    '<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" '
+                    'class="underline underline-offset-2 hover:text-black">OpenAI API key</a>')
 
 
 def render_page(path, builder):
@@ -2116,7 +2119,7 @@ def main() -> int:
         ("Pages/dashboard.html", "VM_MAIN_MARKER", "Dashboard scrolls"),
         ("Pages/solana.html", "VP_PROVIDER_MARKER", "AI provider: Gemini or ChatGPT"),
         ("Pages/checkout.html", "Secure payment", "Checkout says Secure payment"),
-        ("Pages/pricing.html", "aistudio.google.com/api-keys", "Pricing: Google API key link"),
+        ("Pages/pricing.html", "platform.openai.com/api-keys", "Pricing: Google or OpenAI key links"),
     ]
     print()
     for rel, marker, label in checks:
