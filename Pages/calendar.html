@@ -189,7 +189,7 @@
                 <a href="dashboard.html#finances" data-nav="finances" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
                     <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
                     <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                    <span class="text-[11px] font-medium tracking-tight">Finances</span>
+                    <span class="text-[11px] font-medium tracking-tight">Billing</span>
                 </a>
             </div>
         </div>
@@ -691,7 +691,7 @@
     })();
     // Hash-panel switching on dashboard
     (function () {
-      if (!/dashboard\.html$/.test(location.pathname)) return;
+      if (!/dashboard(\.html)?$/.test(location.pathname)) return;
       function activate(name) {
         document.querySelectorAll('.dash-tab').forEach(function (t) {
           var on = t.dataset.panel === name;
@@ -719,6 +719,237 @@
       if (initial && document.getElementById('panel-' + initial)) activate(initial);
       else activate('home');
     })();
+  </script>
+
+
+  <script type="module">
+    /* VK_HOURS_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const DAYS = [['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
+    const ZONES = [['America/New_York','Eastern'],['America/Chicago','Central'],['America/Denver','Mountain'],
+      ['America/Phoenix','Arizona'],['America/Los_Angeles','Pacific'],['America/Anchorage','Alaska'],['Pacific/Honolulu','Hawaii']];
+    const MODES = [
+      ['message', 'Take a message', 'Solana answers, says you are closed, and takes their name, number and reason.'],
+      ['book', 'Book for later', 'Solana answers and books them into your next open time.'],
+      ['forward', 'Forward to my phone', 'The call rings your phone instead. Solana does not answer.'],
+      ['closed', 'Play a message and hang up', 'Callers hear your closed message, then the call ends.']
+    ];
+    const to12 = (t) => { let [h, m] = t.split(':').map(Number); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + String(m).padStart(2, '0') + ' ' + ap; };
+    const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+    const e164 = (v) => { let d = String(v || '').replace(/\D/g, ''); if (d.length === 11 && d[0] === '1') d = d.slice(1); return d.length === 10 ? '+1' + d : ''; };
+    const fmtPhone = (v) => { const e = e164(v); if (!e) return v || ''; const d = e.slice(2); return '(' + d.slice(0,3) + ') ' + d.slice(3,6) + '-' + d.slice(6); };
+
+    const oldGrid = $('hours-grid');
+    const oldCard = oldGrid ? oldGrid.closest('.mt-8') || oldGrid.parentElement : null;
+    if (oldCard) oldCard.style.display = 'none';           // old editor hidden (kept so older scripts don't crash)
+
+    const wrap = document.querySelector('main > div');
+    const header = wrap ? wrap.firstElementChild : null;
+    if (wrap && header) {
+      const card = document.createElement('section');
+      card.id = 'vk-card';
+      card.className = 'mb-8 rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.04)]';
+      card.style.opacity = '0';
+      card.style.transition = 'opacity .3s ease';
+      const sel = 'rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[13px] focus:outline-none focus:border-gray-400';
+      card.innerHTML =
+        '<div class="flex items-start justify-between gap-4 flex-wrap mb-5">' +
+          '<div><div class="flex items-center gap-2"><h2 class="text-[18px] font-semibold text-gray-900">Business hours</h2>' +
+          '<span id="vk-now" class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"></span></div>' +
+          '<p class="text-[13.5px] text-gray-500 mt-0.5">Solana books inside these hours and follows your after-hours choice outside them.</p></div>' +
+          '<div class="flex items-center gap-2 flex-wrap">' +
+            '<label class="text-[12.5px] text-gray-500">Time zone <select id="vk-tz" class="' + sel + ' ml-1"></select></label>' +
+            '<label class="text-[12.5px] text-gray-500">Slot <select id="vk-len" class="' + sel + ' ml-1">' +
+              [15, 30, 45, 60, 90].map(n => '<option value="' + n + '">' + n + ' min</option>').join('') + '</select></label>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid lg:grid-cols-2 gap-6">' +
+          '<div>' +
+            '<div id="vk-days" class="divide-y divide-gray-100 rounded-2xl border border-gray-100"></div>' +
+            '<button id="vk-copy" type="button" class="mt-2 text-[12.5px] font-semibold text-gray-600 hover:text-black underline underline-offset-2">Copy Monday to all weekdays</button>' +
+          '</div>' +
+          '<div>' +
+            '<div class="text-[13px] font-semibold text-gray-900 mb-2">When you are closed</div>' +
+            '<div id="vk-modes" class="space-y-2"></div>' +
+            '<div id="vk-fwd-box" class="hidden mt-3">' +
+              '<label class="block text-[12.5px] text-gray-500 mb-1">Forward calls to</label>' +
+              '<input id="vk-fwd" type="tel" placeholder="(555) 123-4567" class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400">' +
+            '</div>' +
+            '<div id="vk-msg-box" class="mt-3">' +
+              '<label class="block text-[12.5px] text-gray-500 mb-1">What Solana says when you are closed <span class="text-gray-400">(optional)</span></label>' +
+              '<textarea id="vk-msg" rows="3" maxlength="400" class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.5] focus:outline-none focus:border-gray-400"></textarea>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="flex items-center gap-3 mt-5">' +
+          '<button id="vk-save" type="button" class="btn-primary px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>' +
+          '<span id="vk-status" class="text-[13px]"></span>' +
+        '</div>';
+      header.insertAdjacentElement('afterend', card);
+
+      let hours = {}, mode = 'message', tz = 'America/Chicago';
+      const def = () => ({ open: '09:00', close: '17:00', closed: false });
+
+      // ---- render ----
+      const tzSel = $('vk-tz');
+      function renderTz() {
+        const list = ZONES.slice();
+        if (!list.some(z => z[0] === tz)) list.push([tz, tz]);
+        tzSel.innerHTML = list.map(z => '<option value="' + z[0] + '"' + (z[0] === tz ? ' selected' : '') + '>' + z[1] + '</option>').join('');
+      }
+      function renderDays() {
+        const box = $('vk-days');
+        box.innerHTML = '';
+        DAYS.forEach(([k, label]) => {
+          const h = hours[k];
+          const open = !h.closed;
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-3 px-4 py-2.5';
+          row.innerHTML =
+            '<div class="w-24 text-[13.5px] font-medium text-gray-900">' + label + '</div>' +
+            '<button type="button" data-k="' + k + '" class="vk-tog relative w-10 h-6 rounded-full transition-colors ' + (open ? 'bg-black' : 'bg-gray-200') + '" aria-label="Open on ' + label + '">' +
+              '<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform" style="transform:translateX(' + (open ? '16px' : '0') + ')"></span></button>' +
+            (open
+              ? '<input type="time" data-k="' + k + '" data-f="open" value="' + h.open + '" class="vk-t ' + sel + '">' +
+                '<span class="text-[12px] text-gray-400">to</span>' +
+                '<input type="time" data-k="' + k + '" data-f="close" value="' + h.close + '" class="vk-t ' + sel + '">'
+              : '<span class="text-[13px] text-gray-400">Closed</span>');
+          box.appendChild(row);
+        });
+        box.querySelectorAll('.vk-tog').forEach(b => b.addEventListener('click', () => {
+          hours[b.dataset.k].closed = !hours[b.dataset.k].closed; renderDays(); dirty();
+        }));
+        box.querySelectorAll('.vk-t').forEach(i => i.addEventListener('change', () => {
+          hours[i.dataset.k][i.dataset.f] = i.value; dirty();
+        }));
+      }
+      function renderModes() {
+        $('vk-modes').innerHTML = MODES.map(([k, t, d]) =>
+          '<button type="button" data-m="' + k + '" class="vk-mode w-full text-left rounded-2xl border px-4 py-3 transition ' +
+            (mode === k ? 'border-black ring-2 ring-black/10 bg-white' : 'border-gray-200 bg-white hover:border-gray-300') + '">' +
+            '<div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full border-2 flex items-center justify-center ' + (mode === k ? 'border-black' : 'border-gray-300') + '">' +
+            (mode === k ? '<span class="w-2 h-2 rounded-full bg-black"></span>' : '') + '</span>' +
+            '<span class="text-[14px] font-semibold text-gray-900">' + t + '</span></div>' +
+            '<div class="text-[12.5px] text-gray-500 mt-0.5 ml-6">' + d + '</div></button>').join('');
+        $('vk-modes').querySelectorAll('.vk-mode').forEach(b => b.addEventListener('click', () => { mode = b.dataset.m; renderModes(); dirty(); }));
+        $('vk-fwd-box').classList.toggle('hidden', mode !== 'forward');
+        $('vk-msg-box').classList.toggle('hidden', mode === 'forward');
+        $('vk-msg').placeholder = sampleMsg();
+      }
+      function nextOpen() {
+        // Find the next opening time in the business's time zone.
+        const now = new Date();
+        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit' })
+          .formatToParts(now).map(p => [p.type, p.value]));
+        const dayIdx = ['sun','mon','tue','wed','thu','fri','sat'].indexOf(parts.weekday.slice(0, 3).toLowerCase());
+        const nowMin = (Number(parts.hour) % 24) * 60 + Number(parts.minute);
+        const names = { sun:'Sunday', mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday' };
+        let openNow = false, next = '';
+        for (let i = 0; i < 8; i++) {
+          const k = ['sun','mon','tue','wed','thu','fri','sat'][(dayIdx + i) % 7];
+          const h = hours[k];
+          if (!h || h.closed || toMin(h.close) <= toMin(h.open)) continue;
+          if (i === 0 && nowMin >= toMin(h.open) && nowMin < toMin(h.close)) { openNow = true; break; }
+          if (i === 0 && nowMin >= toMin(h.open)) continue;
+          next = (i === 0 ? 'today' : i === 1 ? 'tomorrow' : names[k]) + ' at ' + to12(h.open);
+          break;
+        }
+        return { openNow, next };
+      }
+      function sampleMsg() {
+        const n = nextOpen().next;
+        return "Thanks for calling! We're closed right now" + (n ? ' and open again ' + n : '') + '.';
+      }
+      function renderNow() {
+        const pill = $('vk-now');
+        const { openNow } = nextOpen();
+        pill.textContent = openNow ? 'Open now' : 'Closed now';
+        pill.className = 'text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ' + (openNow ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600');
+      }
+      const status = $('vk-status');
+      function dirty() { status.textContent = ''; renderNow(); $('vk-msg').placeholder = sampleMsg(); }
+
+      tzSel.addEventListener('change', () => { tz = tzSel.value; dirty(); });
+      $('vk-len').addEventListener('change', dirty);
+      $('vk-copy').addEventListener('click', () => {
+        ['tue','wed','thu','fri'].forEach(k => { hours[k] = Object.assign({}, hours.mon); });
+        renderDays(); dirty();
+      });
+
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        let uid = null, myNumber = '';
+
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          uid = user.uid;
+          let d = {};
+          try { const s = await getDoc(doc(db, 'users', uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          const saved = d.hours || {};
+          DAYS.forEach(([k]) => {
+            const h = saved[k];
+            hours[k] = h ? { open: h.open || '09:00', close: h.close || '17:00', closed: !!h.closed }
+                         : Object.assign(def(), { closed: k === 'sat' || k === 'sun' });
+          });
+          tz = d.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
+          mode = ['message', 'book', 'forward', 'closed'].includes(d.afterHours) ? d.afterHours : 'message';
+          myNumber = d.phoneNumber || '';
+          $('vk-len').value = String(d.appointmentLength || 30);
+          if (![...$('vk-len').options].some(o => o.selected)) $('vk-len').value = '30';
+          $('vk-fwd').value = d.afterHoursForward ? fmtPhone(d.afterHoursForward) : '';
+          $('vk-msg').value = d.afterHoursMessage || '';
+          renderTz(); renderDays(); renderModes(); renderNow();
+          requestAnimationFrame(() => { card.style.opacity = '1'; });
+        });
+
+        $('vk-save').addEventListener('click', async () => {
+          if (!uid) return;
+          const bad = DAYS.find(([k]) => !hours[k].closed && toMin(hours[k].close) <= toMin(hours[k].open));
+          if (bad) { status.className = 'text-[13px] text-red-600'; status.textContent = bad[1] + ': closing time must be after opening time.'; return; }
+          let fwd = '';
+          if (mode === 'forward') {
+            fwd = e164($('vk-fwd').value);
+            if (!fwd) { status.className = 'text-[13px] text-red-600'; status.textContent = 'Enter a 10-digit US phone number to forward to.'; return; }
+            if (fwd === myNumber) { status.className = 'text-[13px] text-red-600'; status.textContent = "That's your Solana number. Use your own cell or office number."; return; }
+          }
+          const btn = $('vk-save');
+          btn.disabled = true; btn.textContent = 'Saving…';
+          try {
+            await updateDoc(doc(db, 'users', uid), {
+              hours, timezone: tz,
+              appointmentLength: Number($('vk-len').value) || 30,
+              afterHours: mode,
+              afterHoursForward: fwd,
+              afterHoursMessage: $('vk-msg').value.trim().slice(0, 400)
+            });
+            status.className = 'text-[13px] text-green-700';
+            status.textContent = 'Saved. Solana uses this on the next call.';
+            const sl = $('slot-length'); if (sl) sl.textContent = $('vk-len').value;
+          } catch (e) {
+            status.className = 'text-[13px] text-red-600';
+            status.textContent = 'Could not save: ' + e.message;
+          }
+          btn.disabled = false; btn.textContent = 'Save hours';
+        });
+      } catch (e) {
+        card.style.opacity = '1';
+        status.className = 'text-[13px] text-red-600';
+        status.textContent = 'Could not load your settings. Refresh the page.';
+      }
+    }
   </script>
 
 </body>

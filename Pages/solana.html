@@ -189,7 +189,7 @@
                 <a href="dashboard.html#finances" data-nav="finances" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
                     <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
                     <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                    <span class="text-[11px] font-medium tracking-tight">Finances</span>
+                    <span class="text-[11px] font-medium tracking-tight">Billing</span>
                 </a>
             </div>
         </div>
@@ -645,7 +645,7 @@
     })();
     // Hash-panel switching on dashboard
     (function () {
-      if (!/dashboard\.html$/.test(location.pathname)) return;
+      if (!/dashboard(\.html)?$/.test(location.pathname)) return;
       function activate(name) {
         document.querySelectorAll('.dash-tab').forEach(function (t) {
           var on = t.dataset.panel === name;
@@ -766,6 +766,95 @@
         }
       }, true);  // capture phase: runs before the old listener
     });
+  </script>
+
+
+  <script type="module">
+    /* VS_SOLANA_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const nameIn = $('agent-name'), promptIn = $('system-prompt'), display = $('agent-name-display');
+
+    const makePrompt = (agent, company) =>
+      'You are ' + agent + ', the friendly AI receptionist for ' + (company || 'our business') + '. ' +
+      'You answer the phone like a real person: warm, calm and to the point. Keep every reply to one or two short sentences.\n\n' +
+      'What you do:\n' +
+      '- Greet the caller and find out their name and why they are calling.\n' +
+      '- Answer simple questions about the business. If you do not know something, say so honestly and never make things up.\n' +
+      '- Book appointments when someone asks, using the calendar.\n' +
+      '- If someone needs a person, take a message: their name, the best number to call back, and a short reason.\n\n' +
+      'Always be polite and patient. Before the call ends, repeat back any booking or message so the caller knows it is handled.';
+
+    if (nameIn && promptIn) {
+      promptIn.classList.remove('resize-none');
+      promptIn.style.resize = 'vertical';
+      promptIn.style.minHeight = '260px';
+
+      // Helper row under the prompt: status + "Reset to default"
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between mt-2 text-[12px]';
+      row.innerHTML = '<span id="vs-state" class="text-gray-400"></span>' +
+        '<button type="button" id="vs-reset" class="font-semibold text-gray-600 hover:text-black underline underline-offset-2">Reset to default</button>';
+      promptIn.insertAdjacentElement('afterend', row);
+      const state = $('vs-state');
+
+      let company = '';
+      const currentDefault = () => makePrompt(nameIn.value.trim() || 'Solana', company);
+      let lastDefault = '';
+      const refreshState = () => {
+        const n = promptIn.value.length;
+        state.textContent = (promptIn.value.trim() === lastDefault.trim() ? 'Default prompt · ' : 'Custom prompt · ') + n + ' characters';
+      };
+
+      function fill(d) {
+        company = (d && d.company) || '';
+        if (!nameIn.value.trim()) nameIn.value = (d && d.agentName) || 'Solana';
+        if (display) display.textContent = nameIn.value.trim() || 'Solana';
+        lastDefault = currentDefault();
+        if (!promptIn.value.trim()) promptIn.value = (d && d.systemPrompt) || lastDefault;
+        refreshState();
+      }
+
+      // Rename the agent -> if the prompt is still the default, update the name inside it too.
+      nameIn.addEventListener('input', () => {
+        const wasDefault = promptIn.value.trim() === lastDefault.trim();
+        lastDefault = currentDefault();
+        if (wasDefault) promptIn.value = lastDefault;
+        if (display) display.textContent = nameIn.value.trim() || 'Solana';
+        refreshState();
+      });
+      promptIn.addEventListener('input', refreshState);
+      $('vs-reset').addEventListener('click', () => {
+        lastDefault = currentDefault();
+        promptIn.value = lastDefault;
+        refreshState();
+        promptIn.focus();
+      });
+
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          let d = {};
+          try { const s = await getDoc(doc(db, 'users', user.uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          fill(d);
+        });
+      } catch (e) {
+        fill({});
+      }
+    }
   </script>
 
 </body>

@@ -202,7 +202,7 @@
                 <a href="dashboard.html#finances" data-nav="finances" class="app-tab relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100">
                     <div class="app-bar absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-900 rounded-r-full transition-opacity opacity-0"></div>
                     <svg class="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                    <span class="text-[11px] font-medium tracking-tight">Finances</span>
+                    <span class="text-[11px] font-medium tracking-tight">Billing</span>
                 </a>
             </div>
         </div>
@@ -406,7 +406,7 @@
 
     <div id="panel-finances" class="panel hidden max-w-[1200px] mx-auto px-8 py-8">
       <div class="mb-8">
-        <h1 class="text-[32px] font-semibold text-gray-900">Finances</h1>
+        <h1 class="text-[32px] font-semibold text-gray-900">Billing</h1>
         <p class="text-gray-500 text-[15px] mt-1">Plan and usage.</p>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -868,7 +868,7 @@
     })();
     // Hash-panel switching on dashboard
     (function () {
-      if (!/dashboard\.html$/.test(location.pathname)) return;
+      if (!/dashboard(\.html)?$/.test(location.pathname)) return;
       function activate(name) {
         document.querySelectorAll('.dash-tab').forEach(function (t) {
           var on = t.dataset.panel === name;
@@ -903,7 +903,7 @@
     /* PANEL_FIX_MARKER */
     (function () {
       var path = window.location.pathname.replace(/\\/g, '/');
-      if (!/dashboard\.html$/.test(path)) return;
+      if (!/dashboard(\.html)?$/.test(path)) return;
 
       function activate(name) {
         document.querySelectorAll('.panel').forEach(function (p) {
@@ -1297,30 +1297,280 @@
   </script>
 
 
-  <script>
-    /* VN_EMPTY_MARKER */
-    (function () {
-      var ICON = '<div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">' +
-        '<svg class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-        '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>';
-      function watch(id, test, html) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        var fix = function () {
-          if (el.querySelector('[data-vempty]')) return;
-          if (test.test(el.textContent || '')) el.innerHTML = html;
-        };
-        new MutationObserver(fix).observe(el, { childList: true, subtree: true });
-        fix();
+  <script type="module">
+    /* VC_RECENT_MARKER */
+
+    const fmtPhone = (n) => {
+      let d = String(n || '').replace(/\D/g, '');
+      if (d.length === 11 && d[0] === '1') d = d.slice(1);
+      return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : (n || 'Unknown caller');
+    };
+    const fmtDur = (s) => { s = Math.round(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    const tsOf = (c) => (c.startedAt && c.startedAt.toMillis) ? c.startedAt.toMillis() : 0;
+    const ago = (ms) => {
+      const s = Math.floor((Date.now() - ms) / 1000);
+      if (s < 60) return 'just now';
+      if (s < 3600) return Math.floor(s / 60) + ' min ago';
+      if (s < 86400) return Math.floor(s / 3600) + ' hr ago';
+      return Math.floor(s / 86400) + ' d ago';
+    };
+    const statusPill = (st) => {
+      st = st || 'completed';
+      if (st === 'completed') return ['Completed', 'bg-green-50 text-green-700'];
+      if (st === 'in-progress' || st === 'in_progress') return ['In progress', 'bg-blue-50 text-blue-700'];
+      if (st === 'forwarded') return ['Forwarded', 'bg-purple-50 text-purple-700'];
+      if (st === 'after-hours') return ['After hours', 'bg-amber-50 text-amber-700'];
+      return [st.replace(/[-_]/g, ' '), 'bg-gray-100 text-gray-600'];
+    };
+    const ICON = '<div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">' +
+      '<svg class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>';
+    const emptyBox = (title, sub, pad) =>
+      '<div class="' + (pad || 'py-16') + ' text-center">' + ICON +
+      '<p class="text-[16px] font-medium text-gray-700">' + title + '</p>' +
+      '<p class="text-[13.5px] text-gray-400 mt-1">' + sub + '</p></div>';
+
+    const old = document.getElementById('call-list');
+    if (old) {
+      old.style.display = 'none';                      // older script can keep writing here, unseen
+      const list = document.createElement('div');
+      list.id = 'vc-list';
+      list.className = 'flex flex-col';
+      old.after(list);
+      const search = document.getElementById('call-search');
+      let calls = [], loaded = false;
+
+      function render() {
+        if (!loaded) return;
+        const q = ((search && search.value) || '').replace(/\D/g, '');
+        let rows = q ? calls.filter(c => String(c.from || '').replace(/\D/g, '').includes(q)) : calls;
+        rows = rows.slice(0, 20);
+        if (!rows.length) {
+          list.innerHTML = q
+            ? '<div class="py-12 text-center text-[14px] text-gray-400">No calls match that number.</div>'
+            : emptyBox('Recent call history will show here', 'Call your Solana number to see it in action.');
+          return;
+        }
+        list.innerHTML = '';
+        rows.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'bg-white px-2 py-5 border-b border-gray-200';
+          row.innerHTML =
+            '<div class="flex items-center gap-3 flex-wrap mb-1">' +
+              '<div class="vc-num text-[15px] font-semibold text-gray-900"></div>' +
+              '<div class="vc-ago text-[13px] text-gray-500"></div>' +
+              '<span class="vc-st ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"></span>' +
+            '</div><div class="vc-dur text-[13px] text-gray-500"></div>';
+          const [label, cls] = statusPill(c.status);
+          row.querySelector('.vc-num').textContent = fmtPhone(c.from);
+          row.querySelector('.vc-ago').textContent = tsOf(c) ? ago(tsOf(c)) : '';
+          row.querySelector('.vc-st').textContent = label;
+          row.querySelector('.vc-st').className += ' ' + cls;
+          row.querySelector('.vc-dur').textContent = 'Duration ' + (c.durationSec ? fmtDur(c.durationSec) : '—');
+          list.appendChild(row);
+        });
       }
-      watch('call-list', /No calls/i,
-        '<div data-vempty class="py-16 text-center">' + ICON +
-        '<p class="text-[16px] font-medium text-gray-700">Your recent calls will show here</p>' +
-        '<p class="text-[13.5px] text-gray-400 mt-1">Call your Solana number to see it in action.</p></div>');
-      watch('history-list', /No calls|history will appear/i,
-        '<div data-vempty class="py-20 text-center">' + ICON +
-        '<p class="text-[16px] font-medium text-gray-700">This is where your call history shows</p>' +
-        '<p class="text-[13.5px] text-gray-400 mt-1">Every call Solana answers appears here with the caller, time, and length.</p></div>');
+      if (search) search.addEventListener('input', render);
+      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 3000);
+
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          onSnapshot(collection(db, 'users', user.uid, 'calls'), (s) => {
+            calls = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => tsOf(b) - tsOf(a));
+            loaded = true; render();
+          }, (err) => {
+            loaded = true;
+            list.innerHTML = '<div class="py-12 text-center text-[14px] text-red-600">Could not load calls: ' + err.message + '</div>';
+          });
+        });
+      } catch (e) { loaded = true; render(); }
+    }
+  </script>
+
+
+  <script type="module">
+    /* VB_BILLING_MARKER */
+    const panel = document.getElementById('panel-finances');
+    const PLANS = {
+      none: { name: 'Demo', price: 'Free', limit: 0 },
+      pro:  { name: 'Pro',  price: '$14.99 / month', limit: 300 },
+      max:  { name: 'Max',  price: '$99.99 / month', limit: 1500 }
+    };
+    if (panel) {
+      const legacy = ['fin-plan', 'fin-minutes', 'fin-limit'].map(id => '<span id="' + id + '"></span>').join('');
+      const box = 'bg-white rounded-3xl border border-gray-100 p-7 shadow-[0_2px_10px_rgba(0,0,0,0.04)]';
+      const next = new Date(); next.setMonth(next.getMonth() + 1, 1);
+      panel.innerHTML =
+        '<div class="mb-8"><h1 class="text-[32px] font-semibold text-gray-900">Billing</h1>' +
+        '<p class="text-gray-500 text-[15px] mt-1">Your plan, usage, payment method, and invoices.</p></div>' +
+        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">' +
+          // plan
+          '<div class="' + box + '">' +
+            '<div class="flex items-center justify-between mb-4">' +
+              '<div class="text-[13px] text-gray-500 font-medium">Current plan</div>' +
+              '<span id="vb-status" class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Demo</span>' +
+            '</div>' +
+            '<div id="vb-plan" class="text-[28px] font-semibold text-gray-900">Demo</div>' +
+            '<div id="vb-price" class="text-[15px] text-gray-500 mt-1">Free</div>' +
+            '<a id="vb-cta" href="pricing.html" class="btn-primary mt-6 inline-flex items-center justify-center px-5 py-3 rounded-xl font-semibold text-[14px]">Upgrade</a>' +
+          '</div>' +
+          // usage
+          '<div class="' + box + '">' +
+            '<div class="text-[13px] text-gray-500 font-medium mb-4">Minutes used this month</div>' +
+            '<div class="text-[28px] font-semibold text-gray-900"><span id="vb-min">0</span>' +
+            '<span class="text-[18px] text-gray-400 font-medium"> / <span id="vb-limit">0</span></span></div>' +
+            '<div class="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden"><div id="vb-bar" class="h-full bg-black rounded-full" style="width:0%;transition:width .4s ease"></div></div>' +
+            '<p class="text-[13px] text-gray-500 mt-3">Resets on ' + next.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + '</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">' +
+          // payment method (placeholder until Stripe is wired up)
+          '<div class="' + box + '">' +
+            '<div class="flex items-center justify-between mb-5">' +
+              '<div class="text-[13px] text-gray-500 font-medium">Payment method</div>' +
+              '<button disabled class="text-[13px] font-semibold text-gray-400 cursor-not-allowed">Update card · soon</button>' +
+            '</div>' +
+            '<div class="rounded-2xl p-5 text-white" style="background:linear-gradient(135deg,#111 0%,#3a3a3a 100%);max-width:340px">' +
+              '<div class="flex items-center justify-between mb-8"><span class="text-[12px] font-semibold tracking-[0.15em] opacity-80">VOCALLUS</span>' +
+              '<span class="w-9 h-6 rounded-md" style="background:linear-gradient(135deg,#d9d9d9,#9a9a9a)"></span></div>' +
+              '<div class="font-mono text-[18px] tracking-[0.18em]">•••• •••• •••• ••••</div>' +
+              '<div class="flex justify-between mt-4 text-[12px] opacity-70"><span id="vb-card-name">Cardholder</span><span>MM / YY</span></div>' +
+            '</div>' +
+            '<p id="vb-card-note" class="text-[13px] text-gray-500 mt-4">No card on file yet.</p>' +
+          '</div>' +
+          // invoices (placeholder)
+          '<div class="' + box + '">' +
+            '<div class="text-[13px] text-gray-500 font-medium mb-4">Invoices</div>' +
+            '<div class="grid grid-cols-3 text-[12px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100 pb-2">' +
+              '<span>Date</span><span>Amount</span><span class="text-right">Status</span></div>' +
+            '<div class="py-10 text-center text-[14px] text-gray-400">Invoices will appear here after your first payment.</div>' +
+          '</div>' +
+        '</div>' +
+        '<div hidden>' + legacy + '</div>';
+
+      const $ = (id) => document.getElementById(id);
+      let plan = 'none', minutes = 0;
+
+      function paint() {
+        const p = PLANS[plan] || PLANS.none;
+        $('vb-plan').textContent = p.name;
+        $('vb-price').textContent = p.price;
+        const st = $('vb-status');
+        st.textContent = plan === 'none' ? 'Demo' : 'Active';
+        st.className = 'text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ' +
+          (plan === 'none' ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-700');
+        $('vb-cta').textContent = plan === 'none' ? 'Upgrade' : 'Change plan';
+        $('vb-min').textContent = minutes;
+        $('vb-limit').textContent = p.limit;
+        $('vb-bar').style.width = (p.limit ? Math.min(100, minutes / p.limit * 100) : 0) + '%';
+        $('vb-card-note').textContent = plan === 'none'
+          ? 'No card on file yet.'
+          : 'Your card is saved securely with Stripe. Card details will show here soon.';
+      }
+      paint();
+
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, doc, collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          if (user.displayName) $('vb-card-name').textContent = user.displayName;
+          onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            plan = (snap.exists() && snap.data().plan) || 'none';
+            paint();
+          });
+          onSnapshot(collection(db, 'users', user.uid, 'calls'), (s) => {
+            const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
+            let sec = 0;
+            s.forEach(d => {
+              const c = d.data();
+              const t = (c.startedAt && c.startedAt.toMillis) ? c.startedAt.toMillis() : 0;
+              if (t >= start.getTime()) sec += c.durationSec || 0;
+            });
+            minutes = Math.round(sec / 60);
+            paint();
+          });
+        });
+      } catch (e) {}
+    }
+  </script>
+
+
+  <script>
+    /* VR_ROUTER_MARKER */
+    (function () {
+      if (!document.getElementById('panel-home')) return;
+      function has(name) { return !!document.getElementById('panel-' + name); }
+      function activate(name) {
+        if (!has(name)) name = 'home';
+        document.querySelectorAll('.panel').forEach(function (p) {
+          p.classList.toggle('hidden', p.id !== 'panel-' + name);
+        });
+        document.querySelectorAll('.app-tab[data-nav], .dash-tab[data-panel]').forEach(function (t) {
+          var on = (t.dataset.nav || t.dataset.panel) === name;
+          t.classList.toggle('bg-gray-200/80', on);
+          t.classList.toggle('text-gray-900', on);
+          t.classList.toggle('text-gray-500', !on);
+          var bar = t.querySelector('.app-bar, .dash-bar');
+          if (bar) { bar.classList.toggle('opacity-100', on); bar.classList.toggle('opacity-0', !on); }
+        });
+        var main = document.querySelector('main');
+        if (main) main.scrollTop = 0;
+      }
+      function panelFromHref(href) {
+        var m = String(href || '').match(/^(?:\.\/)?(?:dashboard(?:\.html)?)?(?:#([\w-]*))?$/);
+        if (!m || href === '') return null;
+        return m[1] || 'home';
+      }
+      // Capture phase: runs before every other click handler on the page,
+      // so the old scripts can't send you to the home panel.
+      document.addEventListener('click', function (e) {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        var a = e.target.closest('a[href]');
+        if (!a) return;
+        var href = a.getAttribute('href');
+        if (href === '#') return;
+        var name = panelFromHref(href);
+        if (!name || !has(name)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        activate(name);
+        if (history.replaceState) history.replaceState(null, '', name === 'home' ? location.pathname : '#' + name);
+      }, true);
+      window.addEventListener('hashchange', function () {
+        activate((location.hash || '').replace('#', '') || 'home');
+      });
+      function initial() { activate((location.hash || '').replace('#', '') || 'home'); }
+      initial();
+      window.addEventListener('load', initial);
+      window.addEventListener('pageshow', initial);
     })();
   </script>
 

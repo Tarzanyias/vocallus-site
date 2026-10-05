@@ -6029,6 +6029,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6416,34 +6419,714 @@ _DP_NUMBER_JS = """
   </script>
 """
 
-# ======================= empty states =======================
+# ======================= shared call helpers =======================
 
-_DP_EMPTY_JS = """
-  <script>
-    /* VN_EMPTY_MARKER */
-    (function () {
-      var ICON = '<div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">' +
-        '<svg class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-        '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>';
-      function watch(id, test, html) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        var fix = function () {
-          if (el.querySelector('[data-vempty]')) return;
-          if (test.test(el.textContent || '')) el.innerHTML = html;
-        };
-        new MutationObserver(fix).observe(el, { childList: true, subtree: true });
-        fix();
+_DP_CALL_HELPERS = """
+    const fmtPhone = (n) => {
+      let d = String(n || '').replace(/\\D/g, '');
+      if (d.length === 11 && d[0] === '1') d = d.slice(1);
+      return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : (n || 'Unknown caller');
+    };
+    const fmtDur = (s) => { s = Math.round(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    const tsOf = (c) => (c.startedAt && c.startedAt.toMillis) ? c.startedAt.toMillis() : 0;
+    const ago = (ms) => {
+      const s = Math.floor((Date.now() - ms) / 1000);
+      if (s < 60) return 'just now';
+      if (s < 3600) return Math.floor(s / 60) + ' min ago';
+      if (s < 86400) return Math.floor(s / 3600) + ' hr ago';
+      return Math.floor(s / 86400) + ' d ago';
+    };
+    const statusPill = (st) => {
+      st = st || 'completed';
+      if (st === 'completed') return ['Completed', 'bg-green-50 text-green-700'];
+      if (st === 'in-progress' || st === 'in_progress') return ['In progress', 'bg-blue-50 text-blue-700'];
+      if (st === 'forwarded') return ['Forwarded', 'bg-purple-50 text-purple-700'];
+      if (st === 'after-hours') return ['After hours', 'bg-amber-50 text-amber-700'];
+      return [st.replace(/[-_]/g, ' '), 'bg-gray-100 text-gray-600'];
+    };
+    const ICON = '<div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">' +
+      '<svg class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>';
+    const emptyBox = (title, sub, pad) =>
+      '<div class="' + (pad || 'py-16') + ' text-center">' + ICON +
+      '<p class="text-[16px] font-medium text-gray-700">' + title + '</p>' +
+      '<p class="text-[13.5px] text-gray-400 mt-1">' + sub + '</p></div>';
+"""
+
+# ======================= dashboard: recent calls =======================
+
+_DP_RECENT_JS = """
+  <script type="module">
+    /* VC_RECENT_MARKER */
+""" + _DP_CALL_HELPERS + """
+    const old = document.getElementById('call-list');
+    if (old) {
+      old.style.display = 'none';                      // older script can keep writing here, unseen
+      const list = document.createElement('div');
+      list.id = 'vc-list';
+      list.className = 'flex flex-col';
+      old.after(list);
+      const search = document.getElementById('call-search');
+      let calls = [], loaded = false;
+
+      function render() {
+        if (!loaded) return;
+        const q = ((search && search.value) || '').replace(/\\D/g, '');
+        let rows = q ? calls.filter(c => String(c.from || '').replace(/\\D/g, '').includes(q)) : calls;
+        rows = rows.slice(0, 20);
+        if (!rows.length) {
+          list.innerHTML = q
+            ? '<div class="py-12 text-center text-[14px] text-gray-400">No calls match that number.</div>'
+            : emptyBox('Recent call history will show here', 'Call your Solana number to see it in action.');
+          return;
+        }
+        list.innerHTML = '';
+        rows.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'bg-white px-2 py-5 border-b border-gray-200';
+          row.innerHTML =
+            '<div class="flex items-center gap-3 flex-wrap mb-1">' +
+              '<div class="vc-num text-[15px] font-semibold text-gray-900"></div>' +
+              '<div class="vc-ago text-[13px] text-gray-500"></div>' +
+              '<span class="vc-st ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"></span>' +
+            '</div><div class="vc-dur text-[13px] text-gray-500"></div>';
+          const [label, cls] = statusPill(c.status);
+          row.querySelector('.vc-num').textContent = fmtPhone(c.from);
+          row.querySelector('.vc-ago').textContent = tsOf(c) ? ago(tsOf(c)) : '';
+          row.querySelector('.vc-st').textContent = label;
+          row.querySelector('.vc-st').className += ' ' + cls;
+          row.querySelector('.vc-dur').textContent = 'Duration ' + (c.durationSec ? fmtDur(c.durationSec) : '—');
+          list.appendChild(row);
+        });
       }
-      watch('call-list', /No calls/i,
-        '<div data-vempty class="py-16 text-center">' + ICON +
-        '<p class="text-[16px] font-medium text-gray-700">Your recent calls will show here</p>' +
-        '<p class="text-[13.5px] text-gray-400 mt-1">Call your Solana number to see it in action.</p></div>');
-      watch('history-list', /No calls|history will appear/i,
-        '<div data-vempty class="py-20 text-center">' + ICON +
-        '<p class="text-[16px] font-medium text-gray-700">This is where your call history shows</p>' +
-        '<p class="text-[13.5px] text-gray-400 mt-1">Every call Solana answers appears here with the caller, time, and length.</p></div>');
+      if (search) search.addEventListener('input', render);
+      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 3000);
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          onSnapshot(collection(db, 'users', user.uid, 'calls'), (s) => {
+            calls = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => tsOf(b) - tsOf(a));
+            loaded = true; render();
+          }, (err) => {
+            loaded = true;
+            list.innerHTML = '<div class="py-12 text-center text-[14px] text-red-600">Could not load calls: ' + err.message + '</div>';
+          });
+        });
+      } catch (e) { loaded = true; render(); }
+    }
+  </script>
+"""
+
+# ======================= history page =======================
+
+_DP_HISTORY_JS = """
+  <script type="module">
+    /* VH_HISTORY_MARKER */
+""" + _DP_CALL_HELPERS + """
+    const old = document.getElementById('history-list');
+    if (old) {
+      old.style.display = 'none';
+      const list = document.createElement('div');
+      list.id = 'vh-list';
+      list.className = 'space-y-3';
+      old.after(list);
+
+      // ---- sliding filter (All / Today / This week) ----
+      const RANGES = [['all', 'All'], ['today', 'Today'], ['week', 'This week']];
+      const toggle = document.createElement('div');
+      toggle.className = 'relative inline-flex bg-gray-100 rounded-full p-1';
+      toggle.innerHTML =
+        '<span id="vh-pill" class="absolute top-1 bottom-1 left-0 rounded-full bg-white shadow-sm" ' +
+        'style="width:0;transition:transform .28s cubic-bezier(.16,1,.3,1),width .28s cubic-bezier(.16,1,.3,1)"></span>' +
+        RANGES.map(([r, l]) =>
+          '<button type="button" data-r="' + r + '" class="vh-btn relative z-10 px-5 py-2 rounded-full text-[14px] font-medium text-gray-500 transition-colors outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300">' + l + '</button>'
+        ).join('');
+      const oldBtn = document.querySelector('.hist-filter');
+      if (oldBtn && oldBtn.parentElement) oldBtn.parentElement.replaceWith(toggle);
+      else list.before(toggle);
+
+      const pill = toggle.querySelector('#vh-pill');
+      let range = 'all', calls = [], loaded = false;
+
+      function movePill(animate) {
+        const b = toggle.querySelector('.vh-btn[data-r="' + range + '"]');
+        if (!b) return;
+        if (!animate) pill.style.transition = 'none';
+        pill.style.width = b.offsetWidth + 'px';
+        pill.style.transform = 'translateX(' + b.offsetLeft + 'px)';
+        if (!animate) requestAnimationFrame(() => { pill.style.transition = 'transform .28s cubic-bezier(.16,1,.3,1),width .28s cubic-bezier(.16,1,.3,1)'; });
+        toggle.querySelectorAll('.vh-btn').forEach(x => {
+          const on = x === b;
+          x.classList.toggle('text-gray-900', on);
+          x.classList.toggle('font-semibold', on);
+          x.classList.toggle('text-gray-500', !on);
+          x.classList.toggle('font-medium', !on);
+        });
+      }
+
+      function render() {
+        if (!loaded) return;
+        const now = new Date();
+        const day = new Date(now); day.setHours(0, 0, 0, 0);
+        const week = new Date(day); week.setDate(week.getDate() - ((week.getDay() + 6) % 7));
+        const from = range === 'today' ? day.getTime() : range === 'week' ? week.getTime() : 0;
+        const rows = calls.filter(c => tsOf(c) >= from);
+        list.style.opacity = '0';
+        setTimeout(() => {
+          if (!rows.length) {
+            const sub = range === 'today' ? 'No calls today yet.'
+                      : range === 'week' ? 'No calls this week yet.'
+                      : 'Every call Solana answers shows up here with the caller, time, and length.';
+            list.innerHTML = emptyBox('Call history appears here', sub, 'py-20');
+          } else {
+            list.innerHTML = '';
+            rows.forEach(c => {
+              const row = document.createElement('div');
+              row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm transition';
+              row.innerHTML =
+                '<div class="flex items-start gap-4">' +
+                  '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0">' +
+                    '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
+                  '</div>' +
+                  '<div class="flex-1 min-w-0">' +
+                    '<div class="flex items-center gap-2 flex-wrap">' +
+                      '<div class="vh-num font-semibold text-[15px] text-gray-900"></div>' +
+                      '<span class="vh-st text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"></span>' +
+                      '<div class="vh-when text-[12px] text-gray-400 ml-auto"></div>' +
+                    '</div>' +
+                    '<div class="vh-dur text-[13px] text-gray-500 mt-1"></div>' +
+                    '<div class="vh-msg hidden mt-3 rounded-xl bg-[#f9fafb] border border-gray-100 p-3 text-[13.5px] text-gray-700"></div>' +
+                  '</div>' +
+                '</div>';
+              const [label, cls] = statusPill(c.status);
+              row.querySelector('.vh-num').textContent = fmtPhone(c.from);
+              row.querySelector('.vh-st').textContent = label;
+              row.querySelector('.vh-st').className += ' ' + cls;
+              row.querySelector('.vh-when').textContent = tsOf(c)
+                ? new Date(tsOf(c)).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                : '';
+              row.querySelector('.vh-dur').textContent = 'Duration ' + (c.durationSec ? fmtDur(c.durationSec) : '—');
+              if (c.message && (c.message.reason || c.message.name)) {
+                const m = row.querySelector('.vh-msg');
+                m.classList.remove('hidden');
+                const b = document.createElement('div');
+                b.className = 'font-semibold text-gray-900 mb-0.5';
+                b.textContent = 'Message from ' + (c.message.name || 'caller') + (c.message.phone ? ' · ' + fmtPhone(c.message.phone) : '');
+                const t = document.createElement('div');
+                t.textContent = c.message.reason || '';
+                m.append(b, t);
+              }
+              list.appendChild(row);
+            });
+          }
+          list.style.transition = 'opacity .2s ease';
+          list.style.opacity = '1';
+        }, 120);
+      }
+
+      toggle.querySelectorAll('.vh-btn').forEach(b => b.addEventListener('click', () => {
+        range = b.dataset.r; movePill(true); render();
+      }));
+      requestAnimationFrame(() => movePill(false));
+      window.addEventListener('resize', () => movePill(false));
+      setTimeout(() => { if (!loaded) { loaded = true; render(); } }, 3000);
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          onSnapshot(collection(db, 'users', user.uid, 'calls'), (s) => {
+            calls = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => tsOf(b) - tsOf(a));
+            loaded = true; render();
+          }, (err) => {
+            loaded = true;
+            list.innerHTML = '<div class="py-12 text-center text-[14px] text-red-600">Could not load calls: ' + err.message + '</div>';
+          });
+        });
+      } catch (e) { loaded = true; render(); }
+    }
+  </script>
+"""
+
+# ======================= dashboard: Billing tab =======================
+
+_DP_BILLING_JS = """
+  <script type="module">
+    /* VB_BILLING_MARKER */
+    const panel = document.getElementById('panel-finances');
+    const PLANS = {
+      none: { name: 'Demo', price: 'Free', limit: 0 },
+      pro:  { name: 'Pro',  price: '$14.99 / month', limit: 300 },
+      max:  { name: 'Max',  price: '$99.99 / month', limit: 1500 }
+    };
+    if (panel) {
+      const legacy = ['fin-plan', 'fin-minutes', 'fin-limit'].map(id => '<span id="' + id + '"></span>').join('');
+      const box = 'bg-white rounded-3xl border border-gray-100 p-7 shadow-[0_2px_10px_rgba(0,0,0,0.04)]';
+      const next = new Date(); next.setMonth(next.getMonth() + 1, 1);
+      panel.innerHTML =
+        '<div class="mb-8"><h1 class="text-[32px] font-semibold text-gray-900">Billing</h1>' +
+        '<p class="text-gray-500 text-[15px] mt-1">Your plan, usage, payment method, and invoices.</p></div>' +
+        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">' +
+          // plan
+          '<div class="' + box + '">' +
+            '<div class="flex items-center justify-between mb-4">' +
+              '<div class="text-[13px] text-gray-500 font-medium">Current plan</div>' +
+              '<span id="vb-status" class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Demo</span>' +
+            '</div>' +
+            '<div id="vb-plan" class="text-[28px] font-semibold text-gray-900">Demo</div>' +
+            '<div id="vb-price" class="text-[15px] text-gray-500 mt-1">Free</div>' +
+            '<a id="vb-cta" href="pricing.html" class="btn-primary mt-6 inline-flex items-center justify-center px-5 py-3 rounded-xl font-semibold text-[14px]">Upgrade</a>' +
+          '</div>' +
+          // usage
+          '<div class="' + box + '">' +
+            '<div class="text-[13px] text-gray-500 font-medium mb-4">Minutes used this month</div>' +
+            '<div class="text-[28px] font-semibold text-gray-900"><span id="vb-min">0</span>' +
+            '<span class="text-[18px] text-gray-400 font-medium"> / <span id="vb-limit">0</span></span></div>' +
+            '<div class="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden"><div id="vb-bar" class="h-full bg-black rounded-full" style="width:0%;transition:width .4s ease"></div></div>' +
+            '<p class="text-[13px] text-gray-500 mt-3">Resets on ' + next.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + '</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">' +
+          // payment method (placeholder until Stripe is wired up)
+          '<div class="' + box + '">' +
+            '<div class="flex items-center justify-between mb-5">' +
+              '<div class="text-[13px] text-gray-500 font-medium">Payment method</div>' +
+              '<button disabled class="text-[13px] font-semibold text-gray-400 cursor-not-allowed">Update card · soon</button>' +
+            '</div>' +
+            '<div class="rounded-2xl p-5 text-white" style="background:linear-gradient(135deg,#111 0%,#3a3a3a 100%);max-width:340px">' +
+              '<div class="flex items-center justify-between mb-8"><span class="text-[12px] font-semibold tracking-[0.15em] opacity-80">VOCALLUS</span>' +
+              '<span class="w-9 h-6 rounded-md" style="background:linear-gradient(135deg,#d9d9d9,#9a9a9a)"></span></div>' +
+              '<div class="font-mono text-[18px] tracking-[0.18em]">•••• •••• •••• ••••</div>' +
+              '<div class="flex justify-between mt-4 text-[12px] opacity-70"><span id="vb-card-name">Cardholder</span><span>MM / YY</span></div>' +
+            '</div>' +
+            '<p id="vb-card-note" class="text-[13px] text-gray-500 mt-4">No card on file yet.</p>' +
+          '</div>' +
+          // invoices (placeholder)
+          '<div class="' + box + '">' +
+            '<div class="text-[13px] text-gray-500 font-medium mb-4">Invoices</div>' +
+            '<div class="grid grid-cols-3 text-[12px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100 pb-2">' +
+              '<span>Date</span><span>Amount</span><span class="text-right">Status</span></div>' +
+            '<div class="py-10 text-center text-[14px] text-gray-400">Invoices will appear here after your first payment.</div>' +
+          '</div>' +
+        '</div>' +
+        '<div hidden>' + legacy + '</div>';
+
+      const $ = (id) => document.getElementById(id);
+      let plan = 'none', minutes = 0;
+
+      function paint() {
+        const p = PLANS[plan] || PLANS.none;
+        $('vb-plan').textContent = p.name;
+        $('vb-price').textContent = p.price;
+        const st = $('vb-status');
+        st.textContent = plan === 'none' ? 'Demo' : 'Active';
+        st.className = 'text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ' +
+          (plan === 'none' ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-700');
+        $('vb-cta').textContent = plan === 'none' ? 'Upgrade' : 'Change plan';
+        $('vb-min').textContent = minutes;
+        $('vb-limit').textContent = p.limit;
+        $('vb-bar').style.width = (p.limit ? Math.min(100, minutes / p.limit * 100) : 0) + '%';
+        $('vb-card-note').textContent = plan === 'none'
+          ? 'No card on file yet.'
+          : 'Your card is saved securely with Stripe. Card details will show here soon.';
+      }
+      paint();
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, doc, collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          if (user.displayName) $('vb-card-name').textContent = user.displayName;
+          onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            plan = (snap.exists() && snap.data().plan) || 'none';
+            paint();
+          });
+          onSnapshot(collection(db, 'users', user.uid, 'calls'), (s) => {
+            const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
+            let sec = 0;
+            s.forEach(d => {
+              const c = d.data();
+              const t = (c.startedAt && c.startedAt.toMillis) ? c.startedAt.toMillis() : 0;
+              if (t >= start.getTime()) sec += c.durationSec || 0;
+            });
+            minutes = Math.round(sec / 60);
+            paint();
+          });
+        });
+      } catch (e) {}
+    }
+  </script>
+"""
+
+# ======================= dashboard: tab router (works with Netlify pretty URLs) =======================
+
+_DP_ROUTER_JS = """
+  <script>
+    /* VR_ROUTER_MARKER */
+    (function () {
+      if (!document.getElementById('panel-home')) return;
+      function has(name) { return !!document.getElementById('panel-' + name); }
+      function activate(name) {
+        if (!has(name)) name = 'home';
+        document.querySelectorAll('.panel').forEach(function (p) {
+          p.classList.toggle('hidden', p.id !== 'panel-' + name);
+        });
+        document.querySelectorAll('.app-tab[data-nav], .dash-tab[data-panel]').forEach(function (t) {
+          var on = (t.dataset.nav || t.dataset.panel) === name;
+          t.classList.toggle('bg-gray-200/80', on);
+          t.classList.toggle('text-gray-900', on);
+          t.classList.toggle('text-gray-500', !on);
+          var bar = t.querySelector('.app-bar, .dash-bar');
+          if (bar) { bar.classList.toggle('opacity-100', on); bar.classList.toggle('opacity-0', !on); }
+        });
+        var main = document.querySelector('main');
+        if (main) main.scrollTop = 0;
+      }
+      function panelFromHref(href) {
+        var m = String(href || '').match(/^(?:\\.\\/)?(?:dashboard(?:\\.html)?)?(?:#([\\w-]*))?$/);
+        if (!m || href === '') return null;
+        return m[1] || 'home';
+      }
+      // Capture phase: runs before every other click handler on the page,
+      // so the old scripts can't send you to the home panel.
+      document.addEventListener('click', function (e) {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        var a = e.target.closest('a[href]');
+        if (!a) return;
+        var href = a.getAttribute('href');
+        if (href === '#') return;
+        var name = panelFromHref(href);
+        if (!name || !has(name)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        activate(name);
+        if (history.replaceState) history.replaceState(null, '', name === 'home' ? location.pathname : '#' + name);
+      }, true);
+      window.addEventListener('hashchange', function () {
+        activate((location.hash || '').replace('#', '') || 'home');
+      });
+      function initial() { activate((location.hash || '').replace('#', '') || 'home'); }
+      initial();
+      window.addEventListener('load', initial);
+      window.addEventListener('pageshow', initial);
     })();
+  </script>
+"""
+
+# ======================= Solana page: prefilled agent name + system prompt =======================
+
+_DP_SOLANA_JS = """
+  <script type="module">
+    /* VS_SOLANA_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const nameIn = $('agent-name'), promptIn = $('system-prompt'), display = $('agent-name-display');
+
+    const makePrompt = (agent, company) =>
+      'You are ' + agent + ', the friendly AI receptionist for ' + (company || 'our business') + '. ' +
+      'You answer the phone like a real person: warm, calm and to the point. Keep every reply to one or two short sentences.\\n\\n' +
+      'What you do:\\n' +
+      '- Greet the caller and find out their name and why they are calling.\\n' +
+      '- Answer simple questions about the business. If you do not know something, say so honestly and never make things up.\\n' +
+      '- Book appointments when someone asks, using the calendar.\\n' +
+      '- If someone needs a person, take a message: their name, the best number to call back, and a short reason.\\n\\n' +
+      'Always be polite and patient. Before the call ends, repeat back any booking or message so the caller knows it is handled.';
+
+    if (nameIn && promptIn) {
+      promptIn.classList.remove('resize-none');
+      promptIn.style.resize = 'vertical';
+      promptIn.style.minHeight = '260px';
+
+      // Helper row under the prompt: status + "Reset to default"
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between mt-2 text-[12px]';
+      row.innerHTML = '<span id="vs-state" class="text-gray-400"></span>' +
+        '<button type="button" id="vs-reset" class="font-semibold text-gray-600 hover:text-black underline underline-offset-2">Reset to default</button>';
+      promptIn.insertAdjacentElement('afterend', row);
+      const state = $('vs-state');
+
+      let company = '';
+      const currentDefault = () => makePrompt(nameIn.value.trim() || 'Solana', company);
+      let lastDefault = '';
+      const refreshState = () => {
+        const n = promptIn.value.length;
+        state.textContent = (promptIn.value.trim() === lastDefault.trim() ? 'Default prompt · ' : 'Custom prompt · ') + n + ' characters';
+      };
+
+      function fill(d) {
+        company = (d && d.company) || '';
+        if (!nameIn.value.trim()) nameIn.value = (d && d.agentName) || 'Solana';
+        if (display) display.textContent = nameIn.value.trim() || 'Solana';
+        lastDefault = currentDefault();
+        if (!promptIn.value.trim()) promptIn.value = (d && d.systemPrompt) || lastDefault;
+        refreshState();
+      }
+
+      // Rename the agent -> if the prompt is still the default, update the name inside it too.
+      nameIn.addEventListener('input', () => {
+        const wasDefault = promptIn.value.trim() === lastDefault.trim();
+        lastDefault = currentDefault();
+        if (wasDefault) promptIn.value = lastDefault;
+        if (display) display.textContent = nameIn.value.trim() || 'Solana';
+        refreshState();
+      });
+      promptIn.addEventListener('input', refreshState);
+      $('vs-reset').addEventListener('click', () => {
+        lastDefault = currentDefault();
+        promptIn.value = lastDefault;
+        refreshState();
+        promptIn.focus();
+      });
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          let d = {};
+          try { const s = await getDoc(doc(db, 'users', user.uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          fill(d);
+        });
+      } catch (e) {
+        fill({});
+      }
+    }
+  </script>
+"""
+
+# ======================= Calendar: business hours + after-hours at the top =======================
+
+_DP_HOURS_JS = """
+  <script type="module">
+    /* VK_HOURS_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const DAYS = [['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
+    const ZONES = [['America/New_York','Eastern'],['America/Chicago','Central'],['America/Denver','Mountain'],
+      ['America/Phoenix','Arizona'],['America/Los_Angeles','Pacific'],['America/Anchorage','Alaska'],['Pacific/Honolulu','Hawaii']];
+    const MODES = [
+      ['message', 'Take a message', 'Solana answers, says you are closed, and takes their name, number and reason.'],
+      ['book', 'Book for later', 'Solana answers and books them into your next open time.'],
+      ['forward', 'Forward to my phone', 'The call rings your phone instead. Solana does not answer.'],
+      ['closed', 'Play a message and hang up', 'Callers hear your closed message, then the call ends.']
+    ];
+    const to12 = (t) => { let [h, m] = t.split(':').map(Number); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + String(m).padStart(2, '0') + ' ' + ap; };
+    const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+    const e164 = (v) => { let d = String(v || '').replace(/\\D/g, ''); if (d.length === 11 && d[0] === '1') d = d.slice(1); return d.length === 10 ? '+1' + d : ''; };
+    const fmtPhone = (v) => { const e = e164(v); if (!e) return v || ''; const d = e.slice(2); return '(' + d.slice(0,3) + ') ' + d.slice(3,6) + '-' + d.slice(6); };
+
+    const oldGrid = $('hours-grid');
+    const oldCard = oldGrid ? oldGrid.closest('.mt-8') || oldGrid.parentElement : null;
+    if (oldCard) oldCard.style.display = 'none';           // old editor hidden (kept so older scripts don't crash)
+
+    const wrap = document.querySelector('main > div');
+    const header = wrap ? wrap.firstElementChild : null;
+    if (wrap && header) {
+      const card = document.createElement('section');
+      card.id = 'vk-card';
+      card.className = 'mb-8 rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.04)]';
+      card.style.opacity = '0';
+      card.style.transition = 'opacity .3s ease';
+      const sel = 'rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[13px] focus:outline-none focus:border-gray-400';
+      card.innerHTML =
+        '<div class="flex items-start justify-between gap-4 flex-wrap mb-5">' +
+          '<div><div class="flex items-center gap-2"><h2 class="text-[18px] font-semibold text-gray-900">Business hours</h2>' +
+          '<span id="vk-now" class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"></span></div>' +
+          '<p class="text-[13.5px] text-gray-500 mt-0.5">Solana books inside these hours and follows your after-hours choice outside them.</p></div>' +
+          '<div class="flex items-center gap-2 flex-wrap">' +
+            '<label class="text-[12.5px] text-gray-500">Time zone <select id="vk-tz" class="' + sel + ' ml-1"></select></label>' +
+            '<label class="text-[12.5px] text-gray-500">Slot <select id="vk-len" class="' + sel + ' ml-1">' +
+              [15, 30, 45, 60, 90].map(n => '<option value="' + n + '">' + n + ' min</option>').join('') + '</select></label>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid lg:grid-cols-2 gap-6">' +
+          '<div>' +
+            '<div id="vk-days" class="divide-y divide-gray-100 rounded-2xl border border-gray-100"></div>' +
+            '<button id="vk-copy" type="button" class="mt-2 text-[12.5px] font-semibold text-gray-600 hover:text-black underline underline-offset-2">Copy Monday to all weekdays</button>' +
+          '</div>' +
+          '<div>' +
+            '<div class="text-[13px] font-semibold text-gray-900 mb-2">When you are closed</div>' +
+            '<div id="vk-modes" class="space-y-2"></div>' +
+            '<div id="vk-fwd-box" class="hidden mt-3">' +
+              '<label class="block text-[12.5px] text-gray-500 mb-1">Forward calls to</label>' +
+              '<input id="vk-fwd" type="tel" placeholder="(555) 123-4567" class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400">' +
+            '</div>' +
+            '<div id="vk-msg-box" class="mt-3">' +
+              '<label class="block text-[12.5px] text-gray-500 mb-1">What Solana says when you are closed <span class="text-gray-400">(optional)</span></label>' +
+              '<textarea id="vk-msg" rows="3" maxlength="400" class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.5] focus:outline-none focus:border-gray-400"></textarea>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="flex items-center gap-3 mt-5">' +
+          '<button id="vk-save" type="button" class="btn-primary px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>' +
+          '<span id="vk-status" class="text-[13px]"></span>' +
+        '</div>';
+      header.insertAdjacentElement('afterend', card);
+
+      let hours = {}, mode = 'message', tz = 'America/Chicago';
+      const def = () => ({ open: '09:00', close: '17:00', closed: false });
+
+      // ---- render ----
+      const tzSel = $('vk-tz');
+      function renderTz() {
+        const list = ZONES.slice();
+        if (!list.some(z => z[0] === tz)) list.push([tz, tz]);
+        tzSel.innerHTML = list.map(z => '<option value="' + z[0] + '"' + (z[0] === tz ? ' selected' : '') + '>' + z[1] + '</option>').join('');
+      }
+      function renderDays() {
+        const box = $('vk-days');
+        box.innerHTML = '';
+        DAYS.forEach(([k, label]) => {
+          const h = hours[k];
+          const open = !h.closed;
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-3 px-4 py-2.5';
+          row.innerHTML =
+            '<div class="w-24 text-[13.5px] font-medium text-gray-900">' + label + '</div>' +
+            '<button type="button" data-k="' + k + '" class="vk-tog relative w-10 h-6 rounded-full transition-colors ' + (open ? 'bg-black' : 'bg-gray-200') + '" aria-label="Open on ' + label + '">' +
+              '<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform" style="transform:translateX(' + (open ? '16px' : '0') + ')"></span></button>' +
+            (open
+              ? '<input type="time" data-k="' + k + '" data-f="open" value="' + h.open + '" class="vk-t ' + sel + '">' +
+                '<span class="text-[12px] text-gray-400">to</span>' +
+                '<input type="time" data-k="' + k + '" data-f="close" value="' + h.close + '" class="vk-t ' + sel + '">'
+              : '<span class="text-[13px] text-gray-400">Closed</span>');
+          box.appendChild(row);
+        });
+        box.querySelectorAll('.vk-tog').forEach(b => b.addEventListener('click', () => {
+          hours[b.dataset.k].closed = !hours[b.dataset.k].closed; renderDays(); dirty();
+        }));
+        box.querySelectorAll('.vk-t').forEach(i => i.addEventListener('change', () => {
+          hours[i.dataset.k][i.dataset.f] = i.value; dirty();
+        }));
+      }
+      function renderModes() {
+        $('vk-modes').innerHTML = MODES.map(([k, t, d]) =>
+          '<button type="button" data-m="' + k + '" class="vk-mode w-full text-left rounded-2xl border px-4 py-3 transition ' +
+            (mode === k ? 'border-black ring-2 ring-black/10 bg-white' : 'border-gray-200 bg-white hover:border-gray-300') + '">' +
+            '<div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full border-2 flex items-center justify-center ' + (mode === k ? 'border-black' : 'border-gray-300') + '">' +
+            (mode === k ? '<span class="w-2 h-2 rounded-full bg-black"></span>' : '') + '</span>' +
+            '<span class="text-[14px] font-semibold text-gray-900">' + t + '</span></div>' +
+            '<div class="text-[12.5px] text-gray-500 mt-0.5 ml-6">' + d + '</div></button>').join('');
+        $('vk-modes').querySelectorAll('.vk-mode').forEach(b => b.addEventListener('click', () => { mode = b.dataset.m; renderModes(); dirty(); }));
+        $('vk-fwd-box').classList.toggle('hidden', mode !== 'forward');
+        $('vk-msg-box').classList.toggle('hidden', mode === 'forward');
+        $('vk-msg').placeholder = sampleMsg();
+      }
+      function nextOpen() {
+        // Find the next opening time in the business's time zone.
+        const now = new Date();
+        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit' })
+          .formatToParts(now).map(p => [p.type, p.value]));
+        const dayIdx = ['sun','mon','tue','wed','thu','fri','sat'].indexOf(parts.weekday.slice(0, 3).toLowerCase());
+        const nowMin = (Number(parts.hour) % 24) * 60 + Number(parts.minute);
+        const names = { sun:'Sunday', mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday' };
+        let openNow = false, next = '';
+        for (let i = 0; i < 8; i++) {
+          const k = ['sun','mon','tue','wed','thu','fri','sat'][(dayIdx + i) % 7];
+          const h = hours[k];
+          if (!h || h.closed || toMin(h.close) <= toMin(h.open)) continue;
+          if (i === 0 && nowMin >= toMin(h.open) && nowMin < toMin(h.close)) { openNow = true; break; }
+          if (i === 0 && nowMin >= toMin(h.open)) continue;
+          next = (i === 0 ? 'today' : i === 1 ? 'tomorrow' : names[k]) + ' at ' + to12(h.open);
+          break;
+        }
+        return { openNow, next };
+      }
+      function sampleMsg() {
+        const n = nextOpen().next;
+        return "Thanks for calling! We're closed right now" + (n ? ' and open again ' + n : '') + '.';
+      }
+      function renderNow() {
+        const pill = $('vk-now');
+        const { openNow } = nextOpen();
+        pill.textContent = openNow ? 'Open now' : 'Closed now';
+        pill.className = 'text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ' + (openNow ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600');
+      }
+      const status = $('vk-status');
+      function dirty() { status.textContent = ''; renderNow(); $('vk-msg').placeholder = sampleMsg(); }
+
+      tzSel.addEventListener('change', () => { tz = tzSel.value; dirty(); });
+      $('vk-len').addEventListener('change', dirty);
+      $('vk-copy').addEventListener('click', () => {
+        ['tue','wed','thu','fri'].forEach(k => { hours[k] = Object.assign({}, hours.mon); });
+        renderDays(); dirty();
+      });
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        const { getFirestore, doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const auth = getAuth(app), db = getFirestore(app);
+        let uid = null, myNumber = '';
+
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) return;
+          uid = user.uid;
+          let d = {};
+          try { const s = await getDoc(doc(db, 'users', uid)); if (s.exists()) d = s.data(); } catch (e) {}
+          const saved = d.hours || {};
+          DAYS.forEach(([k]) => {
+            const h = saved[k];
+            hours[k] = h ? { open: h.open || '09:00', close: h.close || '17:00', closed: !!h.closed }
+                         : Object.assign(def(), { closed: k === 'sat' || k === 'sun' });
+          });
+          tz = d.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
+          mode = ['message', 'book', 'forward', 'closed'].includes(d.afterHours) ? d.afterHours : 'message';
+          myNumber = d.phoneNumber || '';
+          $('vk-len').value = String(d.appointmentLength || 30);
+          if (![...$('vk-len').options].some(o => o.selected)) $('vk-len').value = '30';
+          $('vk-fwd').value = d.afterHoursForward ? fmtPhone(d.afterHoursForward) : '';
+          $('vk-msg').value = d.afterHoursMessage || '';
+          renderTz(); renderDays(); renderModes(); renderNow();
+          requestAnimationFrame(() => { card.style.opacity = '1'; });
+        });
+
+        $('vk-save').addEventListener('click', async () => {
+          if (!uid) return;
+          const bad = DAYS.find(([k]) => !hours[k].closed && toMin(hours[k].close) <= toMin(hours[k].open));
+          if (bad) { status.className = 'text-[13px] text-red-600'; status.textContent = bad[1] + ': closing time must be after opening time.'; return; }
+          let fwd = '';
+          if (mode === 'forward') {
+            fwd = e164($('vk-fwd').value);
+            if (!fwd) { status.className = 'text-[13px] text-red-600'; status.textContent = 'Enter a 10-digit US phone number to forward to.'; return; }
+            if (fwd === myNumber) { status.className = 'text-[13px] text-red-600'; status.textContent = "That's your Solana number. Use your own cell or office number."; return; }
+          }
+          const btn = $('vk-save');
+          btn.disabled = true; btn.textContent = 'Saving…';
+          try {
+            await updateDoc(doc(db, 'users', uid), {
+              hours, timezone: tz,
+              appointmentLength: Number($('vk-len').value) || 30,
+              afterHours: mode,
+              afterHoursForward: fwd,
+              afterHoursMessage: $('vk-msg').value.trim().slice(0, 400)
+            });
+            status.className = 'text-[13px] text-green-700';
+            status.textContent = 'Saved. Solana uses this on the next call.';
+            const sl = $('slot-length'); if (sl) sl.textContent = $('vk-len').value;
+          } catch (e) {
+            status.className = 'text-[13px] text-red-600';
+            status.textContent = 'Could not save: ' + e.message;
+          }
+          btn.disabled = false; btn.textContent = 'Save hours';
+        });
+      } catch (e) {
+        card.style.opacity = '1';
+        status.className = 'text-[13px] text-red-600';
+        status.textContent = 'Could not load your settings. Refresh the page.';
+      }
+    }
   </script>
 """
 
@@ -6463,13 +7146,24 @@ def render_page(path, builder):
 
     # ---------- app pages ----------
     if name in _APP_NAMES_AUTH:
+        # Sidebar: "Finances" -> "Billing" on every app page
+        html = _re_auth.sub(r'>\s*Finances\s*<', '>Billing<', html)
         html = _dp_add(html, "DP_SCROLL_CSS", "</head>", _DP_SCROLL_CSS)
+        # Netlify serves /Pages/dashboard (no .html) - make the old checks accept both.
+        html = html.replace('/dashboard\\.html$/', '/dashboard(\\.html)?$/')
         if name == "dashboard.html":
             html = _dp_add(html, "SF_DASH_CSS", "</head>", _DP_DASH_HEAD)
             html = _dp_add(html, "SF_DASH_MARKER", "</body>", _DP_DASH_JS)
             html = _dp_add(html, "VN_NUMBER_MARKER", "</body>", _DP_NUMBER_JS)
-        if name in ("dashboard.html", "history.html"):
-            html = _dp_add(html, "VN_EMPTY_MARKER", "</body>", _DP_EMPTY_JS)
+            html = _dp_add(html, "VC_RECENT_MARKER", "</body>", _DP_RECENT_JS)
+            html = _dp_add(html, "VB_BILLING_MARKER", "</body>", _DP_BILLING_JS)
+            html = _dp_add(html, "VR_ROUTER_MARKER", "</body>", _DP_ROUTER_JS)
+        if name == "solana.html":
+            html = _dp_add(html, "VS_SOLANA_MARKER", "</body>", _DP_SOLANA_JS)
+        if name == "calendar.html":
+            html = _dp_add(html, "VK_HOURS_MARKER", "</body>", _DP_HOURS_JS)
+        if name == "history.html":
+            html = _dp_add(html, "VH_HISTORY_MARKER", "</body>", _DP_HISTORY_JS)
         return html
 
     # ---------- marketing pages ----------
