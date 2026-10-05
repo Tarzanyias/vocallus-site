@@ -6038,6 +6038,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6138,6 +6141,16 @@ _DP_SCROLL_CSS = """
     body > * { min-height: 0; }
     main { min-height: 0 !important; overflow-y: auto !important; }
     #panel-home, #panel-number, #panel-finances { padding-bottom: 6rem; }
+    /* Demo / paid banners: small floating pill instead of a giant black column */
+    #demo-banner, #paid-banner {
+      position: fixed !important; left: 50%; bottom: 20px; top: auto !important;
+      transform: translateX(-50%); width: auto !important; max-width: calc(100vw - 32px);
+      border-radius: 9999px; padding: 10px 18px !important; z-index: 60;
+      box-shadow: 0 8px 24px rgba(0,0,0,.18); white-space: nowrap;
+      animation: vcPillIn .2s ease-out both;
+    }
+    @keyframes vcPillIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    @media (prefers-reduced-motion: reduce) { #demo-banner, #paid-banner { animation: none; } }
   </style>
 """
 
