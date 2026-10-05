@@ -6050,6 +6050,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6158,6 +6161,11 @@ _DP_SCROLL_CSS = """
       box-shadow: 0 8px 24px rgba(0,0,0,.18); white-space: nowrap;
       animation: vcPillIn .2s ease-out both;
     }
+    .vc-spin { animation: vcSpin .8s linear infinite; }
+    @keyframes vcSpin { to { transform: rotate(360deg); } }
+    .vd-dot { display: inline-block; margin-right: 2px; animation: vdBlink 1.2s infinite both; }
+    .vd-dot:nth-child(2) { animation-delay: .2s; } .vd-dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes vdBlink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
     @keyframes vcPillIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
     @media (prefers-reduced-motion: reduce) { #demo-banner, #paid-banner { animation: none; } }
   </style>
@@ -6517,13 +6525,15 @@ _DP_RECENT_JS = """
               '<div class="vc-num text-[15px] font-semibold text-gray-900"></div>' +
               '<div class="vc-ago text-[13px] text-gray-500"></div>' +
               '<span class="vc-st ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"></span>' +
-            '</div><div class="vc-dur text-[13px] text-gray-500"></div>';
+            '</div><div class="vc-dur text-[13px] text-gray-500"></div>' +
+            '<div class="vc-sum hidden text-[13.5px] text-gray-700 mt-1.5 leading-[1.5]"></div>';
           const [label, cls] = statusPill(c.status);
           row.querySelector('.vc-num').textContent = fmtPhone(c.from);
           row.querySelector('.vc-ago').textContent = tsOf(c) ? ago(tsOf(c)) : '';
           row.querySelector('.vc-st').textContent = label;
           row.querySelector('.vc-st').className += ' ' + cls;
           row.querySelector('.vc-dur').textContent = 'Duration ' + (c.durationSec ? fmtDur(c.durationSec) : '—');
+          if (c.summary) { const sm = row.querySelector('.vc-sum'); sm.textContent = c.summary; sm.classList.remove('hidden'); }
           list.appendChild(row);
         });
       }
@@ -6628,6 +6638,7 @@ _DP_HISTORY_JS = """
                       '<div class="vh-when text-[12px] text-gray-400 ml-auto"></div>' +
                     '</div>' +
                     '<div class="vh-dur text-[13px] text-gray-500 mt-1"></div>' +
+                    '<div class="vh-sum hidden text-[13.5px] text-gray-700 mt-2 leading-[1.5]"></div>' +
                     '<div class="vh-msg hidden mt-3 rounded-xl bg-[#f9fafb] border border-gray-100 p-3 text-[13.5px] text-gray-700"></div>' +
                   '</div>' +
                 '</div>';
@@ -6639,6 +6650,7 @@ _DP_HISTORY_JS = """
                 ? new Date(tsOf(c)).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
                 : '';
               row.querySelector('.vh-dur').textContent = 'Duration ' + (c.durationSec ? fmtDur(c.durationSec) : '—');
+              if (c.summary) { const sm = row.querySelector('.vh-sum'); sm.textContent = c.summary; sm.classList.remove('hidden'); }
               if (c.message && (c.message.reason || c.message.name)) {
                 const m = row.querySelector('.vh-msg');
                 m.classList.remove('hidden');
@@ -6877,7 +6889,7 @@ _DP_SOLANA_JS = """
 
       // Helper row under the prompt: status + "Reset to default"
       const row = document.createElement('div');
-      row.className = 'flex items-center justify-end mt-2 text-[12px]';
+      row.className = 'flex items-center justify-start mt-2 text-[12px]';
       row.innerHTML = '<span id="vs-state" hidden></span>' +
         '<button type="button" id="vs-reset" class="font-semibold text-gray-600 hover:text-black underline underline-offset-2">Reset to default</button>';
       promptIn.insertAdjacentElement('afterend', row);
@@ -6998,7 +7010,7 @@ _DP_HOURS_JS = """
           '</div>' +
         '</div>' +
         '<div class="flex items-center gap-3 mt-5">' +
-          '<button id="vk-save" type="button" class="btn-primary px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>' +
+          '<button id="vk-save" type="button" class="btn-primary min-w-[124px] inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>' +
           '<span id="vk-status" class="text-[13px]"></span>' +
         '</div>';
       header.insertAdjacentElement('afterend', card);
@@ -7143,7 +7155,10 @@ _DP_HOURS_JS = """
             if (fwd === myNumber) { status.className = 'text-[13px] text-red-600'; status.textContent = "That's your Solana number. Use your own cell or office number."; return; }
           }
           const btn = $('vk-save');
-          btn.disabled = true; btn.textContent = 'Saving…';
+          status.textContent = '';
+          btn.disabled = true;
+          btn.innerHTML = '<span class="inline-flex items-center gap-2"><svg class="vc-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>Saving</span>';
+          let ok = false;
           try {
             const ref = doc(db, 'users', uid);
             const data = {
@@ -7172,8 +7187,7 @@ _DP_HOURS_JS = """
                 throw e1;
               }
             }
-            status.className = 'text-[13px] text-green-700';
-            status.textContent = 'Saved. Solana uses this on the next call.';
+            ok = true;
             const sl = $('slot-length'); if (sl) sl.textContent = $('vk-len').value;
           } catch (e) {
             console.error('Save hours:', e);
@@ -7186,13 +7200,597 @@ _DP_HOURS_JS = """
               status.textContent = 'Could not save: ' + e.message;
             }
           }
-          btn.disabled = false; btn.textContent = 'Save hours';
+          if (ok) {
+            btn.innerHTML = '<span class="inline-flex items-center gap-2"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Saved</span>';
+            setTimeout(() => { btn.disabled = false; btn.textContent = 'Save hours'; }, 1500);
+          } else {
+            btn.disabled = false; btn.textContent = 'Save hours';
+          }
         });
       } catch (e) {
         card.style.opacity = '1';
         status.className = 'text-[13px] text-red-600';
         status.textContent = 'Could not load your settings. Refresh the page.';
       }
+    }
+  </script>
+"""
+
+# ======================= call alerts (bell) on every app page =======================
+
+
+_DP_ALERTS_JS = """
+  <script type="module">
+    /* VA_ALERTS_MARKER */
+    const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+    const SW_URL = '/firebase-messaging-sw.js';
+    const MSG_SDK = "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+    const onDashboard = !!document.getElementById('panel-home');
+
+    const bell = [...document.querySelectorAll('nav a, nav button')].find(a => (a.innerHTML || '').indexOf('M18 8A6 6 0 0 0 6 8') !== -1);
+    const supported = () => ('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window);
+
+    if (bell) {
+      bell.setAttribute('href', '#');
+      bell.setAttribute('title', 'Call alerts');
+      bell.classList.add('relative');
+      const dot = document.createElement('span');
+      dot.className = 'absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-green-500';
+      dot.style.display = 'none';
+      bell.appendChild(dot);
+
+      const pop = document.createElement('div');
+      pop.className = 'fixed z-[70] w-[330px] max-w-[calc(100vw-32px)] rounded-2xl bg-white border border-gray-200 p-5';
+      pop.style.cssText += ';left:100px;bottom:24px;opacity:0;transform:translateY(6px);pointer-events:none;' +
+        'transition:opacity .15s ease, transform .15s ease;box-shadow:0 12px 40px rgba(0,0,0,.16)';
+      document.body.appendChild(pop);
+
+      const toast = document.createElement('div');
+      toast.className = 'fixed z-[70] left-[100px] bottom-6 w-[330px] max-w-[calc(100vw-32px)] rounded-2xl bg-black text-white p-4 cursor-pointer';
+      toast.style.cssText += ';opacity:0;transform:translateY(6px);pointer-events:none;transition:opacity .15s ease, transform .15s ease';
+      document.body.appendChild(toast);
+
+      let isOpen = false, state = 'ask', note = '', busy = false;
+      let uid = null, db = null, auth = null, fbApp = null, fs = null, pushDoc = {}, userDoc = null, msgReady = false;
+      const token0 = () => { try { return localStorage.getItem('va_token') || ''; } catch (e) { return ''; } };
+      const isOn = () => supported() && Notification.permission === 'granted' && !!pushDoc.enabled &&
+        Array.isArray(pushDoc.tokens) && pushDoc.tokens.indexOf(token0()) !== -1;
+
+      const BELL_ICON = '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0">' +
+        '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></div>';
+      const SPIN = '<svg class="vc-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
+      const btnBlack = 'btn-primary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-[13.5px]';
+      const btnPlain = 'inline-flex items-center justify-center px-4 py-2.5 rounded-xl font-semibold text-[13.5px] text-gray-600 hover:bg-gray-100';
+
+      function render() {
+        dot.style.display = isOn() ? 'block' : 'none';
+        let title, body, actions;
+        if (!supported()) {
+          title = "Alerts aren't available here";
+          body = "This browser can't show alerts. Use Chrome or Edge on a computer, or on iPhone add Vocallus to your Home Screen first.";
+          actions = '';
+        } else if (state === 'blocked' || (Notification.permission === 'denied' && !isOn())) {
+          title = 'Alerts are blocked';
+          body = 'Your browser is blocking alerts for this site. Click the lock icon next to the address bar, set Notifications to Allow, then try again.';
+          actions = '<button data-a="enable" class="' + btnBlack + '">Try again</button>';
+        } else if (isOn()) {
+          title = 'Alerts are on';
+          body = "You'll get a short summary on this device after every call Solana answers.";
+          actions = '<button data-a="test" class="' + btnBlack + '">Send test alert</button>' +
+                    '<button data-a="off" class="' + btnPlain + '">Turn off</button>';
+        } else {
+          title = 'Allow alerts on Solana calls';
+          body = 'Get a short summary of every call Solana answers, right on this device.';
+          actions = '<button data-a="enable" class="' + btnBlack + '">Allow alerts</button>' +
+                    '<button data-a="later" class="' + btnPlain + '">Not now</button>';
+        }
+        pop.innerHTML =
+          '<button data-a="close" aria-label="Close" class="absolute top-3 right-3 w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100">' +
+            '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+          '<div class="flex items-start gap-3 pr-6">' + BELL_ICON +
+            '<div><div class="text-[15px] font-semibold text-gray-900"></div><p class="text-[13.5px] text-gray-500 mt-1 leading-[1.5]"></p></div></div>' +
+          '<div class="va-note text-[12.5px] mt-3"></div>' +
+          (actions ? '<div class="flex items-center gap-2 mt-4">' + actions + '</div>' : '');
+        pop.querySelector('.flex.items-start > div:last-child > div').textContent = title;
+        pop.querySelector('.flex.items-start > div:last-child > p').textContent = body;
+        const n = pop.querySelector('.va-note');
+        n.textContent = note;
+        n.className = 'va-note text-[12.5px] mt-3 ' + (note ? '' : 'hidden ') + (/^Could|^Alerts aren|failed/i.test(note) ? 'text-red-600' : 'text-gray-500');
+        if (busy) {
+          const b = pop.querySelector('[data-a="enable"], [data-a="test"]');
+          if (b) { b.disabled = true; b.innerHTML = SPIN + (b.dataset.a === 'test' ? 'Sending' : 'Turning on'); }
+        }
+      }
+
+      function place() {
+        const r = bell.getBoundingClientRect();
+        pop.style.left = Math.round(r.right + 12) + 'px';
+        pop.style.bottom = Math.max(16, Math.round(window.innerHeight - r.bottom - 4)) + 'px';
+        toast.style.left = pop.style.left;
+      }
+      function open() { note = ''; render(); place(); isOpen = true; pop.style.opacity = '1'; pop.style.transform = 'none'; pop.style.pointerEvents = 'auto'; }
+      function close() { isOpen = false; pop.style.opacity = '0'; pop.style.transform = 'translateY(6px)'; pop.style.pointerEvents = 'none'; }
+      function showToast(title, body) {
+        place();
+        toast.innerHTML = '<div class="text-[13.5px] font-semibold"></div><div class="text-[13px] text-white/75 mt-1 leading-[1.45]"></div>';
+        toast.firstChild.textContent = title || 'Solana';
+        toast.lastChild.textContent = body || '';
+        toast.style.opacity = '1'; toast.style.transform = 'none'; toast.style.pointerEvents = 'auto';
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(6px)'; toast.style.pointerEvents = 'none'; }, 6000);
+      }
+      toast.addEventListener('click', () => { location.href = 'history.html'; });
+
+      bell.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); isOpen ? close() : open(); }, true);
+      document.addEventListener('click', (e) => { const path = e.composedPath(); if (isOpen && path.indexOf(pop) === -1 && path.indexOf(bell) === -1) close(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      window.addEventListener('resize', () => { if (isOpen) place(); });
+
+      async function markPrompted() {
+        if (!uid || !fs || (userDoc && userDoc.alertsPrompted)) return;
+        try { await fs.updateDoc(fs.doc(db, 'users', uid), { alertsPrompted: true }); } catch (e) {}
+      }
+
+      async function api(path, opts) {
+        const tok = await auth.currentUser.getIdToken();
+        const r = await fetch(BRIDGE + path, Object.assign({}, opts || {}, { headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' } }));
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || ('Request failed (' + r.status + ')'));
+        return j;
+      }
+
+      async function startMessaging(vapidKey) {
+        const m = await import(MSG_SDK);
+        if (!(await m.isSupported())) throw new Error("This browser can't show alerts.");
+        const reg = await navigator.serviceWorker.register(SW_URL);
+        await navigator.serviceWorker.ready;
+        const messaging = m.getMessaging(fbApp);
+        const token = await m.getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+        if (!msgReady) {
+          msgReady = true;
+          m.onMessage(messaging, (p) => { const n = p.notification || {}; showToast(n.title, n.body); });
+        }
+        return token;
+      }
+
+      async function enable() {
+        if (!supported() || !uid) return;
+        busy = true; note = ''; render();
+        try {
+          let perm = Notification.permission;
+          if (perm === 'default') perm = await Notification.requestPermission();
+          if (perm !== 'granted') { state = 'blocked'; busy = false; markPrompted(); render(); return; }
+          const cfg = await fetch(BRIDGE + '/api/config').then(r => r.json()).catch(() => ({}));
+          if (!cfg.vapidKey) throw new Error("Alerts aren't switched on for Vocallus yet. Try again later.");
+          const token = await startMessaging(cfg.vapidKey);
+          await fs.setDoc(fs.doc(db, 'users', uid, 'private', 'push'),
+            { enabled: true, tokens: fs.arrayUnion(token), updatedAt: fs.serverTimestamp() }, { merge: true });
+          try { localStorage.setItem('va_token', token); } catch (e) {}
+          pushDoc = Object.assign({}, pushDoc, { enabled: true, tokens: (pushDoc.tokens || []).concat([token]) });
+          markPrompted();
+          state = 'on'; busy = false; note = 'Sending you a test alert…'; render();
+          api('/api/alerts/test', { method: 'POST', body: '{}' })
+            .then(() => { note = 'Test alert sent.'; render(); })
+            .catch((e) => { note = 'Could not send a test alert: ' + e.message; render(); });
+        } catch (e) {
+          console.error('Alerts:', e);
+          busy = false; note = (e.message && e.message.indexOf("Alerts aren") === 0) ? e.message : 'Could not turn on alerts: ' + (e.message || e); render();
+        }
+      }
+
+      pop.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-a]');
+        if (!b || busy) return;
+        const a = b.dataset.a;
+        if (a === 'close' || a === 'later') { markPrompted(); close(); return; }
+        if (a === 'enable') return enable();
+        if (a === 'off') {
+          try { await fs.setDoc(fs.doc(db, 'users', uid, 'private', 'push'), { enabled: false }, { merge: true }); pushDoc.enabled = false; } catch (err) {}
+          note = ''; render(); return;
+        }
+        if (a === 'test') {
+          busy = true; render();
+          try { await api('/api/alerts/test', { method: 'POST', body: '{}' }); note = 'Test alert sent.'; }
+          catch (err) { note = 'Could not send: ' + err.message; }
+          busy = false; render();
+        }
+      });
+
+      try {
+""" + _DP_FB + """
+        fbApp = app;
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        auth = getAuth(app); db = fs.getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid, 'private', 'push'), (s) => { pushDoc = s.exists() ? s.data() : {}; render(); }, () => {});
+          let first = true;
+          fs.onSnapshot(fs.doc(db, 'users', uid), async (s) => {
+            userDoc = s.exists() ? s.data() : null;
+            // Account record missing (e.g. sign-up didn't finish) -> create it so Save buttons work.
+            if (!s.exists() && !s.metadata.fromCache) {
+              try {
+                await fs.setDoc(fs.doc(db, 'users', uid), {
+                  plan: 'none', name: user.displayName || '', email: user.email || '', createdAt: fs.serverTimestamp()
+                }, { merge: true });
+              } catch (e) {}
+            }
+            if (first && !s.metadata.fromCache) {
+              first = false;
+              // Ask once, right after sign-up, on the dashboard.
+              if (onDashboard && userDoc && !userDoc.alertsPrompted && supported() && !isOn() && Notification.permission !== 'denied') {
+                setTimeout(() => { if (!isOn()) open(); }, 900);
+              }
+              // Already on -> keep this device's alert token fresh and show alerts while the page is open.
+              if (supported() && Notification.permission === 'granted' && pushDoc.enabled) {
+                try {
+                  const cfg = await fetch(BRIDGE + '/api/config').then(r => r.json());
+                  if (cfg.vapidKey) {
+                    const token = await startMessaging(cfg.vapidKey);
+                    if (token && (pushDoc.tokens || []).indexOf(token) === -1) {
+                      await fs.setDoc(fs.doc(db, 'users', uid, 'private', 'push'), { tokens: fs.arrayUnion(token) }, { merge: true });
+                    }
+                    try { localStorage.setItem('va_token', token); } catch (e) {}
+                    render();
+                  }
+                } catch (e) {}
+              }
+            }
+          }, () => {});
+        });
+      } catch (e) { console.error('Alerts setup:', e); }
+    }
+  </script>
+"""
+
+# ======================= Solana page: real test call + test chat =======================
+
+_DP_DEMO_JS = """
+  <script type="module">
+    /* VD_DEMO_MARKER */
+    const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+    const WS_URL = BRIDGE.replace(/^http/, 'ws') + '/demo-call';
+    const $ = (id) => document.getElementById(id);
+    const box = $('chat-preview');
+    const oldToggle = document.querySelector('.mode-btn') ? document.querySelector('.mode-btn').parentElement : null;
+
+    if (box) {
+      const agentName = () => (($('agent-name') && $('agent-name').value.trim()) || 'Solana');
+      const SPIN = '<svg class="vc-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
+      const PHONE = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
+
+      // Old element ids stay (hidden) so the page's older scripts don't crash.
+      box.innerHTML =
+        '<div hidden><div id="call-view"></div><button id="start-call"></button><div id="text-view"></div>' +
+        '<div id="chat-log"></div><input id="chat-input"><button id="chat-send"></button></div>' +
+        '<div id="vd-call">' +
+          '<div class="flex flex-col items-center text-center py-6">' +
+            '<div class="relative w-40 h-40 flex items-center justify-center mb-5">' +
+              '<div id="vd-ring1" class="absolute inset-0 rounded-full bg-black" style="opacity:.05;transition:transform .1s linear"></div>' +
+              '<div id="vd-ring2" class="absolute inset-4 rounded-full bg-black" style="opacity:.06;transition:transform .1s linear"></div>' +
+              '<img src="../Images/logo.png" alt="" class="relative w-20 h-20 rounded-3xl shadow-sm">' +
+            '</div>' +
+            '<div id="vd-name" class="text-[22px] font-semibold text-gray-900"></div>' +
+            '<div id="vd-status" class="text-[14px] text-gray-500 mt-1.5"></div>' +
+            '<div id="vd-cap" class="mt-5 min-h-[52px] max-w-[560px] text-[15px] leading-[1.55] text-gray-700"></div>' +
+            '<div class="mt-6 flex items-center gap-3">' +
+              '<button id="vd-start" class="btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-semibold text-[14px]">' + PHONE + 'Start test call</button>' +
+              '<button id="vd-mute" class="hidden inline-flex items-center px-6 py-3.5 rounded-full font-semibold text-[14px] border border-gray-200 bg-white hover:bg-gray-50">Mute</button>' +
+              '<button id="vd-end" class="hidden inline-flex items-center px-7 py-3.5 rounded-full font-semibold text-[14px] text-white" style="background:#dc2626">End call</button>' +
+            '</div>' +
+            '<div id="vd-err" class="hidden mt-4 text-[13.5px] text-red-600 max-w-[480px]"></div>' +
+            '<div class="mt-5 text-[12.5px] text-gray-400">Uses your saved prompt, business hours and calendar. Bookings made here are real.</div>' +
+          '</div>' +
+        '</div>' +
+        '<div id="vd-text" class="hidden">' +
+          '<div id="vd-log" class="space-y-3 mb-5 max-h-[440px] min-h-[200px] overflow-y-auto pr-1"></div>' +
+          '<form id="vd-form" class="flex items-center gap-3">' +
+            '<input id="vd-in" type="text" autocomplete="off" maxlength="1000" placeholder="Message Solana like a customer would" class="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-[14px] focus:outline-none focus:border-gray-400 bg-white">' +
+            '<button id="vd-send" class="btn-primary px-5 py-3 rounded-xl font-semibold text-[14px]">Send</button>' +
+          '</form>' +
+          '<div class="flex items-center justify-between mt-2 text-[12px] text-gray-400">' +
+            '<span>Uses your saved prompt, business hours and calendar.</span>' +
+            '<button type="button" id="vd-clear" class="font-semibold text-gray-500 hover:text-black underline underline-offset-2">Clear chat</button>' +
+          '</div>' +
+        '</div>';
+
+      // ---- Call / Text toggle with a sliding pill ----
+      const tg = document.createElement('div');
+      tg.className = 'relative flex bg-gray-100 rounded-full p-1';
+      tg.innerHTML = '<span id="vd-pill" class="absolute top-1 bottom-1 rounded-full bg-white shadow-sm" style="transition:transform .2s cubic-bezier(.4,0,.2,1), width .2s cubic-bezier(.4,0,.2,1)"></span>' +
+        '<button data-m="call" class="vd-m relative px-5 py-2 rounded-full text-[14px] font-semibold" style="transition:color .2s">Call</button>' +
+        '<button data-m="text" class="vd-m relative px-5 py-2 rounded-full text-[14px] font-semibold" style="transition:color .2s">Text</button>';
+      if (oldToggle) { oldToggle.style.display = 'none'; oldToggle.after(tg); } else { box.before(tg); }
+      let mode = 'call';
+      function movePill(anim) {
+        const b = tg.querySelector('[data-m="' + mode + '"]'), pill = $('vd-pill');
+        if (!anim) pill.style.transition = 'none';
+        pill.style.width = b.offsetWidth + 'px';
+        pill.style.transform = 'translateX(' + (b.offsetLeft - 4) + 'px)';
+        if (!anim) { pill.offsetWidth; pill.style.transition = 'transform .2s cubic-bezier(.4,0,.2,1), width .2s cubic-bezier(.4,0,.2,1)'; }
+        tg.querySelectorAll('.vd-m').forEach(x => { x.style.color = x.dataset.m === mode ? '#111827' : '#6b7280'; });
+      }
+      function setMode(m) {
+        mode = m; movePill(true);
+        const show = $(m === 'call' ? 'vd-call' : 'vd-text'), hide = $(m === 'call' ? 'vd-text' : 'vd-call');
+        hide.classList.add('hidden');
+        show.style.opacity = '0'; show.classList.remove('hidden');
+        requestAnimationFrame(() => { show.style.transition = 'opacity .15s ease'; show.style.opacity = '1'; });
+        if (m === 'text') setTimeout(() => $('vd-in').focus(), 50);
+      }
+      tg.querySelectorAll('.vd-m').forEach(b => b.addEventListener('click', () => setMode(b.dataset.m)));
+      requestAnimationFrame(() => movePill(false));
+      window.addEventListener('resize', () => movePill(false));
+
+      const refreshName = () => { $('vd-name').textContent = agentName(); };
+      refreshName();
+      if ($('agent-name')) $('agent-name').addEventListener('input', refreshName);
+
+      let auth = null, db = null, fs = null, uid = null, saved = { agentName: null, systemPrompt: null };
+
+      // Test with what's typed: save the name + prompt first if they changed.
+      async function saveIfDirty() {
+        if (!uid || !fs) return;
+        const name = agentName(), prompt = ($('system-prompt') && $('system-prompt').value.trim()) || '';
+        if (name === saved.agentName && prompt === saved.systemPrompt) return;
+        try {
+          await fs.updateDoc(fs.doc(db, 'users', uid), { agentName: name, systemPrompt: prompt });
+          saved = { agentName: name, systemPrompt: prompt };
+        } catch (e) { console.warn('Could not save prompt before test:', e); }
+      }
+      async function idToken() { if (!auth || !auth.currentUser) throw new Error('Please sign in again.'); return auth.currentUser.getIdToken(); }
+
+      // ================= Test call =================
+      const WORKLET = [
+        'class VcMic extends AudioWorkletProcessor {',
+        '  constructor() { super(); this.ratio = sampleRate / 16000; this.pos = 0; this.acc = 0; this.n = 0; this.out = new Int16Array(800); this.len = 0; }',
+        '  process(inputs) {',
+        '    const ch = inputs[0] && inputs[0][0];',
+        '    if (ch) for (let i = 0; i < ch.length; i++) {',
+        '      this.acc += ch[i]; this.n++; this.pos += 1;',
+        '      if (this.pos >= this.ratio) {',
+        '        this.pos -= this.ratio;',
+        '        let v = this.acc / this.n; this.acc = 0; this.n = 0;',
+        '        v = Math.max(-1, Math.min(1, v));',
+        '        this.out[this.len++] = v < 0 ? v * 32768 : v * 32767;',
+        '        if (this.len === this.out.length) { this.port.postMessage(this.out.slice(0).buffer); this.len = 0; }',
+        '      }',
+        '    }',
+        '    return true;',
+        '  }',
+        '}',
+        "registerProcessor('vc-mic', VcMic);"
+      ].join(String.fromCharCode(10));
+
+      const toB64 = (buf) => { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); return btoa(s); };
+      const fromB64 = (str) => { const s = atob(str); const b = new Uint8Array(s.length - (s.length % 2)); for (let i = 0; i < b.length; i++) b[i] = s.charCodeAt(i); return b.buffer; };
+      const mmss = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+
+      let ws = null, ctx = null, mic = null, micNode = null, srcNode = null, sink = null, outGain = null, anIn = null, anOut = null;
+      let sources = [], nextTime = 0, muted = false, live = false, callState = 'idle', startedAt = 0, ticker = null, raf = null, connectTimer = null;
+      let capWho = '', capYou = '', capAgent = '', endReason = '';
+
+      function setStatus(t) { $('vd-status').textContent = t; }
+      function showErr(t) { const e = $('vd-err'); e.textContent = t; e.classList.toggle('hidden', !t); }
+      function renderCaps() {
+        const c = $('vd-cap');
+        c.innerHTML = '';
+        if (capYou) { const d = document.createElement('div'); d.className = 'text-gray-400 text-[14px]'; d.textContent = 'You: ' + capYou.trim(); c.appendChild(d); }
+        if (capAgent) { const d = document.createElement('div'); d.className = 'text-gray-900 mt-1'; d.textContent = agentName() + ': ' + capAgent.trim(); c.appendChild(d); }
+      }
+      function setCallState(s) {
+        callState = s;
+        const start = $('vd-start'), mute = $('vd-mute'), end = $('vd-end');
+        start.classList.toggle('hidden', s === 'live');
+        mute.classList.toggle('hidden', s !== 'live');
+        end.classList.toggle('hidden', s !== 'live');
+        start.disabled = s === 'connecting';
+        start.innerHTML = s === 'connecting' ? SPIN + 'Connecting' : PHONE + (s === 'ended' ? 'Call again' : 'Start test call');
+        if (s === 'idle') setStatus('Talk to ' + agentName() + ' right here in your browser.');
+        if (s === 'connecting') setStatus('Connecting…');
+      }
+      setCallState('idle');
+
+      function playChunk(b64) {
+        if (!ctx) return;
+        const pcm = new Int16Array(fromB64(b64));
+        if (!pcm.length) return;
+        const buf = ctx.createBuffer(1, pcm.length, 24000);
+        const ch = buf.getChannelData(0);
+        for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+        const src = ctx.createBufferSource();
+        src.buffer = buf; src.connect(outGain);
+        const t = Math.max(nextTime, ctx.currentTime + 0.05);
+        src.start(t); nextTime = t + buf.duration;
+        sources.push(src);
+        src.onended = () => { sources = sources.filter(x => x !== src); };
+      }
+      function clearAudio() { sources.forEach(s => { try { s.stop(); } catch (e) {} }); sources = []; nextTime = 0; }
+
+      function level(an) {
+        if (!an) return 0;
+        const a = new Uint8Array(an.fftSize); an.getByteTimeDomainData(a);
+        let sum = 0; for (let i = 0; i < a.length; i++) { const v = (a[i] - 128) / 128; sum += v * v; }
+        return Math.min(1, Math.sqrt(sum / a.length) * 4);
+      }
+      function animate() {
+        const out = level(anOut), inp = muted ? 0 : level(anIn) * 0.6;
+        $('vd-ring1').style.transform = 'scale(' + (1 + Math.max(out, inp) * 0.18).toFixed(3) + ')';
+        $('vd-ring2').style.transform = 'scale(' + (1 + out * 0.3).toFixed(3) + ')';
+        raf = requestAnimationFrame(animate);
+      }
+
+      function cleanup() {
+        live = false;
+        clearTimeout(connectTimer); clearInterval(ticker); cancelAnimationFrame(raf);
+        $('vd-ring1').style.transform = ''; $('vd-ring2').style.transform = '';
+        try { mic && mic.getTracks().forEach(t => t.stop()); } catch (e) {}
+        try { srcNode && srcNode.disconnect(); micNode && micNode.disconnect(); } catch (e) {}
+        const c = ctx; ctx = null; mic = null; micNode = null; srcNode = null;
+        setTimeout(() => { try { c && c.close(); } catch (e) {} }, 300);
+        clearAudio();
+      }
+      function finish(msg) {
+        if (callState === 'idle' || callState === 'ended') return;
+        const secs = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
+        try { ws && ws.readyState === 1 && ws.send(JSON.stringify({ type: 'stop' })); } catch (e) {}
+        try { ws && ws.close(); } catch (e) {}
+        ws = null;
+        cleanup();
+        setCallState(startedAt ? 'ended' : 'idle');
+        if (startedAt) setStatus(msg || ('Call ended · ' + mmss(secs)));
+        startedAt = 0;
+      }
+
+      async function startCall() {
+        if (callState === 'connecting' || callState === 'live') return;
+        showErr(''); capYou = ''; capAgent = ''; renderCaps(); endReason = '';
+        setCallState('connecting');
+        try {
+          ctx = new (window.AudioContext || window.webkitAudioContext)();
+          await ctx.resume();
+          mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+        } catch (e) {
+          cleanup(); setCallState('idle');
+          return showErr(e && e.name === 'NotAllowedError'
+            ? 'Allow microphone access to test a call. Click the mic icon in the address bar, choose Allow, then try again.'
+            : "Couldn't start your microphone. Check that one is plugged in.");
+        }
+        try {
+          const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
+          await ctx.audioWorklet.addModule(url);
+          srcNode = ctx.createMediaStreamSource(mic);
+          micNode = new AudioWorkletNode(ctx, 'vc-mic');
+          sink = ctx.createGain(); sink.gain.value = 0;
+          srcNode.connect(micNode); micNode.connect(sink); sink.connect(ctx.destination);
+          anIn = ctx.createAnalyser(); anIn.fftSize = 512; srcNode.connect(anIn);
+          outGain = ctx.createGain(); anOut = ctx.createAnalyser(); anOut.fftSize = 512;
+          outGain.connect(anOut); anOut.connect(ctx.destination);
+          micNode.port.onmessage = (e) => {
+            if (live && !muted && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'audio', data: toB64(e.data) }));
+          };
+          await saveIfDirty();
+          const token = await idToken();
+          ws = new WebSocket(WS_URL);
+          connectTimer = setTimeout(() => { if (callState === 'connecting') { finish(); showErr("Couldn't reach " + agentName() + '. Try again in a moment.'); } }, 15000);
+          ws.onopen = () => ws.send(JSON.stringify({ type: 'start', token }));
+          ws.onmessage = (ev) => {
+            let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+            if (m.type === 'live') {
+              clearTimeout(connectTimer);
+              live = true; startedAt = Date.now(); muted = false; $('vd-mute').textContent = 'Mute';
+              setCallState('live'); setStatus('Live · 0:00');
+              ticker = setInterval(() => setStatus((muted ? 'Muted · ' : 'Live · ') + mmss(Math.round((Date.now() - startedAt) / 1000))), 1000);
+              animate();
+            } else if (m.type === 'audio') {
+              playChunk(m.data);
+            } else if (m.type === 'clear') {
+              clearAudio();
+            } else if (m.type === 'caption') {
+              if (m.who === 'you') { if (capWho !== 'you') capYou = ''; capYou += m.text; }
+              else { if (capWho !== 'agent') capAgent = ''; capAgent += m.text; }
+              capWho = m.who; renderCaps();
+            } else if (m.type === 'tool') {
+              if (m.name === 'book_appointment') setStatus('Booking on your calendar…');
+            } else if (m.type === 'error') {
+              showErr(m.error || 'Something went wrong.');
+            } else if (m.type === 'ended') {
+              endReason = m.reason;
+              // let the last words finish playing
+              const wait = ctx ? Math.max(0, (nextTime - ctx.currentTime) * 1000) : 0;
+              setTimeout(() => finish(m.reason === 'limit' ? 'Test calls are limited to 5 minutes.' : ''), Math.min(wait, 4000));
+            }
+          };
+          ws.onclose = () => { if (callState === 'connecting') { finish(); if ($('vd-err').classList.contains('hidden')) showErr("Couldn't reach " + agentName() + '. Try again in a moment.'); } };
+        } catch (e) {
+          finish(); setCallState('idle');
+          showErr(e.message || "Couldn't start the test call.");
+        }
+      }
+      $('vd-start').addEventListener('click', startCall);
+      $('vd-end').addEventListener('click', () => finish());
+      $('vd-mute').addEventListener('click', () => {
+        muted = !muted;
+        $('vd-mute').textContent = muted ? 'Unmute' : 'Mute';
+        $('vd-mute').style.background = muted ? '#111827' : '';
+        $('vd-mute').style.color = muted ? '#fff' : '';
+      });
+      window.addEventListener('beforeunload', () => finish());
+
+      // ================= Test chat =================
+      const log = $('vd-log');
+      let msgs = [];
+      function empty() {
+        log.innerHTML = '<div class="vd-empty h-[200px] flex flex-col items-center justify-center text-center">' +
+          '<img src="../Images/logo.png" alt="" class="w-12 h-12 rounded-2xl mb-3">' +
+          '<div class="text-[15px] font-medium text-gray-700">Say hi to ' + agentName().replace(/[<>&]/g, '') + '</div>' +
+          '<div class="text-[13px] text-gray-400 mt-1">Try asking for an appointment or your hours.</div></div>';
+      }
+      empty();
+      function bubble(role, text) {
+        const e = log.querySelector('.vd-empty'); if (e) e.remove();
+        const row = document.createElement('div');
+        row.className = role === 'user' ? 'flex justify-end' : 'flex items-start gap-3';
+        row.style.opacity = '0'; row.style.transform = 'translateY(4px)'; row.style.transition = 'opacity .15s ease, transform .15s ease';
+        row.innerHTML = role === 'user'
+          ? '<div class="bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[75%]"><p class="text-[14px] leading-[1.5] whitespace-pre-wrap"></p></div>'
+          : '<img src="../Images/logo.png" alt="" class="w-8 h-8 rounded-xl flex-shrink-0"><div class="bg-white rounded-2xl rounded-tl-sm border border-gray-100 px-4 py-3 max-w-[75%]"><p class="text-[14px] text-gray-800 leading-[1.5] whitespace-pre-wrap"></p></div>';
+        const p = row.querySelector('p');
+        if (text === null) p.innerHTML = '<span class="vd-dot">•</span><span class="vd-dot">•</span><span class="vd-dot">•</span>';
+        else p.textContent = text;
+        log.appendChild(row);
+        requestAnimationFrame(() => { row.style.opacity = '1'; row.style.transform = 'none'; });
+        log.scrollTop = log.scrollHeight;
+        return p;
+      }
+      let sending = false;
+      $('vd-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = $('vd-in'), text = input.value.trim();
+        if (!text || sending) return;
+        sending = true; input.value = '';
+        bubble('user', text);
+        msgs.push({ role: 'user', text });
+        const p = bubble('agent', null);
+        try {
+          await saveIfDirty();
+          const tok = await idToken();
+          const r = await fetch(BRIDGE + '/api/demo/chat', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: msgs })
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || ('Request failed (' + r.status + ')'));
+          p.textContent = j.reply;
+          msgs.push({ role: 'model', text: j.reply });
+        } catch (err) {
+          msgs.pop();
+          p.textContent = err.message === 'Failed to fetch' ? "Couldn't reach " + agentName() + '. Try again in a moment.' : err.message;
+          p.classList.add('text-red-600');
+        }
+        log.scrollTop = log.scrollHeight;
+        sending = false; input.focus();
+      });
+      $('vd-clear').addEventListener('click', () => { msgs = []; empty(); });
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        auth = getAuth(app); db = fs.getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
+            const d = s.exists() ? s.data() : {};
+            saved = { agentName: d.agentName || 'Solana', systemPrompt: d.systemPrompt || '' };
+          }, () => {});
+        });
+      } catch (e) { console.error('Test panel:', e); }
     }
   </script>
 """
@@ -7238,6 +7836,8 @@ def render_page(path, builder):
             html = _dp_add(html, "VR_ROUTER_MARKER", "</body>", _DP_ROUTER_JS)
         if name == "solana.html":
             html = _dp_add(html, "VS_SOLANA_MARKER", "</body>", _DP_SOLANA_JS)
+            html = _dp_add(html, "VD_DEMO_MARKER", "</body>", _DP_DEMO_JS)
+        html = _dp_add(html, "VA_ALERTS_MARKER", "</body>", _DP_ALERTS_JS)
         if name == "calendar.html":
             html = _dp_add(html, "VK_HOURS_MARKER", "</body>", _DP_HOURS_JS)
         if name == "history.html":

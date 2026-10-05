@@ -120,6 +120,11 @@
       box-shadow: 0 8px 24px rgba(0,0,0,.18); white-space: nowrap;
       animation: vcPillIn .2s ease-out both;
     }
+    .vc-spin { animation: vcSpin .8s linear infinite; }
+    @keyframes vcSpin { to { transform: rotate(360deg); } }
+    .vd-dot { display: inline-block; margin-right: 2px; animation: vdBlink 1.2s infinite both; }
+    .vd-dot:nth-child(2) { animation-delay: .2s; } .vd-dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes vdBlink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
     @keyframes vcPillIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
     @media (prefers-reduced-motion: reduce) { #demo-banner, #paid-banner { animation: none; } }
   </style>
@@ -546,6 +551,242 @@
 
 
   <script type="module">
+    /* VA_ALERTS_MARKER */
+    const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+    const SW_URL = '/firebase-messaging-sw.js';
+    const MSG_SDK = "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+    const onDashboard = !!document.getElementById('panel-home');
+
+    const bell = [...document.querySelectorAll('nav a, nav button')].find(a => (a.innerHTML || '').indexOf('M18 8A6 6 0 0 0 6 8') !== -1);
+    const supported = () => ('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window);
+
+    if (bell) {
+      bell.setAttribute('href', '#');
+      bell.setAttribute('title', 'Call alerts');
+      bell.classList.add('relative');
+      const dot = document.createElement('span');
+      dot.className = 'absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-green-500';
+      dot.style.display = 'none';
+      bell.appendChild(dot);
+
+      const pop = document.createElement('div');
+      pop.className = 'fixed z-[70] w-[330px] max-w-[calc(100vw-32px)] rounded-2xl bg-white border border-gray-200 p-5';
+      pop.style.cssText += ';left:100px;bottom:24px;opacity:0;transform:translateY(6px);pointer-events:none;' +
+        'transition:opacity .15s ease, transform .15s ease;box-shadow:0 12px 40px rgba(0,0,0,.16)';
+      document.body.appendChild(pop);
+
+      const toast = document.createElement('div');
+      toast.className = 'fixed z-[70] left-[100px] bottom-6 w-[330px] max-w-[calc(100vw-32px)] rounded-2xl bg-black text-white p-4 cursor-pointer';
+      toast.style.cssText += ';opacity:0;transform:translateY(6px);pointer-events:none;transition:opacity .15s ease, transform .15s ease';
+      document.body.appendChild(toast);
+
+      let isOpen = false, state = 'ask', note = '', busy = false;
+      let uid = null, db = null, auth = null, fbApp = null, fs = null, pushDoc = {}, userDoc = null, msgReady = false;
+      const token0 = () => { try { return localStorage.getItem('va_token') || ''; } catch (e) { return ''; } };
+      const isOn = () => supported() && Notification.permission === 'granted' && !!pushDoc.enabled &&
+        Array.isArray(pushDoc.tokens) && pushDoc.tokens.indexOf(token0()) !== -1;
+
+      const BELL_ICON = '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0">' +
+        '<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></div>';
+      const SPIN = '<svg class="vc-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
+      const btnBlack = 'btn-primary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-[13.5px]';
+      const btnPlain = 'inline-flex items-center justify-center px-4 py-2.5 rounded-xl font-semibold text-[13.5px] text-gray-600 hover:bg-gray-100';
+
+      function render() {
+        dot.style.display = isOn() ? 'block' : 'none';
+        let title, body, actions;
+        if (!supported()) {
+          title = "Alerts aren't available here";
+          body = "This browser can't show alerts. Use Chrome or Edge on a computer, or on iPhone add Vocallus to your Home Screen first.";
+          actions = '';
+        } else if (state === 'blocked' || (Notification.permission === 'denied' && !isOn())) {
+          title = 'Alerts are blocked';
+          body = 'Your browser is blocking alerts for this site. Click the lock icon next to the address bar, set Notifications to Allow, then try again.';
+          actions = '<button data-a="enable" class="' + btnBlack + '">Try again</button>';
+        } else if (isOn()) {
+          title = 'Alerts are on';
+          body = "You'll get a short summary on this device after every call Solana answers.";
+          actions = '<button data-a="test" class="' + btnBlack + '">Send test alert</button>' +
+                    '<button data-a="off" class="' + btnPlain + '">Turn off</button>';
+        } else {
+          title = 'Allow alerts on Solana calls';
+          body = 'Get a short summary of every call Solana answers, right on this device.';
+          actions = '<button data-a="enable" class="' + btnBlack + '">Allow alerts</button>' +
+                    '<button data-a="later" class="' + btnPlain + '">Not now</button>';
+        }
+        pop.innerHTML =
+          '<button data-a="close" aria-label="Close" class="absolute top-3 right-3 w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100">' +
+            '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+          '<div class="flex items-start gap-3 pr-6">' + BELL_ICON +
+            '<div><div class="text-[15px] font-semibold text-gray-900"></div><p class="text-[13.5px] text-gray-500 mt-1 leading-[1.5]"></p></div></div>' +
+          '<div class="va-note text-[12.5px] mt-3"></div>' +
+          (actions ? '<div class="flex items-center gap-2 mt-4">' + actions + '</div>' : '');
+        pop.querySelector('.flex.items-start > div:last-child > div').textContent = title;
+        pop.querySelector('.flex.items-start > div:last-child > p').textContent = body;
+        const n = pop.querySelector('.va-note');
+        n.textContent = note;
+        n.className = 'va-note text-[12.5px] mt-3 ' + (note ? '' : 'hidden ') + (/^Could|^Alerts aren|failed/i.test(note) ? 'text-red-600' : 'text-gray-500');
+        if (busy) {
+          const b = pop.querySelector('[data-a="enable"], [data-a="test"]');
+          if (b) { b.disabled = true; b.innerHTML = SPIN + (b.dataset.a === 'test' ? 'Sending' : 'Turning on'); }
+        }
+      }
+
+      function place() {
+        const r = bell.getBoundingClientRect();
+        pop.style.left = Math.round(r.right + 12) + 'px';
+        pop.style.bottom = Math.max(16, Math.round(window.innerHeight - r.bottom - 4)) + 'px';
+        toast.style.left = pop.style.left;
+      }
+      function open() { note = ''; render(); place(); isOpen = true; pop.style.opacity = '1'; pop.style.transform = 'none'; pop.style.pointerEvents = 'auto'; }
+      function close() { isOpen = false; pop.style.opacity = '0'; pop.style.transform = 'translateY(6px)'; pop.style.pointerEvents = 'none'; }
+      function showToast(title, body) {
+        place();
+        toast.innerHTML = '<div class="text-[13.5px] font-semibold"></div><div class="text-[13px] text-white/75 mt-1 leading-[1.45]"></div>';
+        toast.firstChild.textContent = title || 'Solana';
+        toast.lastChild.textContent = body || '';
+        toast.style.opacity = '1'; toast.style.transform = 'none'; toast.style.pointerEvents = 'auto';
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(6px)'; toast.style.pointerEvents = 'none'; }, 6000);
+      }
+      toast.addEventListener('click', () => { location.href = 'history.html'; });
+
+      bell.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); isOpen ? close() : open(); }, true);
+      document.addEventListener('click', (e) => { const path = e.composedPath(); if (isOpen && path.indexOf(pop) === -1 && path.indexOf(bell) === -1) close(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      window.addEventListener('resize', () => { if (isOpen) place(); });
+
+      async function markPrompted() {
+        if (!uid || !fs || (userDoc && userDoc.alertsPrompted)) return;
+        try { await fs.updateDoc(fs.doc(db, 'users', uid), { alertsPrompted: true }); } catch (e) {}
+      }
+
+      async function api(path, opts) {
+        const tok = await auth.currentUser.getIdToken();
+        const r = await fetch(BRIDGE + path, Object.assign({}, opts || {}, { headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' } }));
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || ('Request failed (' + r.status + ')'));
+        return j;
+      }
+
+      async function startMessaging(vapidKey) {
+        const m = await import(MSG_SDK);
+        if (!(await m.isSupported())) throw new Error("This browser can't show alerts.");
+        const reg = await navigator.serviceWorker.register(SW_URL);
+        await navigator.serviceWorker.ready;
+        const messaging = m.getMessaging(fbApp);
+        const token = await m.getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+        if (!msgReady) {
+          msgReady = true;
+          m.onMessage(messaging, (p) => { const n = p.notification || {}; showToast(n.title, n.body); });
+        }
+        return token;
+      }
+
+      async function enable() {
+        if (!supported() || !uid) return;
+        busy = true; note = ''; render();
+        try {
+          let perm = Notification.permission;
+          if (perm === 'default') perm = await Notification.requestPermission();
+          if (perm !== 'granted') { state = 'blocked'; busy = false; markPrompted(); render(); return; }
+          const cfg = await fetch(BRIDGE + '/api/config').then(r => r.json()).catch(() => ({}));
+          if (!cfg.vapidKey) throw new Error("Alerts aren't switched on for Vocallus yet. Try again later.");
+          const token = await startMessaging(cfg.vapidKey);
+          await fs.setDoc(fs.doc(db, 'users', uid, 'private', 'push'),
+            { enabled: true, tokens: fs.arrayUnion(token), updatedAt: fs.serverTimestamp() }, { merge: true });
+          try { localStorage.setItem('va_token', token); } catch (e) {}
+          pushDoc = Object.assign({}, pushDoc, { enabled: true, tokens: (pushDoc.tokens || []).concat([token]) });
+          markPrompted();
+          state = 'on'; busy = false; note = 'Sending you a test alert…'; render();
+          api('/api/alerts/test', { method: 'POST', body: '{}' })
+            .then(() => { note = 'Test alert sent.'; render(); })
+            .catch((e) => { note = 'Could not send a test alert: ' + e.message; render(); });
+        } catch (e) {
+          console.error('Alerts:', e);
+          busy = false; note = (e.message && e.message.indexOf("Alerts aren") === 0) ? e.message : 'Could not turn on alerts: ' + (e.message || e); render();
+        }
+      }
+
+      pop.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-a]');
+        if (!b || busy) return;
+        const a = b.dataset.a;
+        if (a === 'close' || a === 'later') { markPrompted(); close(); return; }
+        if (a === 'enable') return enable();
+        if (a === 'off') {
+          try { await fs.setDoc(fs.doc(db, 'users', uid, 'private', 'push'), { enabled: false }, { merge: true }); pushDoc.enabled = false; } catch (err) {}
+          note = ''; render(); return;
+        }
+        if (a === 'test') {
+          busy = true; render();
+          try { await api('/api/alerts/test', { method: 'POST', body: '{}' }); note = 'Test alert sent.'; }
+          catch (err) { note = 'Could not send: ' + err.message; }
+          busy = false; render();
+        }
+      });
+
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        fbApp = app;
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        auth = getAuth(app); db = fs.getFirestore(app);
+        onAuthStateChanged(auth, (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid, 'private', 'push'), (s) => { pushDoc = s.exists() ? s.data() : {}; render(); }, () => {});
+          let first = true;
+          fs.onSnapshot(fs.doc(db, 'users', uid), async (s) => {
+            userDoc = s.exists() ? s.data() : null;
+            // Account record missing (e.g. sign-up didn't finish) -> create it so Save buttons work.
+            if (!s.exists() && !s.metadata.fromCache) {
+              try {
+                await fs.setDoc(fs.doc(db, 'users', uid), {
+                  plan: 'none', name: user.displayName || '', email: user.email || '', createdAt: fs.serverTimestamp()
+                }, { merge: true });
+              } catch (e) {}
+            }
+            if (first && !s.metadata.fromCache) {
+              first = false;
+              // Ask once, right after sign-up, on the dashboard.
+              if (onDashboard && userDoc && !userDoc.alertsPrompted && supported() && !isOn() && Notification.permission !== 'denied') {
+                setTimeout(() => { if (!isOn()) open(); }, 900);
+              }
+              // Already on -> keep this device's alert token fresh and show alerts while the page is open.
+              if (supported() && Notification.permission === 'granted' && pushDoc.enabled) {
+                try {
+                  const cfg = await fetch(BRIDGE + '/api/config').then(r => r.json());
+                  if (cfg.vapidKey) {
+                    const token = await startMessaging(cfg.vapidKey);
+                    if (token && (pushDoc.tokens || []).indexOf(token) === -1) {
+                      await fs.setDoc(fs.doc(db, 'users', uid, 'private', 'push'), { tokens: fs.arrayUnion(token) }, { merge: true });
+                    }
+                    try { localStorage.setItem('va_token', token); } catch (e) {}
+                    render();
+                  }
+                } catch (e) {}
+              }
+            }
+          }, () => {});
+        });
+      } catch (e) { console.error('Alerts setup:', e); }
+    }
+  </script>
+
+
+  <script type="module">
     /* VH_HISTORY_MARKER */
 
     const fmtPhone = (n) => {
@@ -650,6 +891,7 @@
                       '<div class="vh-when text-[12px] text-gray-400 ml-auto"></div>' +
                     '</div>' +
                     '<div class="vh-dur text-[13px] text-gray-500 mt-1"></div>' +
+                    '<div class="vh-sum hidden text-[13.5px] text-gray-700 mt-2 leading-[1.5]"></div>' +
                     '<div class="vh-msg hidden mt-3 rounded-xl bg-[#f9fafb] border border-gray-100 p-3 text-[13.5px] text-gray-700"></div>' +
                   '</div>' +
                 '</div>';
@@ -661,6 +903,7 @@
                 ? new Date(tsOf(c)).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
                 : '';
               row.querySelector('.vh-dur').textContent = 'Duration ' + (c.durationSec ? fmtDur(c.durationSec) : '—');
+              if (c.summary) { const sm = row.querySelector('.vh-sum'); sm.textContent = c.summary; sm.classList.remove('hidden'); }
               if (c.message && (c.message.reason || c.message.name)) {
                 const m = row.querySelector('.vh-msg');
                 m.classList.remove('hidden');
