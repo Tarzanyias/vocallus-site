@@ -6047,6 +6047,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -7101,7 +7104,7 @@ _DP_HOURS_JS = """
       try {
 """ + _DP_FB + """
         const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-        const { getFirestore, doc, onSnapshot, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const { getFirestore, doc, onSnapshot, updateDoc, getDoc, setDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
         const firstSnap = (ref) => new Promise((res) => { let un = null; un = onSnapshot(ref, (x) => { res(x.exists() ? x.data() : {}); setTimeout(() => un && un(), 0); }, () => res({})); });
 
         const auth = getAuth(app), db = getFirestore(app);
@@ -7142,21 +7145,46 @@ _DP_HOURS_JS = """
           const btn = $('vk-save');
           btn.disabled = true; btn.textContent = 'Saving…';
           try {
-            await updateDoc(doc(db, 'users', uid), {
+            const ref = doc(db, 'users', uid);
+            const data = {
               hours, timezone: tz,
               appointmentLength: Number($('vk-len').value) || 30,
               afterHours: mode,
               afterHoursForward: fwd,
               afterHoursMessage: $('vk-msg').value.trim().slice(0, 400)
-            });
+            };
+            try {
+              await updateDoc(ref, data);
+            } catch (e1) {
+              // Your account record may not exist yet (rules can only "update" an existing one).
+              let exists = null;
+              try { exists = (await getDoc(ref)).exists(); } catch (e2) { exists = null; }
+              if (exists === false) {
+                const u = auth.currentUser || {};
+                await setDoc(ref, Object.assign({
+                  plan: 'none',
+                  name: u.displayName || '',
+                  email: u.email || '',
+                  createdAt: serverTimestamp()
+                }, data));
+              } else {
+                e1.vcRead = exists;   // true = record exists, null = couldn't even read it
+                throw e1;
+              }
+            }
             status.className = 'text-[13px] text-green-700';
             status.textContent = 'Saved. Solana uses this on the next call.';
             const sl = $('slot-length'); if (sl) sl.textContent = $('vk-len').value;
           } catch (e) {
+            console.error('Save hours:', e);
             status.className = 'text-[13px] text-red-600';
-            status.textContent = (e.code === 'permission-denied')
-              ? 'Could not save: your Firestore rules are blocking it. Publish the new rules, then try again.'
-              : 'Could not save: ' + e.message;
+            if (e.code === 'permission-denied' && e.vcRead === null) {
+              status.textContent = "Could not save: Firestore rules aren't published yet (even reading is blocked). Publish the rules, then refresh.";
+            } else if (e.code === 'permission-denied') {
+              status.textContent = 'Could not save: the Firestore rules on your project are older ones. Paste the new rules and click Publish, then refresh.';
+            } else {
+              status.textContent = 'Could not save: ' + e.message;
+            }
           }
           btn.disabled = false; btn.textContent = 'Save hours';
         });
