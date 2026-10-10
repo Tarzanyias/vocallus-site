@@ -6116,6 +6116,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -10000,6 +10003,187 @@ def render_page(path, builder):
                             r'false && window.whenFirebase(async function (fb) {\1var user = fb.auth.currentUser;', html)
         html = _dp_add(html, "VX_CHECKOUT_MARKER", "</body>", _DP_CHECKOUT_JS)
     return html
+
+# ======================= SEO: titles, descriptions, share previews, Google data, industry pages (VS_SEO_MARKER) =======================
+import json as _seo_json
+import html as _seo_html
+
+SEO_SITE = "https://vocallus.com"
+
+INDUSTRIES = [
+    # slug, name (for titles), plural (in sentences), what customers book, example call, extra bullet, FAQ answer about it
+    ("dentists", "Dental Offices", "dental offices", ["Cleanings", "Check-ups", "Whitening", "Emergency visits"],
+     [("Caller", "Hi, can I get a cleaning on Friday?"), ("Solana", "Friday has 2:00 or 4:30 open. Which works?"),
+      ("Caller", "4:30, please."), ("Booked", "Fri 4:30 PM \u00b7 Cleaning")],
+     "Answers questions about hours, location and insurance you list",
+     "Yes. Solana answers new-patient calls, asks what they need, and books them into an open time on your calendar."),
+    ("salons", "Salons & Barbershops", "salons and barbershops", ["Haircuts", "Color", "Beard trims", "Blowouts"],
+     [("Caller", "Do you have anything for a haircut tomorrow?"), ("Solana", "Tomorrow at 11:00 or 3:30 is open."),
+      ("Caller", "11 works."), ("Booked", "Tomorrow 11:00 AM \u00b7 Haircut")],
+     "Knows how long each service takes, so color never gets a haircut-sized slot",
+     "Yes. Add your services and how long each takes, and Solana only offers times that fit."),
+    ("hvac-plumbing", "HVAC & Plumbing Companies", "HVAC and plumbing companies", ["Service calls", "Estimates", "Maintenance", "Urgent repairs"],
+     [("Caller", "My AC stopped working. Can someone come out?"), ("Solana", "I can book a service call for 9:00 tomorrow."),
+      ("Caller", "Yes, please."), ("Booked", "Tomorrow 9:00 AM \u00b7 Service call")],
+     "Takes detailed messages for urgent jobs after hours",
+     "Yes. After hours Solana can book the next open time, take a message, or forward the call to your phone - you choose."),
+    ("med-spas", "Med Spas & Clinics", "med spas and clinics", ["Consultations", "Facials", "Injectables", "Follow-ups"],
+     [("Caller", "I'd like to book a consultation."), ("Solana", "Sure! Thursday at 1:00 or 5:30?"),
+      ("Caller", "Thursday at 1."), ("Booked", "Thu 1:00 PM \u00b7 Consultation")],
+     "Sounds warm and professional on every call",
+     "Yes. You write what Solana should say about your treatments, and she politely turns down anything unrelated."),
+]
+
+_SEO = {
+    "index.html": ("Vocallus \u2013 AI Receptionist That Answers Every Call 24/7",
+                   "Vocallus gives your business Solana, an AI receptionist that answers every call 24/7, books appointments "
+                   "into your calendar and sends you a summary of each call. Plans from $14.99/month."),
+    "Pages/products.html": ("AI Phone Receptionist for Small Businesses | Vocallus",
+                            "Solana answers your business calls in a natural voice, books appointments, takes messages and "
+                            "sends you transcripts. Keep your existing number."),
+    "Pages/solutions.html": ("AI Answering Service for Every Business | Vocallus",
+                             "See how dental offices, salons, HVAC and plumbing companies and med spas use Vocallus to never miss a call."),
+    "Pages/pricing.html": ("Pricing \u2013 AI Receptionist from $14.99/month | Vocallus",
+                           "Simple plans for an AI receptionist: Pro $14.99/month and Max $99.99/month. Try a free test call first."),
+    "Pages/resources.html": ("Guides for Small Businesses | Vocallus",
+                             "Guides and playbooks on missed calls, greetings and after-hours phone coverage."),
+    "Pages/talk-to-sales.html": ("Talk to Sales | Vocallus", "Tell us about your calls and we'll help you pick the right plan."),
+    "Pages/signup.html": ("Try Vocallus Free \u2013 AI Receptionist", "Create your account and test your AI receptionist in minutes."),
+    "Pages/login.html": ("Sign in | Vocallus", "Sign in to your Vocallus account."),
+}
+for _slug, _name, _plural, _svc, _call, _extra, _faq in INDUSTRIES:
+    _SEO["Pages/ai-receptionist-for-" + _slug + ".html"] = (
+        "AI Receptionist for " + _name + " | Vocallus",
+        "Vocallus is the AI receptionist for " + _plural + ": it answers every call 24/7, books " + _svc[0].lower() + " and more into your "
+        "calendar, and sends you a summary of each call. From $14.99/month.")
+
+_NOINDEX = {"dashboard.html", "solana.html", "calendar.html", "history.html", "checkout.html"}
+
+
+def _seo_url(path):
+    if path == "index.html":
+        return SEO_SITE + "/"
+    return SEO_SITE + "/" + (path[:-5] if path.endswith(".html") else path)
+
+
+def _industry_page(ind):
+    slug, name, plural, svc, call, extra, faq = ind
+
+    def build(ctx):
+        title = "AI Receptionist for " + name
+        desc = _SEO["Pages/ai-receptionist-for-" + slug + ".html"][1]
+        body = page_hero(
+            "The AI receptionist for " + plural,
+            "Solana answers every call to your business 24/7, books " + ", ".join(s.lower() for s in svc[:-1]) +
+            " and " + svc[-1].lower() + " into your calendar, and sends you a summary of each call. "
+            "No more voicemail. No more missed customers.")
+        body += section_split(
+            "how", "How it works", "Every caller gets answered and booked",
+            "Forward your existing number to Solana, or get a new local number. She picks up on the first ring, day or night.",
+            [("Books appointments.", svc[0] + ", " + ", ".join(s.lower() for s in svc[1:]) + " go straight into open times."),
+             ("Knows your business.", extra + "."),
+             ("Keeps you in the loop.", "You get a summary and transcript of every call."),
+             ("Keeps your number.", "Forward your existing line, and callers dial the number they already know.")],
+            card_visual("Example call", call))
+        body += section_centered(
+            "faq", "Questions", "Common questions from " + plural, "",
+            [("Can it book new customers?", faq),
+             ("Do I keep my phone number?", "Yes. Forward your current number to your Solana number, and callers keep dialing the number they know."),
+             ("How much does it cost?", "Pro is $14.99/month and Max is $99.99/month. You can try a free test call first.")])
+        cta = (
+            '<div class="max-w-[760px] mx-auto text-center">'
+            '<h2 class="text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.12] tracking-[-0.03em] text-[#111111]">Never miss another call</h2>'
+            '<p class="mt-5 text-[17px] leading-[1.6] text-[#55565B]">Set up Solana for your business in minutes. Try a free test call first.</p>'
+            '<div class="mt-8 flex items-center justify-center gap-3 flex-wrap">'
+            '<a href="' + ctx.u("Pages/signup.html") + '" class="btn-primary inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-semibold text-[15px]">Try it free</a>'
+            '<a href="' + ctx.u("Pages/pricing.html") + '" class="inline-flex items-center justify-center px-6 py-3.5 rounded-xl border border-neutral-300 font-semibold text-[15px] text-[#111111] hover:bg-neutral-50 transition">See pricing</a>'
+            '</div></div>')
+        body += section_wrap("start", cta, "bg-neutral-50")
+        return title, desc, body, ""
+    return build
+
+
+for _ind in INDUSTRIES:
+    _p = "Pages/ai-receptionist-for-" + _ind[0] + ".html"
+    if not any(p == _p for p, _ in PAGES):
+        PAGES.append((_p, _industry_page(_ind)))
+
+
+def _industry_links(prefix):
+    links = "".join(
+        '<a href="' + prefix + 'Pages/ai-receptionist-for-' + i[0] + '" class="px-4 py-2 rounded-full border border-neutral-200 '
+        'text-[14px] font-semibold text-[#111111] hover:bg-neutral-50 transition">' + i[1] + '</a>' for i in INDUSTRIES)
+    return ('\n<section id="vs-industries" class="bg-white"><div class="max-w-[1400px] mx-auto px-6 lg:px-12 py-12 text-center">'
+            '<p class="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#55565B]">AI receptionist for</p>'
+            '<div class="mt-4 flex flex-wrap justify-center gap-2">' + links + '</div></div></section>\n')
+
+
+_prev_rp_seo = render_page
+
+
+def render_page(path, builder):
+    html = _prev_rp_seo(path, builder)
+    name = Path(path).name
+    if "VS_SEO_MARKER" in html:
+        return html
+    url = _seo_url(path)
+    title, desc = _SEO.get(path, (None, None))
+    esc = lambda s: _seo_html.escape(s, quote=True)
+    if title:
+        html = _re_auth.sub(r"<title>.*?</title>", lambda m: "<title>" + esc(title) + "</title>", html, count=1, flags=_re_auth.S)
+    if desc:
+        if _re_auth.search(r'<meta name="description"[^>]*>', html):
+            html = _re_auth.sub(r'<meta name="description"[^>]*>', lambda m: '<meta name="description" content="' + esc(desc) + '">', html, count=1)
+        else:
+            html = html.replace("</title>", '</title>\n  <meta name="description" content="' + esc(desc) + '">', 1)
+    t = title or "Vocallus"
+    d = desc or "Vocallus \u2013 the AI receptionist that answers every call."
+    og_img = SEO_SITE + "/Images/" + ("og-image.png" if (ROOT / "Images" / "og-image.png").exists() else "logo.png")
+    head = ['<!-- VS_SEO_MARKER -->']
+    if name in _NOINDEX:
+        head.append('<meta name="robots" content="noindex, nofollow">')
+    else:
+        head += [
+            '<link rel="canonical" href="' + url + '">',
+            '<meta property="og:type" content="website">',
+            '<meta property="og:site_name" content="Vocallus">',
+            '<meta property="og:title" content="' + esc(t) + '">',
+            '<meta property="og:description" content="' + esc(d) + '">',
+            '<meta property="og:url" content="' + url + '">',
+            '<meta property="og:image" content="' + og_img + '">',
+            '<meta name="twitter:card" content="summary_large_image">',
+            '<meta name="twitter:title" content="' + esc(t) + '">',
+            '<meta name="twitter:description" content="' + esc(d) + '">',
+            '<meta name="twitter:image" content="' + og_img + '">',
+        ]
+    data = None
+    if path == "index.html":
+        data = [{
+            "@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Vocallus",
+            "applicationCategory": "BusinessApplication", "operatingSystem": "Web", "url": SEO_SITE + "/",
+            "description": _SEO["index.html"][1],
+            "offers": [{"@type": "Offer", "name": "Pro", "price": "14.99", "priceCurrency": "USD"},
+                       {"@type": "Offer", "name": "Max", "price": "99.99", "priceCurrency": "USD"}]},
+            {"@context": "https://schema.org", "@type": "Organization", "name": "Vocallus", "url": SEO_SITE + "/",
+             "logo": SEO_SITE + "/Images/logo.png"}]
+    elif name.startswith("ai-receptionist-for-"):
+        ind = next(i for i in INDUSTRIES if name == "ai-receptionist-for-" + i[0] + ".html")
+        data = {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+            {"@type": "Question", "name": "Can it book new customers?", "acceptedAnswer": {"@type": "Answer", "text": ind[6]}},
+            {"@type": "Question", "name": "Do I keep my phone number?", "acceptedAnswer": {"@type": "Answer",
+             "text": "Yes. Forward your current number to your Solana number, and callers keep dialing the number they know."}},
+            {"@type": "Question", "name": "How much does it cost?", "acceptedAnswer": {"@type": "Answer",
+             "text": "Pro is $14.99/month and Max is $99.99/month. You can try a free test call first."}}]}
+    if data is not None:
+        head.append('<script type="application/ld+json">' + _seo_json.dumps(data).replace("</", "<\\/") + "</script>")
+    html = html.replace("</head>", "  " + "\n  ".join(head) + "\n</head>", 1)
+    # links to the industry pages (helps Google find them)
+    if (name in ("index.html", "solutions.html") or name.startswith("ai-receptionist-for-")) and "<footer" in html:
+        prefix = "" if path == "index.html" else "../"
+        i = html.rfind("<footer")
+        html = html[:i] + _industry_links(prefix) + html[i:]
+    return html
+
 
 # --- end deepseek_python.py ---
 
