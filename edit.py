@@ -2110,10 +2110,7 @@ _DP_VOICE_JS = """
       const V = [
         { id: 'default', label: 'Solana', sub: 'Default voice', tier: 'free', imgs: ['logo.png'], audio: 'solana' },
         { id: 'female', label: 'Female', sub: 'Pro voice', tier: 'pro', imgs: ['pfmale.png', 'pfemale.png', 'pfmales.png'], audio: 'pfmale' },
-        { id: 'male', label: 'Male', sub: 'Pro voice', tier: 'pro', imgs: ['pmale.png'], audio: 'pmale' },
-        { id: 'mmale', label: 'Professional Male', sub: 'Max voice', tier: 'max', imgs: ['mmale.png'], audio: 'mmale' },
-        { id: 'mfmale', label: 'Professional Female', sub: 'Max voice', tier: 'max', imgs: ['mfmale.png', 'mfemale.png'], audio: 'mfmale' },
-        { id: 'rmale', label: 'Rustic Male', sub: 'Max voice', tier: 'max', imgs: ['rmale.png'], audio: 'rmale' }
+        { id: 'male', label: 'Male', sub: 'Pro voice', tier: 'pro', imgs: ['pmale.png'], audio: 'pmale' }
       ];
       const RANK = { free: 0, pro: 1, max: 2 };
       const planRank = (p) => p === 'max' ? 2 : p === 'pro' ? 1 : 0;
@@ -2431,6 +2428,68 @@ _DP_ABOUT_JS = """
             const v = (s.exists() && s.data().businessDescription) || '';
             if (document.activeElement !== ta) { ta.value = v; saved = v.trim(); }
           }, () => {});
+        });
+      } catch (e) {}
+    }
+  </script>
+"""
+
+# ======================= Solana page: name + prompt save by themselves (no Save button) =======================
+
+_DP_AUTOSAVE_JS = """
+  <script type="module">
+    /* VQ_AUTOSAVE_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const btn = $('save-prompt'), nameIn = $('agent-name'), promptIn = $('system-prompt');
+    if (btn && nameIn && promptIn) {
+      btn.style.display = 'none';                          // kept in the page (other scripts use it as an anchor)
+      const st = document.createElement('span');
+      st.id = 'vq-state';
+      st.className = 'ml-auto inline-flex items-center gap-1.5 text-[12px] text-gray-400';
+      st.style.cssText = 'opacity:0;transition:opacity .2s ease';
+      const row = $('vs-reset') ? $('vs-reset').parentElement : null;
+      if (row) { row.classList.remove('justify-start'); row.classList.add('justify-between'); row.appendChild(st); }
+      else promptIn.insertAdjacentElement('afterend', st);
+      const CHECK = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+      let hideT = null;
+      const show = (html, color, stay) => {
+        clearTimeout(hideT);
+        st.innerHTML = html; st.style.color = color || ''; st.style.opacity = '1';
+        if (!stay) hideT = setTimeout(() => { st.style.opacity = '0'; }, 1800);
+      };
+
+      let uid = null, fs = null, db = null, ready = false, last = null, timer = null, dirty = false;
+      const current = () => ({ agentName: nameIn.value.trim() || 'Solana', systemPrompt: promptIn.value.trim() });
+      async function save() {
+        clearTimeout(timer);
+        if (!ready || !uid || !fs || !dirty) return;
+        const data = current();
+        if (last && data.agentName === last.agentName && data.systemPrompt === last.systemPrompt) return;
+        show('Saving…', '', true);
+        try {
+          await fs.setDoc(fs.doc(db, 'users', uid), data, { merge: true });
+          last = data; dirty = false;
+          show(CHECK + 'Saved', '#15803d');
+        } catch (e) { show('Couldn’t save: ' + e.message, '#dc2626', true); }
+      }
+      const soon = () => { dirty = true; clearTimeout(timer); timer = setTimeout(save, 700); };
+      nameIn.addEventListener('input', soon);
+      promptIn.addEventListener('input', soon);
+      nameIn.addEventListener('blur', save);
+      promptIn.addEventListener('blur', save);
+      document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('#vs-reset')) setTimeout(soon, 0); });
+      window.addEventListener('beforeunload', () => { if (dirty) save(); });
+
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        db = fs.getFirestore(app);
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (!user) return;
+          uid = user.uid;
+          // wait until the page has filled in the saved name + prompt, then start saving changes
+          setTimeout(() => { last = current(); ready = true; if (dirty) save(); }, 1500);
         });
       } catch (e) {}
     }
@@ -3262,6 +3321,7 @@ def render_page(path, builder):
             html = _dp_add(html, "VP_PROVIDER_MARKER", "</body>", _DP_PROVIDER_JS)
             html = _dp_add(html, "VV_VOICE_MARKER", "</body>", _DP_VOICE_JS)
             html = _dp_add(html, "VZ_ABOUT_MARKER", "</body>", _DP_ABOUT_JS)
+            html = _dp_add(html, "VQ_AUTOSAVE_MARKER", "</body>", _DP_AUTOSAVE_JS)
             # "AGENT NAME" / "SYSTEM PROMPT" -> "Agent name" / "System prompt"
             html = html.replace('block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2',
                                 'block text-[13px] font-semibold text-gray-700 mb-1.5')
@@ -3347,8 +3407,7 @@ def main() -> int:
     BUILD_PY.write_text(src, encoding="utf-8")
     print("[ok] added deepseek_python.py v15")
     for f, how in (("Audio/solana.mp3", "make_voices.py"), ("Audio/pfmale.mp3", "make_voices.py"), ("Audio/pmale.mp3", "make_voices.py"),
-                   ("Audio/mmale.mp3", "make_max_voices.py"), ("Audio/mfmale.mp3", "make_max_voices.py"), ("Audio/rmale.mp3", "make_max_voices.py"),
-                   ("Images/pmale.png", ""), ("Images/pfmale.png", ""), ("Images/mmale.png", ""), ("Images/mfmale.png", ""), ("Images/rmale.png", "")):
+                   ("Images/pmale.png", ""), ("Images/pfmale.png", "")):
         if not (ROOT / f).exists() and not (ROOT / f.replace(".mp3", ".wav")).exists():
             print(f"[note] {f} not found yet" + (f" - run {how}" if how else " - add the picture"))
     (ROOT / "firebase-messaging-sw.js").write_text(SW_FILE, encoding="utf-8")
@@ -3387,6 +3446,7 @@ def main() -> int:
         ("Pages/calendar.html", "VG_CAL_MARKER", "Calendar: clean week view"),
         ("Pages/dashboard.html", "VO_ONBOARD_MARKER", "Sign-up question: what your business does"),
         ("Pages/solana.html", "VZ_ABOUT_MARKER", "Solana page: business description"),
+        ("Pages/solana.html", "VQ_AUTOSAVE_MARKER", "Solana page: saves by itself (no Save button)"),
         ("Pages/checkout.html", "VX_CHECKOUT_MARKER", "Checkout: card form loads reliably"),
         ("Pages/checkout.html", "false && window.whenFirebase", "Checkout: old script switched off"),
         ("Pages/dashboard.html", "VA_DELETE_MARKER", "Billing: Delete account"),
