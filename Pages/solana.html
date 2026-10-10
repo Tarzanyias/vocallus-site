@@ -274,9 +274,7 @@
             <a href="#" class="text-gray-500 hover:text-gray-800 relative p-2 transition-colors">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             </a>
-            <button id="signout-btn" title="Sign out" class="text-gray-500 hover:text-gray-800 p-2 transition-colors">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-            </button>
+            <button id="vu-acct" type="button" title="Account" aria-haspopup="menu" aria-expanded="false" class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900 flex items-center justify-center transition-colors"><svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></button><span id="signout-btn" hidden></span>
         </div>
     </nav>
     <aside class="w-[320px] bg-[#f9fafb] border-r border-gray-200 flex flex-col flex-shrink-0">
@@ -1918,6 +1916,155 @@
           }, () => {});
         });
       } catch (e) { console.error('Alerts setup:', e); }
+    }
+  </script>
+
+
+  <style>
+    /* VU_ACCOUNT_MARKER */
+    #vu-menu { position: fixed; z-index: 96; width: 240px; background: #fff; border: 1px solid #ececec; border-radius: 16px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.16); padding: 6px; opacity: 0; pointer-events: none;
+      transform: translateY(6px) scale(.97); transform-origin: bottom left;
+      transition: opacity .16s ease, transform .2s cubic-bezier(.16,1,.3,1); }
+    #vu-menu.vu-open { opacity: 1; pointer-events: auto; transform: none; }
+    #vu-menu .vu-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; text-align: left; transition: background-color .12s ease; }
+    #vu-menu .vu-grey { color: #4b5563; } #vu-menu .vu-grey:hover { background: #f3f4f6; color: #111827; }
+    #vu-menu .vu-red { color: #dc2626; } #vu-menu .vu-red:hover { background: #fef2f2; }
+    #vu-veil { position: fixed; inset: 0; z-index: 97; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center;
+      padding: 16px; opacity: 0; pointer-events: none; transition: opacity .18s ease; }
+    #vu-veil.vu-open { opacity: 1; pointer-events: auto; }
+    #vu-box { background: #fff; border-radius: 24px; width: 100%; max-width: 420px; padding: 28px; box-shadow: 0 24px 60px rgba(0,0,0,.22);
+      transform: translateY(8px) scale(.98); transition: transform .22s cubic-bezier(.16,1,.3,1); }
+    #vu-veil.vu-open #vu-box { transform: none; }
+    #vu-menu .vu-item { background: none; border: 0; cursor: pointer; font-family: inherit; }
+    #vu-menu svg, #vu-box .vu-warn svg { width: 18px; height: 18px; flex-shrink: 0; }
+    #vu-who { padding: 8px 12px 10px; font-size: 12px; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #vu-menu .vu-line { height: 1px; background: #f3f4f6; margin: 0 4px 4px; }
+    #vu-box .vu-warn { width: 44px; height: 44px; border-radius: 999px; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+    #vu-box h3 { font-size: 20px; font-weight: 600; color: #111827; margin: 0; }
+    #vu-box p { font-size: 14px; color: #6b7280; line-height: 1.6; margin: 8px 0 0; }
+    #vu-box .vu-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+    #vu-box .vu-btn { padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background-color .15s ease, opacity .15s ease; }
+    #vu-cancel { background: #fff; border: 1px solid #e5e7eb; color: #1f2937; } #vu-cancel:hover { background: #f9fafb; }
+    #vu-go { background: #dc2626; border: 1px solid #dc2626; color: #fff; min-width: 150px; } #vu-go:hover { background: #b91c1c; } #vu-go:disabled { opacity: .7; cursor: default; }
+    #vu-err { font-size: 13px; color: #dc2626; margin-top: 12px; } #vu-err.hidden { display: none; }
+    .vu-spin { animation: vuSpin .8s linear infinite; } @keyframes vuSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #vu-menu, #vu-veil, #vu-box { transition: none; } }
+  </style>
+  <script type="module">
+    const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+    const btn = document.getElementById('vu-acct');
+    if (btn) {
+      const I = (d) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+      const menu = document.createElement('div');
+      menu.id = 'vu-menu'; menu.setAttribute('role', 'menu');
+      menu.innerHTML =
+        '<div id="vu-who">Signed in</div>' +
+        '<div class="vu-line"></div>' +
+        '<button id="vu-out" class="vu-item vu-grey" role="menuitem">' + I('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line>') + 'Log out</button>' +
+        '<button id="vu-del" class="vu-item vu-red" role="menuitem">' + I('<polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>') + 'Delete account</button>';
+      document.body.appendChild(menu);
+
+      const veil = document.createElement('div');
+      veil.id = 'vu-veil';
+      veil.innerHTML =
+        '<div id="vu-box" role="dialog" aria-modal="true">' +
+          '<div class="vu-warn">' + I('<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>') + '</div>' +
+          '<h3>Are you sure?</h3>' +
+          '<p>This cancels your subscription, turns off your Solana phone number, and permanently erases your calls, calendar and settings. This can’t be undone.</p>' +
+          '<div id="vu-err" class="hidden"></div>' +
+          '<div class="vu-row">' +
+            '<button id="vu-cancel" class="vu-btn">Cancel</button>' +
+            '<button id="vu-go" class="vu-btn">Delete account</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(veil);
+
+      const $ = (id) => document.getElementById(id);
+      let auth = null, A = null, busy = false;
+
+      const place = () => {
+        const r = btn.getBoundingClientRect();
+        if (r.right + 252 <= window.innerWidth) {          // beside the sidebar icon
+          menu.style.left = (r.right + 12) + 'px';
+          menu.style.top = ''; menu.style.bottom = Math.max(8, window.innerHeight - r.bottom) + 'px';
+          menu.style.transformOrigin = 'bottom left';
+        } else {                                            // small screens: under the icon
+          menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 248)) + 'px';
+          menu.style.bottom = ''; menu.style.top = (r.bottom + 8) + 'px';
+          menu.style.transformOrigin = 'top left';
+        }
+      };
+      const isOpen = () => menu.classList.contains('vu-open');
+      const openMenu = () => { place(); menu.classList.add('vu-open'); btn.setAttribute('aria-expanded', 'true'); };
+      const closeMenu = () => { menu.classList.remove('vu-open'); btn.setAttribute('aria-expanded', 'false'); };
+      btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); isOpen() ? closeMenu() : openMenu(); });
+      document.addEventListener('mousedown', (e) => { if (isOpen() && !menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); });
+      window.addEventListener('resize', () => { if (isOpen()) place(); });
+
+      const leave = (to) => {
+        try { ['vocallus_user', 'vocallus_agent', 'va_token'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+        document.body.style.transition = 'opacity .25s ease'; document.body.style.opacity = '0';
+        setTimeout(() => { location.href = to; }, 260);
+      };
+
+      $('vu-out').addEventListener('click', async () => {
+        closeMenu();
+        try { if (A && auth) await A.signOut(auth); } catch (e) {}
+        leave('login.html');
+      });
+
+      const openConfirm = () => { $('vu-err').classList.add('hidden'); veil.classList.add('vu-open'); setTimeout(() => $('vu-cancel').focus(), 60); };
+      const closeConfirm = () => { if (!busy) veil.classList.remove('vu-open'); };
+      $('vu-del').addEventListener('click', () => { closeMenu(); setTimeout(openConfirm, 90); });
+      $('vu-cancel').addEventListener('click', closeConfirm);
+      veil.addEventListener('mousedown', (e) => { if (e.target === veil) closeConfirm(); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (veil.classList.contains('vu-open')) closeConfirm(); else if (isOpen()) closeMenu();
+      });
+
+      $('vu-go').addEventListener('click', async () => {
+        const go = $('vu-go'), err = $('vu-err');
+        if (busy) return;
+        if (!auth || !auth.currentUser) { err.textContent = 'Still loading your account - try again in a second.'; err.classList.remove('hidden'); return; }
+        busy = true; go.disabled = true; err.classList.add('hidden');
+        go.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px"><svg class="vu-spin" style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>Deleting…</span>';
+        try {
+          const tok = await auth.currentUser.getIdToken();
+          const r = await fetch(BRIDGE + '/api/account/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+            body: JSON.stringify({ confirm: 'DELETE' })
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || ('Something went wrong (' + r.status + ').'));
+          try { await A.signOut(auth); } catch (e) {}
+          leave('../index.html');
+        } catch (e) {
+          busy = false; go.disabled = false; go.textContent = 'Delete account';
+          err.textContent = e.message === 'Failed to fetch' ? 'Couldn’t reach Vocallus. Try again in a moment.' : e.message;
+          err.classList.remove('hidden');
+        }
+      });
+
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        A = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        auth = A.getAuth(app);
+        A.onAuthStateChanged(auth, (u) => { if (u && u.email) $('vu-who').textContent = u.email; });
+      } catch (e) {}
     }
   </script>
 
