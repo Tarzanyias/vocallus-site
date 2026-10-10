@@ -4195,18 +4195,27 @@ def write_seo_files():
         print("[note] share picture skipped (pip install pillow to make Images/og-image.png)")
         return
     lg0 = ROOT / "Images" / "logo.png"
-    if lg0.exists():                                     # favicon set from logo.png, on a white square
+    if lg0.exists():                                     # favicon set from logo.png, transparent background
+        from PIL import ImageDraw as _ID
         src = Image.open(lg0).convert("RGBA")
-        bb = src.getbbox()
+        w0, h0 = src.size
+        corners = [(0, 0), (w0 - 1, 0), (0, h0 - 1), (w0 - 1, h0 - 1)]
+        if all(src.getpixel(c)[3] > 200 for c in corners):   # logo has a solid background: cut it out
+            for c in corners:
+                if src.getpixel(c)[3] > 0:
+                    _ID.floodfill(src, c, (0, 0, 0, 0), thresh=60)
+        bb = src.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
         if bb:
             src = src.crop(bb)
-        side = int(max(src.size) * 1.18)
-        sq = Image.new("RGBA", (side, side), (255, 255, 255, 255))
+        side = int(max(src.size) * 1.06)
+        sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
         sq.paste(src, ((side - src.width) // 2, (side - src.height) // 2), src)
         sq.resize((192, 192), Image.LANCZOS).save(ROOT / "Images" / "icon-192.png")
-        sq.convert("RGB").resize((180, 180), Image.LANCZOS).save(ROOT / "Images" / "apple-touch-icon.png")
         sq.resize((256, 256), Image.LANCZOS).save(ROOT / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
-        print("[ok] made favicon.ico + Images/icon-192.png + Images/apple-touch-icon.png")
+        ap = Image.new("RGBA", (side, side), (255, 255, 255, 255))   # iPhone home screen needs a solid square
+        ap.alpha_composite(sq)
+        ap.convert("RGB").resize((180, 180), Image.LANCZOS).save(ROOT / "Images" / "apple-touch-icon.png")
+        print("[ok] made favicon.ico + Images/icon-192.png + Images/apple-touch-icon.png (transparent)")
     W, H = 1200, 630
     im = Image.new("RGB", (W, H), (255, 255, 255))
     d = ImageDraw.Draw(im)
