@@ -762,7 +762,12 @@
               first = false;
               // Ask once, right after sign-up, on the dashboard.
               if (onDashboard && userDoc && !userDoc.alertsPrompted && supported() && !isOn() && Notification.permission !== 'denied') {
-                setTimeout(() => { if (!isOn()) open(); }, 900);
+                const tryOpen = () => {
+                  const r = document.documentElement.classList;
+                  if (r.contains('vo-check') || r.contains('vo-open')) return setTimeout(tryOpen, 700);
+                  if (!isOn()) open();
+                };
+                setTimeout(tryOpen, 900);
               }
               // Already on -> keep this device's alert token fresh and show alerts while the page is open.
               if (supported() && Notification.permission === 'granted' && pushDoc.enabled) {
@@ -843,6 +848,93 @@
 
       const pill = toggle.querySelector('#vh-pill');
       let range = 'all', calls = [], loaded = false;
+      // ---- call detail drawer (click a call) ----
+      const veil = document.createElement('div');
+      veil.className = 'fixed inset-0 z-[80] bg-black/30';
+      veil.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .2s ease';
+      const drawer = document.createElement('aside');
+      drawer.className = 'fixed top-0 right-0 bottom-0 z-[81] w-[460px] max-w-[100vw] bg-white flex flex-col';
+      drawer.style.cssText += ';transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1);box-shadow:-12px 0 40px rgba(0,0,0,.12)';
+      document.body.append(veil, drawer);
+      let openId = null;
+      const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+      const niceDate = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return d || '';
+        return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+      const ICONS = {
+        check_availability: '<path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/>',
+        book_appointment: '<polyline points="20 6 9 17 4 12"/>',
+        take_message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+      };
+      function actionText(a) {
+        if (a.type === 'check_availability') return 'Checked open times for ' + niceDate(a.date) + (a.open ? (a.times ? ' · ' + a.times + ' free' : ' · none free') : ' · closed');
+        if (a.type === 'book_appointment') return a.ok
+          ? 'Booked ' + (a.reason || 'an appointment') + (a.name ? ' for ' + a.name : '') + ' on ' + niceDate(a.date) + ' at ' + a.time
+          : 'Tried to book ' + niceDate(a.date) + ' at ' + (a.time || '?') + ' (not available)';
+        if (a.type === 'take_message') return 'Took a message' + (a.name ? ' from ' + a.name : '');
+        return a.type;
+      }
+      function closeDetail() {
+        openId = null;
+        veil.style.opacity = '0'; veil.style.pointerEvents = 'none';
+        drawer.style.transform = 'translateX(100%)';
+        if (location.hash.indexOf('#call=') === 0 && history.replaceState) history.replaceState(null, '', location.pathname);
+      }
+      function openDetail(c) {
+        openId = c.id;
+        const [label, cls] = statusPill(c.status);
+        const when = tsOf(c) ? new Date(tsOf(c)).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+        const acts = (c.actions || []).slice().sort((x, y) => ((x.at && x.at.toMillis) ? x.at.toMillis() : 0) - ((y.at && y.at.toMillis) ? y.at.toMillis() : 0));
+        const lines = Array.isArray(c.transcript) ? c.transcript : [];
+        let h =
+          '<div class="flex items-start justify-between gap-3 px-6 pt-6 pb-4 border-b border-gray-100">' +
+            '<div><div class="text-[20px] font-semibold text-gray-900">' + esc(fmtPhone(c.from)) + '</div>' +
+            '<div class="text-[13px] text-gray-500 mt-0.5">' + esc(when) + (c.durationSec ? ' · ' + fmtDur(c.durationSec) : '') + '</div>' +
+            '<span class="inline-block mt-2 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ' + cls + '">' + esc(label) + '</span></div>' +
+            '<button data-x aria-label="Close" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100">' +
+              '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+          '</div><div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">';
+        if (c.summary) h += '<div><div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">Summary</div>' +
+          '<p class="text-[14.5px] leading-[1.55] text-gray-800">' + esc(c.summary) + '</p></div>';
+        if (acts.length || (c.message && (c.message.reason || c.message.name))) {
+          h += '<div><div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400 mb-2">What ' + esc(agent) + ' did</div><div class="space-y-2">';
+          acts.forEach(a => {
+            const good = a.type !== 'book_appointment' || a.ok;
+            h += '<div class="flex items-start gap-3 rounded-xl border border-gray-100 px-3.5 py-3">' +
+              '<div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ' + (a.type === 'book_appointment' && a.ok ? 'bg-black text-white' : 'bg-gray-100 text-gray-700') + '">' +
+              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[a.type] || ICONS.check_availability) + '</svg></div>' +
+              '<div class="flex-1 text-[13.5px] leading-[1.45] ' + (good ? 'text-gray-800' : 'text-gray-500') + '">' + esc(actionText(a)) +
+              (a.type === 'book_appointment' && a.ok && a.date ? '<a href="calendar.html#date=' + esc(a.date) + '" class="block mt-1 text-[12.5px] font-semibold text-gray-900 underline underline-offset-2">Open in Calendar</a>' : '') +
+              '</div></div>';
+          });
+          if (c.message && (c.message.reason || c.message.name)) {
+            h += '<div class="rounded-xl bg-[#f9fafb] border border-gray-100 px-3.5 py-3 text-[13.5px] text-gray-700"><div class="font-semibold text-gray-900 mb-0.5">Message from ' +
+              esc(c.message.name || 'caller') + (c.message.phone ? ' · ' + esc(fmtPhone(c.message.phone)) : '') + '</div>' + esc(c.message.reason || '') + '</div>';
+          }
+          h += '</div></div>';
+        }
+        h += '<div><div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Conversation</div>';
+        if (!lines.length) {
+          h += '<p class="text-[13.5px] text-gray-500">' + (c.status === 'in-progress' ? 'This call is still going. The conversation shows here when it ends.' : 'No transcript for this call.') + '</p>';
+        } else {
+          h += '<div class="space-y-3">';
+          lines.forEach(l => {
+            const me = l.who !== 'Caller';
+            h += '<div class="flex ' + (me ? 'justify-end' : 'justify-start') + '"><div class="max-w-[82%]">' +
+              '<div class="text-[11px] font-semibold text-gray-400 mb-0.5 ' + (me ? 'text-right' : '') + '">' + esc(me ? l.who : 'Caller') + '</div>' +
+              '<div class="rounded-2xl px-3.5 py-2.5 text-[14px] leading-[1.5] ' + (me ? 'bg-black text-white rounded-tr-sm' : 'bg-gray-100 text-gray-900 rounded-tl-sm') + '">' + esc(l.text) + '</div></div></div>';
+          });
+          h += '</div>';
+        }
+        h += '</div></div>';
+        drawer.innerHTML = h;
+        drawer.querySelector('[data-x]').addEventListener('click', closeDetail);
+        veil.style.opacity = '1'; veil.style.pointerEvents = 'auto';
+        requestAnimationFrame(() => { drawer.style.transform = 'none'; });
+        if (history.replaceState) history.replaceState(null, '', '#call=' + c.id);
+      }
+      veil.addEventListener('click', closeDetail);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openId) closeDetail(); });
+      let agent = 'Solana';
 
       function movePill(animate) {
         const b = toggle.querySelector('.vh-btn[data-r="' + range + '"]');
@@ -878,7 +970,11 @@
             list.innerHTML = '';
             rows.forEach(c => {
               const row = document.createElement('div');
-              row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm transition';
+              row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm hover:border-gray-200 transition cursor-pointer';
+              row.setAttribute('role', 'button');
+              row.tabIndex = 0;
+              row.addEventListener('click', () => openDetail(c));
+              row.addEventListener('keydown', (e) => { if (e.key === 'Enter') openDetail(c); });
               row.innerHTML =
                 '<div class="flex items-start gap-4">' +
                   '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0">' +
@@ -946,9 +1042,16 @@
         const auth = getAuth(app), db = getFirestore(app);
         onAuthStateChanged(auth, (user) => {
           if (!user) return;
+          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js").then(m => {
+            m.onSnapshot(m.doc(db, 'users', user.uid), (s) => { if (s.exists() && s.data().agentName) agent = s.data().agentName; }, () => {});
+          });
+          let first = true;
           onSnapshot(collection(db, 'users', user.uid, 'calls'), (s) => {
             calls = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => tsOf(b) - tsOf(a));
             loaded = true; render();
+            const want = openId || (first && location.hash.indexOf('#call=') === 0 ? location.hash.slice(6) : null);
+            if (want) { const c = calls.find(x => x.id === want); if (c) openDetail(c); }
+            first = false;
           }, (err) => {
             loaded = true;
             list.innerHTML = '<div class="py-12 text-center text-[14px] text-red-600">Could not load calls: ' + err.message + '</div>';

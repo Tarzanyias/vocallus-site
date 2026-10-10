@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 deepseek_python.py (v7) - one script for all the site polish.
+  v14: History: click a call -> transcript + what Solana did; clean black & white Google-style calendar;
+       "What does your business do?" after sign-up + on the Solana page; dashboard tabs fade in.
+  v13: Solana page shows what calls will really use (number, voice) and explains voice problems;
+       clearer 'no numbers in that area code' message.
   v12: Max voices (Professional Male, Professional Female, Rustic Male) with a MAX tag + 'More voices coming soon'.
   v11.1: Pro upgrade box slides + fades in smoothly.
   v11: Voices: Solana (default, free) + Female and Male with a PRO tag. Demo accounts that pick
@@ -422,7 +426,7 @@ _DP_NUMBER_JS = """
             try {
               const j = await api('/api/numbers/search?areaCode=' + ac);
               const list = j.numbers || [];
-              if (!list.length) { status.textContent = 'No numbers in that area code, try another.'; return; }
+              if (!list.length) { status.textContent = 'Twilio has no numbers left in ' + ac + ' right now. Try a nearby area code' + (['832', '281', '346', '713'].includes(ac) ? ' (Houston: 281, 346, 713 or 832).' : '.'); return; }
               status.textContent = list.length + ' number' + (list.length === 1 ? '' : 's') + ' available';
               list.forEach((n) => {
                 const row = document.createElement('div');
@@ -557,7 +561,8 @@ _DP_RECENT_JS = """
         list.innerHTML = '';
         rows.forEach(c => {
           const row = document.createElement('div');
-          row.className = 'bg-white px-2 py-5 border-b border-gray-200';
+          row.className = 'bg-white px-2 py-5 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors';
+          row.addEventListener('click', () => { location.href = 'history.html#call=' + c.id; });
           row.innerHTML =
             '<div class="flex items-center gap-3 flex-wrap mb-1">' +
               '<div class="vc-num text-[15px] font-semibold text-gray-900"></div>' +
@@ -628,6 +633,93 @@ _DP_HISTORY_JS = """
 
       const pill = toggle.querySelector('#vh-pill');
       let range = 'all', calls = [], loaded = false;
+      // ---- call detail drawer (click a call) ----
+      const veil = document.createElement('div');
+      veil.className = 'fixed inset-0 z-[80] bg-black/30';
+      veil.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .2s ease';
+      const drawer = document.createElement('aside');
+      drawer.className = 'fixed top-0 right-0 bottom-0 z-[81] w-[460px] max-w-[100vw] bg-white flex flex-col';
+      drawer.style.cssText += ';transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1);box-shadow:-12px 0 40px rgba(0,0,0,.12)';
+      document.body.append(veil, drawer);
+      let openId = null;
+      const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+      const niceDate = (d) => { const m = String(d || '').match(/^(\\d{4})-(\\d{2})-(\\d{2})$/); if (!m) return d || '';
+        return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+      const ICONS = {
+        check_availability: '<path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/>',
+        book_appointment: '<polyline points="20 6 9 17 4 12"/>',
+        take_message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+      };
+      function actionText(a) {
+        if (a.type === 'check_availability') return 'Checked open times for ' + niceDate(a.date) + (a.open ? (a.times ? ' · ' + a.times + ' free' : ' · none free') : ' · closed');
+        if (a.type === 'book_appointment') return a.ok
+          ? 'Booked ' + (a.reason || 'an appointment') + (a.name ? ' for ' + a.name : '') + ' on ' + niceDate(a.date) + ' at ' + a.time
+          : 'Tried to book ' + niceDate(a.date) + ' at ' + (a.time || '?') + ' (not available)';
+        if (a.type === 'take_message') return 'Took a message' + (a.name ? ' from ' + a.name : '');
+        return a.type;
+      }
+      function closeDetail() {
+        openId = null;
+        veil.style.opacity = '0'; veil.style.pointerEvents = 'none';
+        drawer.style.transform = 'translateX(100%)';
+        if (location.hash.indexOf('#call=') === 0 && history.replaceState) history.replaceState(null, '', location.pathname);
+      }
+      function openDetail(c) {
+        openId = c.id;
+        const [label, cls] = statusPill(c.status);
+        const when = tsOf(c) ? new Date(tsOf(c)).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+        const acts = (c.actions || []).slice().sort((x, y) => ((x.at && x.at.toMillis) ? x.at.toMillis() : 0) - ((y.at && y.at.toMillis) ? y.at.toMillis() : 0));
+        const lines = Array.isArray(c.transcript) ? c.transcript : [];
+        let h =
+          '<div class="flex items-start justify-between gap-3 px-6 pt-6 pb-4 border-b border-gray-100">' +
+            '<div><div class="text-[20px] font-semibold text-gray-900">' + esc(fmtPhone(c.from)) + '</div>' +
+            '<div class="text-[13px] text-gray-500 mt-0.5">' + esc(when) + (c.durationSec ? ' · ' + fmtDur(c.durationSec) : '') + '</div>' +
+            '<span class="inline-block mt-2 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ' + cls + '">' + esc(label) + '</span></div>' +
+            '<button data-x aria-label="Close" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100">' +
+              '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+          '</div><div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">';
+        if (c.summary) h += '<div><div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">Summary</div>' +
+          '<p class="text-[14.5px] leading-[1.55] text-gray-800">' + esc(c.summary) + '</p></div>';
+        if (acts.length || (c.message && (c.message.reason || c.message.name))) {
+          h += '<div><div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400 mb-2">What ' + esc(agent) + ' did</div><div class="space-y-2">';
+          acts.forEach(a => {
+            const good = a.type !== 'book_appointment' || a.ok;
+            h += '<div class="flex items-start gap-3 rounded-xl border border-gray-100 px-3.5 py-3">' +
+              '<div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ' + (a.type === 'book_appointment' && a.ok ? 'bg-black text-white' : 'bg-gray-100 text-gray-700') + '">' +
+              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[a.type] || ICONS.check_availability) + '</svg></div>' +
+              '<div class="flex-1 text-[13.5px] leading-[1.45] ' + (good ? 'text-gray-800' : 'text-gray-500') + '">' + esc(actionText(a)) +
+              (a.type === 'book_appointment' && a.ok && a.date ? '<a href="calendar.html#date=' + esc(a.date) + '" class="block mt-1 text-[12.5px] font-semibold text-gray-900 underline underline-offset-2">Open in Calendar</a>' : '') +
+              '</div></div>';
+          });
+          if (c.message && (c.message.reason || c.message.name)) {
+            h += '<div class="rounded-xl bg-[#f9fafb] border border-gray-100 px-3.5 py-3 text-[13.5px] text-gray-700"><div class="font-semibold text-gray-900 mb-0.5">Message from ' +
+              esc(c.message.name || 'caller') + (c.message.phone ? ' · ' + esc(fmtPhone(c.message.phone)) : '') + '</div>' + esc(c.message.reason || '') + '</div>';
+          }
+          h += '</div></div>';
+        }
+        h += '<div><div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Conversation</div>';
+        if (!lines.length) {
+          h += '<p class="text-[13.5px] text-gray-500">' + (c.status === 'in-progress' ? 'This call is still going. The conversation shows here when it ends.' : 'No transcript for this call.') + '</p>';
+        } else {
+          h += '<div class="space-y-3">';
+          lines.forEach(l => {
+            const me = l.who !== 'Caller';
+            h += '<div class="flex ' + (me ? 'justify-end' : 'justify-start') + '"><div class="max-w-[82%]">' +
+              '<div class="text-[11px] font-semibold text-gray-400 mb-0.5 ' + (me ? 'text-right' : '') + '">' + esc(me ? l.who : 'Caller') + '</div>' +
+              '<div class="rounded-2xl px-3.5 py-2.5 text-[14px] leading-[1.5] ' + (me ? 'bg-black text-white rounded-tr-sm' : 'bg-gray-100 text-gray-900 rounded-tl-sm') + '">' + esc(l.text) + '</div></div></div>';
+          });
+          h += '</div>';
+        }
+        h += '</div></div>';
+        drawer.innerHTML = h;
+        drawer.querySelector('[data-x]').addEventListener('click', closeDetail);
+        veil.style.opacity = '1'; veil.style.pointerEvents = 'auto';
+        requestAnimationFrame(() => { drawer.style.transform = 'none'; });
+        if (history.replaceState) history.replaceState(null, '', '#call=' + c.id);
+      }
+      veil.addEventListener('click', closeDetail);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openId) closeDetail(); });
+      let agent = 'Solana';
 
       function movePill(animate) {
         const b = toggle.querySelector('.vh-btn[data-r="' + range + '"]');
@@ -663,7 +755,11 @@ _DP_HISTORY_JS = """
             list.innerHTML = '';
             rows.forEach(c => {
               const row = document.createElement('div');
-              row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm transition';
+              row.className = 'rounded-2xl border border-gray-100 bg-white p-5 hover:shadow-sm hover:border-gray-200 transition cursor-pointer';
+              row.setAttribute('role', 'button');
+              row.tabIndex = 0;
+              row.addEventListener('click', () => openDetail(c));
+              row.addEventListener('keydown', (e) => { if (e.key === 'Enter') openDetail(c); });
               row.innerHTML =
                 '<div class="flex items-start gap-4">' +
                   '<div class="w-10 h-10 rounded-xl bg-black flex items-center justify-center flex-shrink-0">' +
@@ -721,9 +817,16 @@ _DP_HISTORY_JS = """
         const auth = getAuth(app), db = getFirestore(app);
         onAuthStateChanged(auth, (user) => {
           if (!user) return;
+          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js").then(m => {
+            m.onSnapshot(m.doc(db, 'users', user.uid), (s) => { if (s.exists() && s.data().agentName) agent = s.data().agentName; }, () => {});
+          });
+          let first = true;
           onSnapshot(collection(db, 'users', user.uid, 'calls'), (s) => {
             calls = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => tsOf(b) - tsOf(a));
             loaded = true; render();
+            const want = openId || (first && location.hash.indexOf('#call=') === 0 ? location.hash.slice(6) : null);
+            if (want) { const c = calls.find(x => x.id === want); if (c) openDetail(c); }
+            first = false;
           }, (err) => {
             loaded = true;
             list.innerHTML = '<div class="py-12 text-center text-[14px] text-red-600">Could not load calls: ' + err.message + '</div>';
@@ -855,10 +958,21 @@ _DP_ROUTER_JS = """
     (function () {
       if (!document.getElementById('panel-home')) return;
       function has(name) { return !!document.getElementById('panel-' + name); }
+      var current = null;
       function activate(name) {
         if (!has(name)) name = 'home';
+        var changed = current !== null && current !== name;
+        current = name;
         document.querySelectorAll('.panel').forEach(function (p) {
-          p.classList.toggle('hidden', p.id !== 'panel-' + name);
+          var on = p.id === 'panel-' + name;
+          p.classList.toggle('hidden', !on);
+          if (on && changed) {                       // fade + rise the new tab in
+            p.style.transition = 'none'; p.style.opacity = '0'; p.style.transform = 'translateY(8px)';
+            requestAnimationFrame(function () { requestAnimationFrame(function () {
+              p.style.transition = 'opacity .22s ease, transform .22s cubic-bezier(.16,1,.3,1)';
+              p.style.opacity = '1'; p.style.transform = 'none';
+            }); });
+          }
         });
         document.querySelectorAll('.app-tab[data-nav], .dash-tab[data-panel]').forEach(function (t) {
           var on = (t.dataset.nav || t.dataset.panel) === name;
@@ -1460,7 +1574,12 @@ _DP_ALERTS_JS = """
               first = false;
               // Ask once, right after sign-up, on the dashboard.
               if (onDashboard && userDoc && !userDoc.alertsPrompted && supported() && !isOn() && Notification.permission !== 'denied') {
-                setTimeout(() => { if (!isOn()) open(); }, 900);
+                const tryOpen = () => {
+                  const r = document.documentElement.classList;
+                  if (r.contains('vo-check') || r.contains('vo-open')) return setTimeout(tryOpen, 700);
+                  if (!isOn()) open();
+                };
+                setTimeout(tryOpen, 900);
               }
               // Already on -> keep this device's alert token fresh and show alerts while the page is open.
               if (supported() && Notification.permission === 'granted' && pushDoc.enabled) {
@@ -2011,10 +2130,46 @@ _DP_VOICE_JS = """
           '</div>' +
         '</div>' +
         '<p class="text-[12px] text-gray-500 mt-2">More voices coming soon.</p>' +
-        '<p id="vv-note" class="text-[12px] text-gray-400 mt-1">Press play to hear a voice.</p>';
+        '<p id="vv-note" class="text-[12px] text-gray-400 mt-1">Press play to hear a voice.</p>' +
+        '<div id="vv-live" class="hidden mt-3 rounded-xl border px-3 py-2.5 text-[12.5px] leading-[1.45]"></div>';
       saveBtn.parentNode.insertBefore(wrap, saveBtn);
 
-      let voice = 'default', plan = 'none', uid = null, fs = null, db = null, audio = null, playing = null;
+      let voice = 'default', plan = 'none', uid = null, fs = null, db = null, audio = null, playing = null, authUser = null;
+      const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+      const fmtNum = (n) => { let d = String(n || '').replace(/[^0-9]/g, ''); if (d.length === 11 && d[0] === '1') d = d.slice(1);
+        return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : n; };
+      // What the server will really use on calls (number, AI, voice) + any problem.
+      let statusTimer = null;
+      function refreshStatus(delay) {
+        clearTimeout(statusTimer);
+        statusTimer = setTimeout(async () => {
+          const box = $('vv-live');
+          if (!authUser) return;
+          try {
+            const tok = await authUser.getIdToken();
+            const r = await fetch(BRIDGE + '/api/agent/status', { headers: { 'Authorization': 'Bearer ' + tok } });
+            if (!r.ok) throw new Error('status ' + r.status);
+            const st = await r.json();
+            const v = V.find(x => x.id === st.voice) || V[0];
+            const lines = [];
+            let bad = false;
+            if (st.phoneNumber) lines.push('Calls to <b>' + fmtNum(st.phoneNumber) + '</b> use the <b>' + v.label + '</b> voice.');
+            else lines.push('No phone number on this account yet, so you can only test here.');
+            if (!st.aiReady) { bad = true; lines.push('Add an API key in the AI provider card so calls can be answered.'); }
+            if (st.savedVoice !== st.voice) lines.push('Your plan uses the default voice.');
+            const P = {
+              'eleven-missing': "Max voices aren't switched on yet: the server needs ELEVENLABS_API_KEY in Railway. Calls use the default voice until then.",
+              'eleven-key': 'ElevenLabs rejected the server key (ELEVENLABS_API_KEY). Calls fall back to the default voice.',
+              'eleven-voice': "ElevenLabs can't find this voice in your account. Add it to My Voices in ElevenLabs or fix the voice ID in Railway.",
+              'eleven-unreachable': "Couldn't reach ElevenLabs right now."
+            };
+            if (st.problem && P[st.problem]) { bad = true; lines.push(P[st.problem]); }
+            box.innerHTML = lines.join('<br>');
+            box.className = 'mt-3 rounded-xl border px-3 py-2.5 text-[12.5px] leading-[1.45] ' +
+              (bad ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-white text-gray-600');
+          } catch (e) { box.classList.add('hidden'); }
+        }, delay || 0);
+      }
       const allowed = (v) => planRank(plan) >= RANK[v.tier];
 
       function render() {
@@ -2085,7 +2240,7 @@ _DP_VOICE_JS = """
         if (id === voice) return;
         voice = id; render();
         if (uid && fs) {
-          try { await fs.updateDoc(fs.doc(db, 'users', uid), { voice: id }); $('vv-note').textContent = 'Saved. Used on your next call.'; }
+          try { await fs.updateDoc(fs.doc(db, 'users', uid), { voice: id }); $('vv-note').textContent = 'Saved. Used on your next call.'; refreshStatus(300); }
           catch (err) { $('vv-note').textContent = 'Could not save: ' + err.message; }
         }
       }
@@ -2107,9 +2262,11 @@ _DP_VOICE_JS = """
         db = fs.getFirestore(app);
         onAuthStateChanged(getAuth(app), (user) => {
           if (!user) return;
-          uid = user.uid;
+          uid = user.uid; authUser = user;
+          refreshStatus(0);
           fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
             const d = s.exists() ? s.data() : {};
+            if (!s.metadata.fromCache) refreshStatus(400);
             plan = d.plan || 'none';
             const want = V.find(x => x.id === d.voice) || V[0];
             voice = allowed(want) ? want.id : 'default';
@@ -2142,6 +2299,472 @@ _DP_PRICING_BACK_JS = """
       });
       box.parentElement.insertBefore(row, box);
     })();
+  </script>
+"""
+
+# ======================= Dashboard: "What does your business do?" (asked once after sign-up) =======================
+
+_DP_ONBOARD_JS = """
+  <script type="module">
+    /* VO_ONBOARD_MARKER */
+    const root = document.documentElement;
+    root.classList.add('vo-check');                    // the alerts prompt waits until this is answered
+    const done = () => { root.classList.remove('vo-check', 'vo-open'); };
+    let skipped = false;
+    try { skipped = sessionStorage.getItem('vo_skip') === '1'; } catch (e) {}
+    try {
+""" + _DP_FB + """
+      const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      const fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      const db = fs.getFirestore(app);
+      onAuthStateChanged(getAuth(app), (user) => {
+        if (!user) return done();
+        let asked = false;
+        fs.onSnapshot(fs.doc(db, 'users', user.uid), (snap) => {
+          if (snap.metadata.fromCache || asked) return;
+          asked = true;
+          const d = snap.exists() ? snap.data() : {};
+          if (skipped || (d.businessDescription && String(d.businessDescription).trim())) return done();
+          root.classList.add('vo-open');
+          const veil = document.createElement('div');
+          veil.className = 'fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4';
+          veil.style.cssText += ';opacity:0;transition:opacity .2s ease';
+          veil.innerHTML =
+            '<div class="vo-card bg-white rounded-3xl w-full max-w-[520px] p-7" style="transform:translateY(8px) scale(.98);transition:transform .25s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.2)">' +
+              '<div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400">Quick setup</div>' +
+              '<h2 class="text-[22px] font-semibold text-gray-900 mt-1">What does your business do?</h2>' +
+              '<p class="text-[14px] text-gray-500 mt-1.5">Solana uses this to answer questions, and politely turns down anything unrelated.</p>' +
+              '<label class="block text-[13px] font-semibold text-gray-700 mt-5 mb-1.5">Business name</label>' +
+              '<input id="vo-name" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-400" placeholder="Acme Dental">' +
+              '<label class="block text-[13px] font-semibold text-gray-700 mt-4 mb-1.5">What you do</label>' +
+              '<textarea id="vo-about" rows="4" maxlength="1500" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] leading-[1.5] focus:outline-none focus:border-gray-400" ' +
+                'placeholder="Family dental clinic in Houston. Cleanings, fillings, whitening and check-ups. Most insurance accepted."></textarea>' +
+              '<div id="vo-err" class="hidden text-[13px] text-red-600 mt-2"></div>' +
+              '<div class="flex items-center justify-end gap-2 mt-6">' +
+                '<button id="vo-skip" class="px-4 py-2.5 rounded-xl text-[14px] font-semibold text-gray-600 hover:bg-gray-100">Skip for now</button>' +
+                '<button id="vo-save" class="btn-primary min-w-[110px] px-5 py-2.5 rounded-xl text-[14px] font-semibold">Save</button>' +
+              '</div>' +
+            '</div>';
+          document.body.appendChild(veil);
+          const card = veil.querySelector('.vo-card');
+          veil.querySelector('#vo-name').value = d.company || '';
+          requestAnimationFrame(() => { veil.style.opacity = '1'; card.style.transform = 'none'; });
+          const close = () => {
+            veil.style.opacity = '0'; card.style.transform = 'translateY(8px) scale(.98)';
+            setTimeout(() => { veil.remove(); done(); }, 220);
+          };
+          veil.querySelector('#vo-skip').addEventListener('click', () => { try { sessionStorage.setItem('vo_skip', '1'); } catch (e) {} close(); });
+          veil.querySelector('#vo-save').addEventListener('click', async () => {
+            const about = veil.querySelector('#vo-about').value.trim(), name = veil.querySelector('#vo-name').value.trim();
+            const err = veil.querySelector('#vo-err');
+            if (about.length < 10) { err.textContent = 'Add a sentence or two about what you do.'; err.classList.remove('hidden'); return; }
+            const btn = veil.querySelector('#vo-save'); btn.disabled = true; btn.textContent = 'Saving…';
+            try {
+              const data = { businessDescription: about };
+              if (name) data.company = name;
+              await fs.updateDoc(fs.doc(db, 'users', user.uid), data);
+              close();
+            } catch (e) { btn.disabled = false; btn.textContent = 'Save'; err.textContent = 'Could not save: ' + e.message; err.classList.remove('hidden'); }
+          });
+        }, () => done());
+      });
+    } catch (e) { done(); }
+    setTimeout(() => { if (!root.classList.contains('vo-open')) root.classList.remove('vo-check'); }, 6000);
+  </script>
+"""
+
+# ======================= Solana page: "What your business does" field =======================
+
+_DP_ABOUT_JS = """
+  <script type="module">
+    /* VZ_ABOUT_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const prompt = $('system-prompt');
+    const anchor = prompt ? prompt.parentElement : null;
+    if (anchor && anchor.parentNode) {
+      const box = document.createElement('div');
+      box.innerHTML =
+        '<label class="block text-[13px] font-semibold text-gray-700 mb-1.5">What your business does</label>' +
+        '<textarea id="vz-about" rows="4" maxlength="1500" placeholder="e.g. Family dental clinic. Cleanings, fillings, whitening. Most insurance accepted." ' +
+          'class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.55] focus:outline-none focus:border-gray-400 bg-white" style="resize:vertical"></textarea>' +
+        '<p id="vz-note" class="text-[12px] text-gray-400 mt-1.5">Solana only helps with things related to this.</p>';
+      anchor.parentNode.insertBefore(box, anchor);
+      const ta = $('vz-about'), note = $('vz-note');
+      let uid = null, fs = null, db = null, saved = '';
+      async function save() {
+        const v = ta.value.trim();
+        if (!uid || !fs || v === saved) return;
+        note.textContent = 'Saving…';
+        try { await fs.updateDoc(fs.doc(db, 'users', uid), { businessDescription: v }); saved = v; note.textContent = 'Saved. Used on your next call.'; }
+        catch (e) { note.textContent = 'Could not save: ' + e.message; }
+      }
+      ta.addEventListener('blur', save);
+      let t = null;
+      ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(save, 1200); });
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        db = fs.getFirestore(app);
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
+            const v = (s.exists() && s.data().businessDescription) || '';
+            if (document.activeElement !== ta) { ta.value = v; saved = v.trim(); }
+          }, () => {});
+        });
+      } catch (e) {}
+    }
+  </script>
+"""
+
+# ======================= Calendar: clean black & white week view (Google Calendar style) =======================
+
+_DP_GCAL_JS = """
+  <style>
+    /* VG_CAL_CSS */
+    #vg-grid .vg-col { background-image: linear-gradient(to bottom, #eeeeee 1px, transparent 1px); }
+    #vg-grid .vg-ev { transition: transform .12s ease, box-shadow .12s ease; }
+    #vg-grid .vg-ev:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+    #vg-scroll::-webkit-scrollbar { width: 8px; } #vg-scroll::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 8px; }
+  </style>
+  <script type="module">
+    /* VG_CAL_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const wrap = document.querySelector('main > div');
+    if (wrap && $('week-view')) {
+      // Old calendar UI stays in the page (hidden) so older scripts don't crash.
+      ['week-view', 'list-view'].forEach(id => { const e = $(id); if (e) e.style.display = 'none'; });
+      const vb = document.querySelector('.view-btn'); if (vb && vb.parentElement) vb.parentElement.style.display = 'none';
+      const pv = $('prev-week'); if (pv && pv.parentElement) pv.parentElement.style.display = 'none';
+
+      const H = 52;                                   // px per hour
+      const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const CHEV = (d) => '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>';
+      const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+      const pad = (n) => String(n).padStart(2, '0');
+      const ymd = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      const hm = (d) => pad(d.getHours()) + ':' + pad(d.getMinutes());
+      const t12 = (d) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const startOfWeek = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+      const toDate = (v) => v && v.toDate ? v.toDate() : (v ? new Date(v) : null);
+
+      const sec = document.createElement('section');
+      sec.id = 'vg-cal';
+      sec.className = 'mb-8';
+      sec.innerHTML =
+        '<div class="flex items-center gap-1.5 flex-wrap mb-4">' +
+          '<button id="vg-today" class="px-4 py-2 rounded-full border border-gray-300 text-[13.5px] font-semibold text-gray-800 hover:bg-gray-50 mr-1">Today</button>' +
+          '<button id="vg-prev" aria-label="Previous week" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-700 hover:bg-gray-100">' + CHEV('M15 18l-6-6 6-6') + '</button>' +
+          '<button id="vg-next" aria-label="Next week" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-700 hover:bg-gray-100">' + CHEV('M9 18l6-6-6-6') + '</button>' +
+          '<h2 id="vg-title" class="text-[21px] font-semibold text-gray-900 ml-2 tracking-[-0.01em]"></h2>' +
+          '<div class="ml-auto flex items-center gap-2">' +
+            '<div id="vg-tg" class="relative flex bg-gray-100 rounded-full p-1">' +
+              '<span id="vg-pill" class="absolute top-1 bottom-1 rounded-full bg-white shadow-sm" style="transition:transform .22s cubic-bezier(.4,0,.2,1), width .22s cubic-bezier(.4,0,.2,1)"></span>' +
+              '<button data-v="week" class="vg-v relative px-4 py-1.5 rounded-full text-[13.5px] font-semibold">Week</button>' +
+              '<button data-v="list" class="vg-v relative px-4 py-1.5 rounded-full text-[13.5px] font-semibold">Upcoming</button>' +
+            '</div>' +
+            '<button id="vg-new" class="btn-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[13.5px] font-semibold">' +
+              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New</button>' +
+          '</div>' +
+        '</div>' +
+        '<div id="vg-week" class="rounded-2xl border border-gray-200 bg-white overflow-hidden" style="transition:opacity .15s ease">' +
+          '<div id="vg-head" class="grid border-b border-gray-200" style="grid-template-columns:60px repeat(7,minmax(0,1fr))"></div>' +
+          '<div id="vg-scroll" class="overflow-y-auto" style="max-height:620px"><div id="vg-grid" class="relative grid" style="grid-template-columns:60px repeat(7,minmax(0,1fr))"></div></div>' +
+        '</div>' +
+        '<div id="vg-list" class="hidden" style="transition:opacity .15s ease"></div>';
+      const after = $('vk-card') || wrap.firstElementChild;
+      after.insertAdjacentElement('afterend', sec);
+
+      // ---------- modal ----------
+      const veil = document.createElement('div');
+      veil.className = 'fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4';
+      veil.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .18s ease';
+      const fld = 'w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] text-gray-900 focus:outline-none focus:border-gray-900 bg-white';
+      const lab = 'block text-[12.5px] font-semibold text-gray-600 mb-1.5';
+      veil.innerHTML =
+        '<form id="vg-form" class="bg-white rounded-3xl w-full max-w-[460px] p-6" style="transform:translateY(8px) scale(.98);transition:transform .22s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.22)">' +
+          '<div class="flex items-center justify-between mb-4">' +
+            '<h3 id="vg-mt" class="text-[19px] font-semibold text-gray-900">New appointment</h3>' +
+            '<button type="button" id="vg-x" aria-label="Close" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-100">' +
+              '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+          '</div>' +
+          '<input id="vg-title-in" placeholder="Add title" class="w-full border-0 border-b-2 border-gray-200 focus:border-gray-900 px-0 py-2 text-[18px] font-semibold text-gray-900 placeholder-gray-400 focus:outline-none mb-4">' +
+          '<div class="grid grid-cols-3 gap-2.5 mb-3">' +
+            '<div class="col-span-3 sm:col-span-1"><label class="' + lab + '">Date</label><input id="vg-date" type="date" required class="' + fld + '"></div>' +
+            '<div><label class="' + lab + '">Start</label><input id="vg-start" type="time" step="300" required class="' + fld + '"></div>' +
+            '<div><label class="' + lab + '">Length</label><select id="vg-len" class="' + fld + '">' +
+              [15, 30, 45, 60, 90, 120].map(n => '<option value="' + n + '">' + (n < 60 ? n + ' min' : (n / 60) + ' hr' + (n > 60 ? 's' : '')) + '</option>').join('') + '</select></div>' +
+          '</div>' +
+          '<div class="grid grid-cols-2 gap-2.5 mb-3">' +
+            '<div><label class="' + lab + '">Customer</label><input id="vg-name" placeholder="Name" class="' + fld + '"></div>' +
+            '<div><label class="' + lab + '">Phone</label><input id="vg-phone" type="tel" placeholder="(555) 123-4567" class="' + fld + '"></div>' +
+          '</div>' +
+          '<label class="' + lab + '">Notes</label><textarea id="vg-notes" rows="3" class="' + fld + '" style="resize:vertical"></textarea>' +
+          '<div id="vg-src" class="hidden mt-3 text-[12.5px] text-gray-500"></div>' +
+          '<div id="vg-err" class="hidden mt-3 text-[13px] text-red-600"></div>' +
+          '<div class="flex items-center gap-2 mt-5">' +
+            '<button type="button" id="vg-del" class="hidden text-[13.5px] font-semibold text-gray-500 hover:text-black underline underline-offset-2">Delete</button>' +
+            '<div class="ml-auto flex items-center gap-2">' +
+              '<button type="button" id="vg-cancel" class="px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-800 hover:bg-gray-50">Cancel</button>' +
+              '<button type="submit" id="vg-save" class="btn-primary min-w-[96px] px-5 py-2.5 rounded-xl text-[14px] font-semibold">Save</button>' +
+            '</div>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(veil);
+      const form = $('vg-form');
+
+      let weekStart = startOfWeek(new Date()), view = 'week', appts = [], hours = null, slot = 30;
+      let uid = null, fs = null, db = null, editing = null;
+
+      // jump to a week from History ("Open in Calendar")
+      const hd = (location.hash.match(/date=(\\d{4}-\\d{2}-\\d{2})/) || [])[1];
+      if (hd) { const [y, m, d] = hd.split('-').map(Number); weekStart = startOfWeek(new Date(y, m - 1, d)); }
+
+      function range() {
+        let lo = 8, hi = 18;
+        if (hours) DAYS.forEach(k => { const h = hours[k]; if (h && !h.closed) {
+          lo = Math.min(lo, parseInt(h.open, 10)); hi = Math.max(hi, Math.ceil(parseInt(h.close, 10) + (+(h.close.split(':')[1] || 0) > 0 ? 1 : 0)));
+        } });
+        appts.forEach(a => { if (a._s >= weekStart && a._s < new Date(weekStart.getTime() + 7 * 864e5)) {
+          lo = Math.min(lo, a._s.getHours()); hi = Math.max(hi, Math.min(24, a._e.getHours() + (a._e.getMinutes() ? 1 : 0)));
+        } });
+        return [Math.max(0, lo - 1), Math.min(24, hi + 1)];
+      }
+
+      function render() {
+        const days = [...Array(7)].map((_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
+        const last = days[6];
+        const m1 = days[0].toLocaleDateString('en-US', { month: 'long' }), m2 = last.toLocaleDateString('en-US', { month: 'long' });
+        $('vg-title').textContent = m1 === m2 ? m1 + ' ' + last.getFullYear()
+          : days[0].toLocaleDateString('en-US', { month: 'short' }) + ' – ' + last.toLocaleDateString('en-US', { month: 'short' }) + ' ' + last.getFullYear();
+        if (view === 'list') return renderList();
+
+        const today = ymd(new Date());
+        $('vg-head').innerHTML = '<div></div>' + days.map(d => {
+          const isT = ymd(d) === today;
+          return '<div class="py-2.5 text-center border-l border-gray-100">' +
+            '<div class="text-[11px] font-semibold tracking-[.08em] ' + (isT ? 'text-gray-900' : 'text-gray-500') + '">' + d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() + '</div>' +
+            '<div class="mx-auto mt-1 w-9 h-9 rounded-full flex items-center justify-center text-[19px] ' +
+              (isT ? 'bg-black text-white font-semibold' : 'text-gray-900') + '">' + d.getDate() + '</div></div>';
+        }).join('');
+
+        const [lo, hi] = range();
+        const total = (hi - lo) * H;
+        let g = '<div class="relative" style="height:' + total + 'px">';
+        for (let h = lo + 1; h < hi; h++) {
+          const lbl = new Date(2000, 0, 1, h).toLocaleTimeString('en-US', { hour: 'numeric' });
+          g += '<div class="absolute right-2 text-[11px] text-gray-400 -translate-y-1/2" style="top:' + ((h - lo) * H) + 'px">' + lbl + '</div>';
+        }
+        g += '</div>';
+        days.forEach((d, i) => {
+          const key = DAYS[d.getDay()], hrs = hours ? hours[key] : null;
+          let shade = '';
+          const block = (fromMin, toMin) => {
+            const a = Math.max(fromMin, lo * 60), b = Math.min(toMin, hi * 60);
+            if (b > a) shade += '<div class="absolute left-0 right-0 bg-gray-50" style="top:' + ((a - lo * 60) / 60 * H) + 'px;height:' + ((b - a) / 60 * H) + 'px"></div>';
+          };
+          if (hours) {
+            if (!hrs || hrs.closed) block(0, 1440);
+            else {
+              const [oh, om] = hrs.open.split(':').map(Number), [ch, cm] = hrs.close.split(':').map(Number);
+              block(0, oh * 60 + om); block(ch * 60 + cm, 1440);
+            }
+          }
+          g += '<div class="vg-col relative border-l border-gray-100 cursor-pointer" data-day="' + ymd(d) + '" style="height:' + total + 'px;background-size:100% ' + H + 'px">' + shade;
+          // events, side by side when they overlap
+          const evs = appts.filter(a => ymd(a._s) === ymd(d)).sort((a, b) => a._s - b._s);
+          const lanes = [];
+          evs.forEach(a => { let l = lanes.findIndex(end => end <= a._s); if (l === -1) { l = lanes.length; lanes.push(a._e); } else lanes[l] = a._e; a._lane = l; });
+          evs.forEach(a => {
+            const top = ((a._s.getHours() * 60 + a._s.getMinutes()) - lo * 60) / 60 * H;
+            const ht = Math.max(22, (a._e - a._s) / 3600000 * H - 2);
+            const n = lanes.length, w = 100 / n;
+            const ai = a.source === 'ai';
+            g += '<div class="vg-ev absolute rounded-lg px-2 py-1 overflow-hidden cursor-pointer ' +
+                (ai ? 'bg-black text-white' : 'bg-white text-gray-900 border border-gray-900') + '" data-id="' + a.id + '" ' +
+                'style="top:' + (top + 1) + 'px;height:' + ht + 'px;left:calc(' + (a._lane * w) + '% + 2px);width:calc(' + w + '% - 4px)">' +
+              '<div class="text-[12px] font-semibold leading-tight truncate">' + esc(a.title || 'Appointment') + '</div>' +
+              (ht > 30 ? '<div class="text-[11px] leading-tight truncate ' + (ai ? 'text-white/70' : 'text-gray-500') + '">' + t12(a._s) + ' – ' + t12(a._e) + '</div>' : '') +
+              (ht > 46 && a.customerName ? '<div class="text-[11px] leading-tight truncate ' + (ai ? 'text-white/70' : 'text-gray-500') + '">' + esc(a.customerName) + '</div>' : '') +
+            '</div>';
+          });
+          // current time
+          if (ymd(d) === today) {
+            const now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
+            if (mins >= lo * 60 && mins <= hi * 60) {
+              const y = (mins - lo * 60) / 60 * H;
+              g += '<div class="absolute left-0 right-0 pointer-events-none" style="top:' + y + 'px;border-top:2px solid #111"><span class="absolute -left-[5px] -top-[6px] w-[10px] h-[10px] rounded-full bg-black"></span></div>';
+            }
+          }
+          g += '</div>';
+        });
+        $('vg-grid').innerHTML = g;
+        $('vg-grid').dataset.lo = lo;
+      }
+
+      function renderList() {
+        const now = new Date();
+        const up = appts.filter(a => a._e >= now).sort((a, b) => a._s - b._s);
+        if (!up.length) {
+          $('vg-list').innerHTML = '<div class="rounded-2xl border border-gray-200 bg-white py-16 text-center">' +
+            '<div class="text-[15px] font-medium text-gray-800">No upcoming appointments</div>' +
+            '<div class="text-[13px] text-gray-400 mt-1">Bookings from Solana and ones you add show up here.</div></div>';
+          return;
+        }
+        let html = '<div class="rounded-2xl border border-gray-200 bg-white divide-y divide-gray-100">', lastDay = '';
+        up.forEach(a => {
+          const day = ymd(a._s);
+          if (day !== lastDay) {
+            lastDay = day;
+            html += '<div class="px-5 pt-4 pb-2 text-[12px] font-semibold uppercase tracking-[.08em] text-gray-500 bg-[#fafafa]">' +
+              a._s.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + '</div>';
+          }
+          html += '<div class="vg-row flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors" data-id="' + a.id + '">' +
+            '<div class="w-[110px] flex-shrink-0 text-[13.5px] font-semibold text-gray-900">' + t12(a._s) + '<div class="text-[12px] font-normal text-gray-400">' + t12(a._e) + '</div></div>' +
+            '<div class="w-1 self-stretch rounded-full ' + (a.source === 'ai' ? 'bg-black' : 'bg-gray-300') + '"></div>' +
+            '<div class="flex-1 min-w-0"><div class="text-[14.5px] font-semibold text-gray-900 truncate">' + esc(a.title || 'Appointment') + '</div>' +
+            '<div class="text-[13px] text-gray-500 truncate">' + esc([a.customerName, a.customerPhone].filter(Boolean).join(' · ')) + '</div></div>' +
+            (a.source === 'ai' ? '<span class="text-[10.5px] font-bold uppercase tracking-wide bg-black text-white rounded-full px-2 py-0.5">Solana</span>' : '') +
+          '</div>';
+        });
+        $('vg-list').innerHTML = html + '</div>';
+      }
+
+      // ---------- toggle ----------
+      const tg = $('vg-tg');
+      function movePill(anim) {
+        const b = tg.querySelector('[data-v="' + view + '"]'), p = $('vg-pill');
+        if (!anim) p.style.transition = 'none';
+        p.style.width = b.offsetWidth + 'px'; p.style.transform = 'translateX(' + (b.offsetLeft - 4) + 'px)';
+        if (!anim) { p.offsetWidth; p.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1), width .22s cubic-bezier(.4,0,.2,1)'; }
+        tg.querySelectorAll('.vg-v').forEach(x => { x.style.color = x.dataset.v === view ? '#111827' : '#6b7280'; });
+      }
+      function setView(v) {
+        view = v; movePill(true);
+        const show = $(v === 'week' ? 'vg-week' : 'vg-list'), hide = $(v === 'week' ? 'vg-list' : 'vg-week');
+        hide.classList.add('hidden'); show.style.opacity = '0'; show.classList.remove('hidden');
+        ['vg-prev', 'vg-next'].forEach(id => { $(id).style.visibility = v === 'week' ? 'visible' : 'hidden'; });
+        render(); requestAnimationFrame(() => { show.style.opacity = '1'; });
+      }
+      tg.querySelectorAll('.vg-v').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
+      requestAnimationFrame(() => movePill(false));
+      window.addEventListener('resize', () => movePill(false));
+      const fadeWeek = (fn) => { const w = $('vg-week'); w.style.opacity = '0'; setTimeout(() => { fn(); render(); w.style.opacity = '1'; }, 120); };
+      $('vg-prev').addEventListener('click', () => fadeWeek(() => weekStart.setDate(weekStart.getDate() - 7)));
+      $('vg-next').addEventListener('click', () => fadeWeek(() => weekStart.setDate(weekStart.getDate() + 7)));
+      $('vg-today').addEventListener('click', () => fadeWeek(() => { weekStart = startOfWeek(new Date()); }));
+      setInterval(() => { if (view === 'week') render(); }, 60000);   // keep the "now" line moving
+
+      // ---------- open / save ----------
+      function openModal(a, start) {
+        editing = a || null;
+        $('vg-mt').textContent = a ? 'Edit appointment' : 'New appointment';
+        const s = a ? a._s : start, e = a ? a._e : new Date(start.getTime() + slot * 60000);
+        $('vg-title-in').value = a ? (a.title || '') : '';
+        $('vg-date').value = ymd(s); $('vg-start').value = hm(s);
+        const len = Math.round((e - s) / 60000);
+        const sel = $('vg-len');
+        if (![...sel.options].some(o => +o.value === len)) sel.insertAdjacentHTML('beforeend', '<option value="' + len + '">' + len + ' min</option>');
+        sel.value = String(len);
+        $('vg-name').value = a ? (a.customerName || '') : ''; $('vg-phone').value = a ? (a.customerPhone || '') : '';
+        $('vg-notes').value = a ? (a.notes || '') : '';
+        $('vg-del').classList.toggle('hidden', !a);
+        const src = $('vg-src');
+        if (a && a.source === 'ai') {
+          src.innerHTML = 'Booked by Solana on a call' + (a.callId ? ' · <a href="history.html#call=' + esc(a.callId) + '" class="font-semibold text-gray-900 underline underline-offset-2">View call</a>' : '');
+          src.classList.remove('hidden');
+        } else src.classList.add('hidden');
+        $('vg-err').classList.add('hidden');
+        veil.style.opacity = '1'; veil.style.pointerEvents = 'auto';
+        requestAnimationFrame(() => { form.style.transform = 'none'; });
+        setTimeout(() => $('vg-title-in').focus(), 60);
+      }
+      function closeModal() {
+        veil.style.opacity = '0'; veil.style.pointerEvents = 'none';
+        form.style.transform = 'translateY(8px) scale(.98)';
+        editing = null;
+      }
+      $('vg-x').addEventListener('click', closeModal);
+      $('vg-cancel').addEventListener('click', closeModal);
+      veil.addEventListener('mousedown', (e) => { if (e.target === veil) closeModal(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && veil.style.pointerEvents === 'auto') closeModal(); });
+
+      $('vg-new').addEventListener('click', () => {
+        const s = new Date(); s.setMinutes(Math.ceil(s.getMinutes() / 30) * 30, 0, 0); s.setHours(s.getHours() + 1);
+        openModal(null, s);
+      });
+      $('vg-grid').addEventListener('click', (e) => {
+        const ev = e.target.closest('.vg-ev');
+        if (ev) { const a = appts.find(x => x.id === ev.dataset.id); if (a) openModal(a); return; }
+        const col = e.target.closest('.vg-col');
+        if (!col) return;
+        const r = col.getBoundingClientRect();
+        const lo = +($('vg-grid').dataset.lo || 0);
+        let mins = lo * 60 + Math.floor(((e.clientY - r.top) / H * 60) / slot) * slot;
+        const [y, m, d] = col.dataset.day.split('-').map(Number);
+        openModal(null, new Date(y, m - 1, d, Math.floor(mins / 60), mins % 60));
+      });
+      $('vg-list').addEventListener('click', (e) => {
+        const row = e.target.closest('.vg-row'); if (!row) return;
+        const a = appts.find(x => x.id === row.dataset.id); if (a) openModal(a);
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const err = $('vg-err');
+        if (!uid || !fs) { err.textContent = 'Please sign in again.'; err.classList.remove('hidden'); return; }
+        const [y, m, d] = $('vg-date').value.split('-').map(Number), [hh, mm] = $('vg-start').value.split(':').map(Number);
+        if (!y || isNaN(hh)) { err.textContent = 'Pick a date and start time.'; err.classList.remove('hidden'); return; }
+        const s = new Date(y, m - 1, d, hh, mm), en = new Date(s.getTime() + (+$('vg-len').value || slot) * 60000);
+        const data = {
+          title: $('vg-title-in').value.trim() || 'Appointment',
+          customerName: $('vg-name').value.trim(), customerPhone: $('vg-phone').value.trim(),
+          notes: $('vg-notes').value.trim(),
+          start: fs.Timestamp.fromDate(s), end: fs.Timestamp.fromDate(en)
+        };
+        const btn = $('vg-save'); btn.disabled = true; btn.textContent = 'Saving…';
+        try {
+          if (editing) await fs.updateDoc(fs.doc(db, 'users', uid, 'appointments', editing.id), data);
+          else await fs.addDoc(fs.collection(db, 'users', uid, 'appointments'), Object.assign(data, { source: 'manual', createdAt: fs.serverTimestamp() }));
+          closeModal();
+        } catch (ex) { err.textContent = 'Could not save: ' + ex.message; err.classList.remove('hidden'); }
+        btn.disabled = false; btn.textContent = 'Save';
+      });
+      $('vg-del').addEventListener('click', async () => {
+        if (!editing || !confirm('Delete this appointment?')) return;
+        try { await fs.deleteDoc(fs.doc(db, 'users', uid, 'appointments', editing.id)); closeModal(); }
+        catch (ex) { const err = $('vg-err'); err.textContent = 'Could not delete: ' + ex.message; err.classList.remove('hidden'); }
+      });
+
+      render();
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        db = fs.getFirestore(app);
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
+            const d = s.exists() ? s.data() : {};
+            hours = d.hours || null; slot = Number(d.appointmentLength) || 30; render();
+          }, () => {});
+          let scrolled = false;
+          fs.onSnapshot(fs.collection(db, 'users', uid, 'appointments'), (s) => {
+            appts = s.docs.map(x => { const a = Object.assign({ id: x.id }, x.data()); a._s = toDate(a.start); a._e = toDate(a.end) || (a._s ? new Date(a._s.getTime() + slot * 60000) : null); return a; })
+              .filter(a => a._s && !isNaN(a._s));
+            render();
+            if (!scrolled) {            // start the view near the first working hour
+              scrolled = true;
+              const lo = +($('vg-grid').dataset.lo || 0);
+              $('vg-scroll').scrollTop = Math.max(0, (8 - lo) * H - 10);
+            }
+          }, () => {});
+        });
+      } catch (e) { console.error('Calendar:', e); }
+    }
   </script>
 """
 
@@ -2198,11 +2821,13 @@ def render_page(path, builder):
             html = _dp_add(html, "VC_RECENT_MARKER", "</body>", _DP_RECENT_JS)
             html = _dp_add(html, "VB_BILLING_MARKER", "</body>", _DP_BILLING_JS)
             html = _dp_add(html, "VR_ROUTER_MARKER", "</body>", _DP_ROUTER_JS)
+            html = _dp_add(html, "VO_ONBOARD_MARKER", "</body>", _DP_ONBOARD_JS)
         if name == "solana.html":
             html = _dp_add(html, "VS_SOLANA_MARKER", "</body>", _DP_SOLANA_JS)
             html = _dp_add(html, "VD_DEMO_MARKER", "</body>", _DP_DEMO_JS)
             html = _dp_add(html, "VP_PROVIDER_MARKER", "</body>", _DP_PROVIDER_JS)
             html = _dp_add(html, "VV_VOICE_MARKER", "</body>", _DP_VOICE_JS)
+            html = _dp_add(html, "VZ_ABOUT_MARKER", "</body>", _DP_ABOUT_JS)
             # "AGENT NAME" / "SYSTEM PROMPT" -> "Agent name" / "System prompt"
             html = html.replace('block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2',
                                 'block text-[13px] font-semibold text-gray-700 mb-1.5')
@@ -2212,6 +2837,7 @@ def render_page(path, builder):
         html = _dp_add(html, "VA_ALERTS_MARKER", "</body>", _DP_ALERTS_JS)
         if name == "calendar.html":
             html = _dp_add(html, "VK_HOURS_MARKER", "</body>", _DP_HOURS_JS)
+            html = _dp_add(html, "VG_CAL_MARKER", "</body>", _DP_GCAL_JS)
         if name == "history.html":
             html = _dp_add(html, "VH_HISTORY_MARKER", "</body>", _DP_HISTORY_JS)
         return html
@@ -2274,7 +2900,7 @@ def main() -> int:
 
     src = src.replace(MAIN_GUARD, OVERRIDE + "\n\n" + MAIN_GUARD, 1)
     BUILD_PY.write_text(src, encoding="utf-8")
-    print("[ok] added deepseek_python.py v12")
+    print("[ok] added deepseek_python.py v14")
     for f, how in (("Audio/solana.mp3", "make_voices.py"), ("Audio/pfmale.mp3", "make_voices.py"), ("Audio/pmale.mp3", "make_voices.py"),
                    ("Audio/mmale.mp3", "make_max_voices.py"), ("Audio/mfmale.mp3", "make_max_voices.py"), ("Audio/rmale.mp3", "make_max_voices.py"),
                    ("Images/pmale.png", ""), ("Images/pfmale.png", ""), ("Images/mmale.png", ""), ("Images/mfmale.png", ""), ("Images/rmale.png", "")):
@@ -2312,6 +2938,10 @@ def main() -> int:
         ("Pages/pricing.html", "platform.openai.com/api-keys", "Pricing: Google or OpenAI key links"),
         ("Pages/solana.html", "VV_VOICE_MARKER", "Voice picker (male / female)"),
         ("Pages/pricing.html", "VB_BACK_MARKER", "Pricing Back button"),
+        ("Pages/history.html", "openDetail", "History: click a call for details"),
+        ("Pages/calendar.html", "VG_CAL_MARKER", "Calendar: clean week view"),
+        ("Pages/dashboard.html", "VO_ONBOARD_MARKER", "Sign-up question: what your business does"),
+        ("Pages/solana.html", "VZ_ABOUT_MARKER", "Solana page: business description"),
     ]
     print()
     for rel, marker, label in checks:

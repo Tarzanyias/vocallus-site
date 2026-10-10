@@ -1613,6 +1613,59 @@
 
 
   <script type="module">
+    /* VZ_ABOUT_MARKER */
+    const $ = (id) => document.getElementById(id);
+    const prompt = $('system-prompt');
+    const anchor = prompt ? prompt.parentElement : null;
+    if (anchor && anchor.parentNode) {
+      const box = document.createElement('div');
+      box.innerHTML =
+        '<label class="block text-[13px] font-semibold text-gray-700 mb-1.5">What your business does</label>' +
+        '<textarea id="vz-about" rows="4" maxlength="1500" placeholder="e.g. Family dental clinic. Cleanings, fillings, whitening. Most insurance accepted." ' +
+          'class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13.5px] leading-[1.55] focus:outline-none focus:border-gray-400 bg-white" style="resize:vertical"></textarea>' +
+        '<p id="vz-note" class="text-[12px] text-gray-400 mt-1.5">Solana only helps with things related to this.</p>';
+      anchor.parentNode.insertBefore(box, anchor);
+      const ta = $('vz-about'), note = $('vz-note');
+      let uid = null, fs = null, db = null, saved = '';
+      async function save() {
+        const v = ta.value.trim();
+        if (!uid || !fs || v === saved) return;
+        note.textContent = 'Saving…';
+        try { await fs.updateDoc(fs.doc(db, 'users', uid), { businessDescription: v }); saved = v; note.textContent = 'Saved. Used on your next call.'; }
+        catch (e) { note.textContent = 'Could not save: ' + e.message; }
+      }
+      ta.addEventListener('blur', save);
+      let t = null;
+      ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(save, 1200); });
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        db = fs.getFirestore(app);
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (!user) return;
+          uid = user.uid;
+          fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
+            const v = (s.exists() && s.data().businessDescription) || '';
+            if (document.activeElement !== ta) { ta.value = v; saved = v.trim(); }
+          }, () => {});
+        });
+      } catch (e) {}
+    }
+  </script>
+
+
+  <script type="module">
     /* VA_ALERTS_MARKER */
     const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
     const SW_URL = '/firebase-messaging-sw.js';
@@ -1824,7 +1877,12 @@
               first = false;
               // Ask once, right after sign-up, on the dashboard.
               if (onDashboard && userDoc && !userDoc.alertsPrompted && supported() && !isOn() && Notification.permission !== 'denied') {
-                setTimeout(() => { if (!isOn()) open(); }, 900);
+                const tryOpen = () => {
+                  const r = document.documentElement.classList;
+                  if (r.contains('vo-check') || r.contains('vo-open')) return setTimeout(tryOpen, 700);
+                  if (!isOn()) open();
+                };
+                setTimeout(tryOpen, 900);
               }
               // Already on -> keep this device's alert token fresh and show alerts while the page is open.
               if (supported() && Notification.permission === 'granted' && pushDoc.enabled) {
