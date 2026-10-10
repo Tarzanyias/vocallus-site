@@ -2577,7 +2577,6 @@ _DP_GCAL_JS = """
       after.insertAdjacentElement('afterend', sec);
 
       // ---------- Import to Google Calendar (VG_IMPORT) ----------
-      const isWin = /Windows/i.test(navigator.userAgent) || ((navigator.userAgentData || {}).platform === 'Windows');
       const imp = document.createElement('div');
       imp.id = 'vg-import';
       imp.className = 'mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-gray-200 bg-white px-5 py-4';
@@ -2585,13 +2584,12 @@ _DP_GCAL_JS = """
         '<div class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-800">' +
           '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v5M9.5 16.5L12 19l2.5-2.5"/></svg></div>' +
         '<div class="flex-1 min-w-[220px]"><div class="text-[14.5px] font-semibold text-gray-900">Import to Google Calendar</div>' +
-          '<div class="text-[13px] text-gray-500">Download a file with your upcoming appointments and simple steps to add them to Google Calendar.</div></div>' +
+          '<div class="text-[13px] text-gray-500">Copy your upcoming appointments into Google Calendar in a few clicks.</div></div>' +
         '<div class="flex items-center gap-3">' +
-          (isWin ? '<button id="vg-imp-html" class="text-[12.5px] font-semibold text-gray-500 hover:text-black underline underline-offset-2">Get .html instead</button>' : '') +
           '<button id="vg-imp" class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13.5px] font-semibold">' +
             '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Import</button>' +
         '</div>' +
-        '<div id="vg-imp-msg" class="w-full text-[12.5px] text-gray-500" style="max-height:0;opacity:0;overflow:hidden;transition:max-height .25s ease, opacity .25s ease"></div>';
+        '';
       sec.appendChild(imp);
 
       // ---------- modal ----------
@@ -2865,88 +2863,76 @@ _DP_GCAL_JS = """
         });
         return rows.map(r => r.map(cq).join(',')).join(CRLF) + CRLF;
       }
-      function importPage(list, hta) {
-        const data = btoa(unescape(encodeURIComponent(buildCsv(list))));
-        const count = list.length + ' upcoming appointment' + (list.length === 1 ? '' : 's');
-        const SC = '<' + 'script>', SE = '<' + '/script>';
-        const L = [
-          '<!doctype html>',
-          '<html><head><meta charset="utf-8"><meta http-equiv="x-ua-compatible" content="ie=edge">',
-          '<title>Vocallus - Import to Google Calendar</title>',
-          '__HTA__',
-          '<style>',
-          'body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;background:#f5f5f6;color:#111;margin:0;padding:28px}',
-          '.c{max-width:640px;margin:0 auto;background:#fff;border:1px solid #e6e6e6;border-radius:20px;padding:30px 32px}',
-          '.k{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888}',
-          'h1{font-size:25px;margin:6px 0}h2{font-size:16px;margin:26px 0 8px}',
-          'p{color:#555;line-height:1.55;margin:0 0 14px}',
-          '.b{display:inline-block;background:#111;color:#fff;border:0;border-radius:12px;padding:13px 20px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;margin:6px 8px 0 0;font-family:inherit}',
-          '.b:hover{background:#333}.g{background:#fff;color:#111;border:1px solid #cfcfcf}.g:hover{background:#f3f3f3}',
-          'ol{padding-left:22px;line-height:1.65;color:#333;margin:0}li{margin-bottom:8px}',
-          '#ok{color:#15803d;font-weight:600;margin-top:12px;min-height:20px;font-size:14px}',
-          '.n{font-size:13px;color:#888;margin-top:20px;border-top:1px solid #eee;padding-top:14px;line-height:1.5}',
-          '</style></head><body><div class="c">',
-          '<div class="k">Vocallus</div>',
-          '<h1>Import to Google Calendar</h1>',
-          '<p>__N__ from Vocallus, ready to add to your Google Calendar.</p>',
-          '<button class="b" onclick="dl()">1. Download CSV</button>',
-          '<a class="b g" href="https://calendar.google.com/calendar/r/settings/export" target="_blank" onclick="return go()">2. Open Google Calendar import</a>',
-          '<div id="ok"></div>',
-          '<h2>How to import</h2>',
-          '<ol>',
-          '<li>Click <b>Download CSV</b>. It saves <b>vocallus-appointments.csv</b> to your Downloads folder.</li>',
-          '<li>Click <b>Open Google Calendar import</b>. (Or open calendar.google.com, click the gear icon, then <b>Settings</b>, then <b>Import &amp; export</b>.)</li>',
-          '<li>Under <b>Import</b>, click <b>Select file from your computer</b> and choose <b>vocallus-appointments.csv</b>.</li>',
-          '<li>Under <b>Add to calendar</b>, pick the calendar you want, then click <b>Import</b>.</li>',
-          '<li>Done. Your appointments now show in Google Calendar.</li>',
-          '</ol>',
-          '<div class="n">This adds a copy of these appointments. Importing the same file twice makes duplicates, so next time only import new bookings. Importing works on a computer, not in the Google Calendar phone app.</div>',
-          '</div>',
-          SC,
-          'var D="__DATA__";',
-          'try{window.resizeTo(760,900)}catch(e){}',
-          'function csv(){return decodeURIComponent(escape(window.atob(D)));}',
-          'function say(t){document.getElementById("ok").innerHTML=t;}',
-          'function isHta(){return ("ActiveXObject" in window);}',
-          'function dl(){try{',
-          ' if(isHta()){',
-          '  var sh=new ActiveXObject("WScript.Shell"),S=String.fromCharCode(92);',
-          '  var p=sh.ExpandEnvironmentStrings("%USERPROFILE%")+S+"Downloads"+S+"vocallus-appointments.csv";',
-          '  var t=new ActiveXObject("ADODB.Stream");t.Type=2;t.Charset="utf-8";t.Open();t.WriteText(csv());t.Position=3;',
-          '  var b=new ActiveXObject("ADODB.Stream");b.Type=1;b.Open();t.CopyTo(b);b.SaveToFile(p,2);b.Close();t.Close();',
-          '  say("Saved to "+p);',
-          ' }else{',
-          '  var bl=new Blob([csv()],{type:"text/csv"}),a=document.createElement("a");',
-          '  a.href=URL.createObjectURL(bl);a.download="vocallus-appointments.csv";document.body.appendChild(a);a.click();document.body.removeChild(a);',
-          '  say("Downloaded vocallus-appointments.csv");',
-          ' }',
-          '}catch(e){say("Could not save the file: "+(e.message||e));}}',
-          'function go(){if(isHta()){try{new ActiveXObject("WScript.Shell").Run("https://calendar.google.com/calendar/r/settings/export");return false;}catch(e){}}return true;}',
-          SE,
-          '</body></html>'
-        ];
-        const HTA = '<hta:application id="vcimp" applicationname="Vocallus Calendar Import" border="thin" maximizebutton="no" scroll="yes" singleinstance="yes" windowstate="normal" />';
-        return L.join(LF).split('__HTA__').join(hta ? HTA : '').split('__N__').join(count).split('__DATA__').join(data);
+      // In-page popup: download the CSV + step-by-step import instructions (VG_IMPORT_MODAL)
+      const iv = document.createElement('div');
+      iv.className = 'fixed inset-0 z-[92] bg-black/40 flex items-center justify-center p-4';
+      iv.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .2s ease';
+      const STEP = (n, html) => '<li class="flex gap-3"><span class="w-6 h-6 rounded-full bg-gray-900 text-white text-[12px] font-bold flex items-center justify-center flex-shrink-0 mt-[1px]">' + n + '</span><span class="text-[14px] text-gray-700 leading-[1.55]">' + html + '</span></li>';
+      iv.innerHTML =
+        '<div id="vg-ic" class="bg-white rounded-3xl w-full max-w-[520px] max-h-[90vh] overflow-y-auto p-7" style="transform:translateY(10px) scale(.98);transition:transform .26s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.22)">' +
+          '<div class="flex items-start justify-between gap-4">' +
+            '<div><div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400">Google Calendar</div>' +
+            '<h3 class="text-[21px] font-semibold text-gray-900 mt-0.5">Import your appointments</h3>' +
+            '<p id="vg-icount" class="text-[14px] text-gray-500 mt-1"></p></div>' +
+            '<button id="vg-ix" aria-label="Close" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors flex-shrink-0">' +
+              '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+          '</div>' +
+          '<div id="vg-ipre" class="mt-4 rounded-2xl border border-gray-100 bg-gray-50 divide-y divide-gray-100 text-[13px]"></div>' +
+          '<div class="flex flex-wrap gap-2 mt-5">' +
+            '<button id="vg-icsv" class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[14px] font-semibold">' +
+              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Download CSV</button>' +
+            '<a id="vg-igo" href="https://calendar.google.com/calendar/r/settings/export" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors">' +
+              'Open Google Calendar<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg></a>' +
+          '</div>' +
+          '<div id="vg-idone" class="text-[13px] font-semibold text-green-700" style="max-height:0;opacity:0;overflow:hidden;transition:max-height .25s ease, opacity .25s ease, margin .25s ease"></div>' +
+          '<div class="text-[13px] font-semibold text-gray-900 mt-6 mb-3">How to import</div>' +
+          '<ol class="space-y-3">' +
+            STEP(1, 'Click <b>Download CSV</b>. It saves <b>vocallus-appointments.csv</b> to your Downloads.') +
+            STEP(2, 'Click <b>Open Google Calendar</b>. It opens the <b>Import &amp; export</b> settings in a new tab.') +
+            STEP(3, 'Under <b>Import</b>, click <b>Select file from your computer</b> and pick <b>vocallus-appointments.csv</b>.') +
+            STEP(4, 'Choose the calendar to add them to, then click <b>Import</b>. Done!') +
+          '</ol>' +
+          '<p class="text-[12.5px] text-gray-400 mt-5 leading-[1.5]">This adds a copy of these appointments. Importing the same file twice makes duplicates, so next time only import new bookings. Import works on a computer, not the Google Calendar phone app.</p>' +
+        '</div>';
+      document.body.appendChild(iv);
+      const ic = $('vg-ic');
+      let impList = [];
+      const upcoming = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return appts.filter(a => a._e && a._e >= t).sort((a, b) => a._s - b._s); };
+      function openImport() {
+        impList = upcoming();
+        const n = impList.length;
+        $('vg-icount').textContent = n ? n + ' upcoming appointment' + (n === 1 ? '' : 's') + ' ready to add.' : 'No upcoming appointments yet.';
+        $('vg-ipre').innerHTML = n ? impList.slice(0, 4).map(a =>
+            '<div class="flex items-center gap-3 px-4 py-2.5"><span class="w-[118px] flex-shrink-0 font-semibold text-gray-900">' +
+              a._s.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + '</span>' +
+            '<span class="text-gray-500 w-[64px] flex-shrink-0">' + t12(a._s) + '</span>' +
+            '<span class="truncate text-gray-700">' + esc(a.title || 'Appointment') + (a.customerName ? ' · ' + esc(a.customerName) : '') + '</span></div>').join('') +
+            (n > 4 ? '<div class="px-4 py-2 text-gray-400">+ ' + (n - 4) + ' more</div>' : '')
+          : '<div class="px-4 py-6 text-center text-gray-400">Bookings from Solana and ones you add will show here.</div>';
+        $('vg-icsv').disabled = !n; $('vg-icsv').style.opacity = n ? '1' : '.45';
+        const d = $('vg-idone'); d.style.maxHeight = '0'; d.style.opacity = '0'; d.style.marginTop = '0';
+        iv.style.opacity = '1'; iv.style.pointerEvents = 'auto';
+        requestAnimationFrame(() => { ic.style.transform = 'none'; });
       }
-      function impMsg(html) {
-        const m = $('vg-imp-msg');
-        m.innerHTML = html; m.style.maxHeight = '80px'; m.style.opacity = '1';
+      function closeImport() {
+        iv.style.opacity = '0'; iv.style.pointerEvents = 'none';
+        ic.style.transform = 'translateY(10px) scale(.98)';
       }
-      function doImport(hta) {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const list = appts.filter(a => a._e && a._e >= today).sort((a, b) => a._s - b._s);
-        if (!list.length) return impMsg('No upcoming appointments to import yet.');
-        const blob = new Blob([importPage(list, hta)], { type: hta ? 'application/hta' : 'text/html' });
+      $('vg-imp').addEventListener('click', openImport);
+      $('vg-ix').addEventListener('click', closeImport);
+      iv.addEventListener('mousedown', (e) => { if (e.target === iv) closeImport(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && iv.style.pointerEvents === 'auto') closeImport(); });
+      $('vg-icsv').addEventListener('click', () => {
+        if (!impList.length) return;
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'Vocallus-Google-Calendar-Import.' + (hta ? 'hta' : 'html');
+        a.href = URL.createObjectURL(new Blob([buildCsv(impList)], { type: 'text/csv' }));
+        a.download = 'vocallus-appointments.csv';
         a.click();          // not added to the page, so the app's link router never sees it
         setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-        impMsg('Downloaded <b>' + a.download + '</b> with ' + list.length + ' appointment' + (list.length === 1 ? '' : 's') +
-          '. Open it and follow the steps inside.' + (hta ? ' If your browser warns about the file, choose <b>Keep</b>, or click <b>Get .html instead</b>.' : ''));
-      }
-      $('vg-imp').addEventListener('click', () => doImport(isWin));
-      if ($('vg-imp-html')) $('vg-imp-html').addEventListener('click', () => doImport(false));
+        const d = $('vg-idone');
+        d.innerHTML = '✓ Downloaded vocallus-appointments.csv. Now click <b>Open Google Calendar</b>.';
+        d.style.maxHeight = '60px'; d.style.opacity = '1'; d.style.marginTop = '12px';
+      });
 
       // ---------- "Solana just booked" toast ----------
       const toast = document.createElement('div');
@@ -3642,7 +3628,7 @@ def main() -> int:
         ("Pages/dashboard.html", "VO_ONBOARD_MARKER", "Sign-up question: what your business does"),
         ("Pages/solana.html", "VZ_ABOUT_MARKER", "Solana page: business description"),
         ("Pages/solana.html", "VQ_AUTOSAVE_MARKER", "Solana page: saves by itself (no Save button)"),
-        ("Pages/calendar.html", "VG_IMPORT", "Calendar: Import to Google Calendar"),
+        ("Pages/calendar.html", "VG_IMPORT_MODAL", "Calendar: Import to Google Calendar popup"),
         ("Pages/solana.html", "VV_LIVE_SWITCH", "Test call: switch voice live"),
         ("Pages/checkout.html", "VX_CHECKOUT_MARKER", "Checkout: card form loads reliably"),
         ("Pages/checkout.html", "false && window.whenFirebase", "Checkout: old script switched off"),
