@@ -6095,6 +6095,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -7728,7 +7731,18 @@ _DP_DEMO_JS = """
 
       let ws = null, ctx = null, mic = null, micNode = null, srcNode = null, sink = null, outGain = null, anIn = null, anOut = null;
       let sources = [], nextTime = 0, muted = false, live = false, callState = 'idle', startedAt = 0, ticker = null, raf = null, connectTimer = null;
-      let capWho = '', capYou = '', capAgent = '', endReason = '';
+      let capWho = '', capYou = '', capAgent = '', endReason = '', switchingV = false;
+      // Voice picked during a live test call -> switch it live, smoothly
+      window.addEventListener('vc-voice', (e) => {
+        if (callState !== 'live' || !ws || ws.readyState !== 1 || !ctx || !outGain) return;
+        const d = e.detail || {};
+        if (d.agentName) { try { $('vd-name') && ($('vd-name').textContent = d.agentName); } catch (x) {} }
+        switchingV = true;
+        setStatus('Switching voice…');
+        outGain.gain.cancelScheduledValues(ctx.currentTime);
+        outGain.gain.setTargetAtTime(0, ctx.currentTime, 0.07);
+        ws.send(JSON.stringify({ type: 'voice', voice: d.voice, agentName: d.agentName }));
+      });
 
       function setStatus(t) { $('vd-status').textContent = t; }
       function showErr(t) { const e = $('vd-err'); e.textContent = t; e.classList.toggle('hidden', !t); }
@@ -7840,12 +7854,21 @@ _DP_DEMO_JS = """
               clearTimeout(connectTimer);
               live = true; startedAt = Date.now(); muted = false; $('vd-mute').textContent = 'Mute';
               setCallState('live'); setStatus('Live · 0:00');
-              ticker = setInterval(() => setStatus((muted ? 'Muted · ' : 'Live · ') + mmss(Math.round((Date.now() - startedAt) / 1000))), 1000);
+              ticker = setInterval(() => setStatus(switchingV ? 'Switching voice…' : (muted ? 'Muted · ' : 'Live · ') + mmss(Math.round((Date.now() - startedAt) / 1000))), 1000);
               animate();
             } else if (m.type === 'audio') {
               playChunk(m.data);
             } else if (m.type === 'clear') {
               clearAudio();
+            } else if (m.type === 'switched') {
+              switchingV = false;
+              clearAudio(); capAgent = ''; renderCaps();
+              if (ctx && outGain) {
+                outGain.gain.cancelScheduledValues(ctx.currentTime);
+                outGain.gain.setValueAtTime(0, ctx.currentTime);
+                outGain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.35);
+              }
+              if (m.failed) showErr("Couldn't switch the voice mid-call. It will be used on your next call.");
             } else if (m.type === 'caption') {
               if (m.who === 'you') { if (capWho !== 'you') capYou = ''; capYou += m.text; }
               else { if (capWho !== 'agent') capAgent = ''; capAgent += m.text; }
@@ -8252,6 +8275,8 @@ _DP_VOICE_JS = """
             if (pr && pr.value.trim()) upd.systemPrompt = pr.value.trim();
           }
         }
+        // live test call? switch the voice right away (VV_LIVE_SWITCH)
+        window.dispatchEvent(new CustomEvent('vc-voice', { detail: { voice: id, agentName: upd.agentName || (nameIn ? nameIn.value.trim() : '') } }));
         if (uid && fs) {
           try { await fs.updateDoc(fs.doc(db, 'users', uid), upd); $('vv-note').textContent = upd.agentName ? 'Saved. Your agent is now called ' + upd.agentName + '.' : 'Saved. Used on your next call.'; refreshStatus(300); }
           catch (err) { $('vv-note').textContent = 'Could not save: ' + err.message; }
@@ -8552,6 +8577,24 @@ _DP_GCAL_JS = """
       const after = $('vk-card') || wrap.firstElementChild;
       after.insertAdjacentElement('afterend', sec);
 
+      // ---------- Import to Google Calendar (VG_IMPORT) ----------
+      const isWin = /Windows/i.test(navigator.userAgent) || ((navigator.userAgentData || {}).platform === 'Windows');
+      const imp = document.createElement('div');
+      imp.id = 'vg-import';
+      imp.className = 'mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-gray-200 bg-white px-5 py-4';
+      imp.innerHTML =
+        '<div class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-800">' +
+          '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v5M9.5 16.5L12 19l2.5-2.5"/></svg></div>' +
+        '<div class="flex-1 min-w-[220px]"><div class="text-[14.5px] font-semibold text-gray-900">Import to Google Calendar</div>' +
+          '<div class="text-[13px] text-gray-500">Download a file with your upcoming appointments and simple steps to add them to Google Calendar.</div></div>' +
+        '<div class="flex items-center gap-3">' +
+          (isWin ? '<button id="vg-imp-html" class="text-[12.5px] font-semibold text-gray-500 hover:text-black underline underline-offset-2">Get .html instead</button>' : '') +
+          '<button id="vg-imp" class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13.5px] font-semibold">' +
+            '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Import</button>' +
+        '</div>' +
+        '<div id="vg-imp-msg" class="w-full text-[12.5px] text-gray-500" style="max-height:0;opacity:0;overflow:hidden;transition:max-height .25s ease, opacity .25s ease"></div>';
+      sec.appendChild(imp);
+
       // ---------- modal ----------
       const veil = document.createElement('div');
       veil.className = 'fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4';
@@ -8807,6 +8850,138 @@ _DP_GCAL_JS = """
         } catch (ex) { err.textContent = 'Could not save: ' + ex.message; err.classList.remove('hidden'); }
         btn.disabled = false; btn.textContent = 'Save';
       });
+      // ---------- Google Calendar import file ----------
+      const p2 = (n) => String(n).padStart(2, '0');
+      const csvDate = (d) => p2(d.getMonth() + 1) + '/' + p2(d.getDate()) + '/' + d.getFullYear();
+      const csvTime = (d) => { let h = d.getHours(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return p2(h) + ':' + p2(d.getMinutes()) + ' ' + ap; };
+      const CRLF = String.fromCharCode(13, 10), LF = String.fromCharCode(10), CR = String.fromCharCode(13);
+      const cq = (v) => '"' + String(v == null ? '' : v).split(CR).join(' ').split(LF).join(' ').split('"').join('""') + '"';
+      function buildCsv(list) {
+        const rows = [['Subject', 'Start Date', 'Start Time', 'End Date', 'End Time', 'All Day Event', 'Description', 'Location', 'Private']];
+        list.forEach(a => {
+          const desc = [a.customerName && ('Customer: ' + a.customerName), a.customerPhone && ('Phone: ' + a.customerPhone),
+            a.notes && ('Notes: ' + a.notes), a.source === 'ai' ? 'Booked by Solana (Vocallus)' : 'Added in Vocallus'].filter(Boolean).join(' | ');
+          rows.push([(a.title || 'Appointment') + (a.customerName ? ' - ' + a.customerName : ''),
+            csvDate(a._s), csvTime(a._s), csvDate(a._e), csvTime(a._e), 'False', desc, '', 'True']);
+        });
+        return rows.map(r => r.map(cq).join(',')).join(CRLF) + CRLF;
+      }
+      function importPage(list, hta) {
+        const data = btoa(unescape(encodeURIComponent(buildCsv(list))));
+        const count = list.length + ' upcoming appointment' + (list.length === 1 ? '' : 's');
+        const SC = '<' + 'script>', SE = '<' + '/script>';
+        const L = [
+          '<!doctype html>',
+          '<html><head><meta charset="utf-8"><meta http-equiv="x-ua-compatible" content="ie=edge">',
+          '<title>Vocallus - Import to Google Calendar</title>',
+          '__HTA__',
+          '<style>',
+          'body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;background:#f5f5f6;color:#111;margin:0;padding:28px}',
+          '.c{max-width:640px;margin:0 auto;background:#fff;border:1px solid #e6e6e6;border-radius:20px;padding:30px 32px}',
+          '.k{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888}',
+          'h1{font-size:25px;margin:6px 0}h2{font-size:16px;margin:26px 0 8px}',
+          'p{color:#555;line-height:1.55;margin:0 0 14px}',
+          '.b{display:inline-block;background:#111;color:#fff;border:0;border-radius:12px;padding:13px 20px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;margin:6px 8px 0 0;font-family:inherit}',
+          '.b:hover{background:#333}.g{background:#fff;color:#111;border:1px solid #cfcfcf}.g:hover{background:#f3f3f3}',
+          'ol{padding-left:22px;line-height:1.65;color:#333;margin:0}li{margin-bottom:8px}',
+          '#ok{color:#15803d;font-weight:600;margin-top:12px;min-height:20px;font-size:14px}',
+          '.n{font-size:13px;color:#888;margin-top:20px;border-top:1px solid #eee;padding-top:14px;line-height:1.5}',
+          '</style></head><body><div class="c">',
+          '<div class="k">Vocallus</div>',
+          '<h1>Import to Google Calendar</h1>',
+          '<p>__N__ from Vocallus, ready to add to your Google Calendar.</p>',
+          '<button class="b" onclick="dl()">1. Download CSV</button>',
+          '<a class="b g" href="https://calendar.google.com/calendar/r/settings/export" target="_blank" onclick="return go()">2. Open Google Calendar import</a>',
+          '<div id="ok"></div>',
+          '<h2>How to import</h2>',
+          '<ol>',
+          '<li>Click <b>Download CSV</b>. It saves <b>vocallus-appointments.csv</b> to your Downloads folder.</li>',
+          '<li>Click <b>Open Google Calendar import</b>. (Or open calendar.google.com, click the gear icon, then <b>Settings</b>, then <b>Import &amp; export</b>.)</li>',
+          '<li>Under <b>Import</b>, click <b>Select file from your computer</b> and choose <b>vocallus-appointments.csv</b>.</li>',
+          '<li>Under <b>Add to calendar</b>, pick the calendar you want, then click <b>Import</b>.</li>',
+          '<li>Done. Your appointments now show in Google Calendar.</li>',
+          '</ol>',
+          '<div class="n">This adds a copy of these appointments. Importing the same file twice makes duplicates, so next time only import new bookings. Importing works on a computer, not in the Google Calendar phone app.</div>',
+          '</div>',
+          SC,
+          'var D="__DATA__";',
+          'try{window.resizeTo(760,900)}catch(e){}',
+          'function csv(){return decodeURIComponent(escape(window.atob(D)));}',
+          'function say(t){document.getElementById("ok").innerHTML=t;}',
+          'function isHta(){return ("ActiveXObject" in window);}',
+          'function dl(){try{',
+          ' if(isHta()){',
+          '  var sh=new ActiveXObject("WScript.Shell"),S=String.fromCharCode(92);',
+          '  var p=sh.ExpandEnvironmentStrings("%USERPROFILE%")+S+"Downloads"+S+"vocallus-appointments.csv";',
+          '  var t=new ActiveXObject("ADODB.Stream");t.Type=2;t.Charset="utf-8";t.Open();t.WriteText(csv());t.Position=3;',
+          '  var b=new ActiveXObject("ADODB.Stream");b.Type=1;b.Open();t.CopyTo(b);b.SaveToFile(p,2);b.Close();t.Close();',
+          '  say("Saved to "+p);',
+          ' }else{',
+          '  var bl=new Blob([csv()],{type:"text/csv"}),a=document.createElement("a");',
+          '  a.href=URL.createObjectURL(bl);a.download="vocallus-appointments.csv";document.body.appendChild(a);a.click();document.body.removeChild(a);',
+          '  say("Downloaded vocallus-appointments.csv");',
+          ' }',
+          '}catch(e){say("Could not save the file: "+(e.message||e));}}',
+          'function go(){if(isHta()){try{new ActiveXObject("WScript.Shell").Run("https://calendar.google.com/calendar/r/settings/export");return false;}catch(e){}}return true;}',
+          SE,
+          '</body></html>'
+        ];
+        const HTA = '<hta:application id="vcimp" applicationname="Vocallus Calendar Import" border="thin" maximizebutton="no" scroll="yes" singleinstance="yes" windowstate="normal" />';
+        return L.join(LF).split('__HTA__').join(hta ? HTA : '').split('__N__').join(count).split('__DATA__').join(data);
+      }
+      function impMsg(html) {
+        const m = $('vg-imp-msg');
+        m.innerHTML = html; m.style.maxHeight = '80px'; m.style.opacity = '1';
+      }
+      function doImport(hta) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const list = appts.filter(a => a._e && a._e >= today).sort((a, b) => a._s - b._s);
+        if (!list.length) return impMsg('No upcoming appointments to import yet.');
+        const blob = new Blob([importPage(list, hta)], { type: hta ? 'application/hta' : 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'Vocallus-Google-Calendar-Import.' + (hta ? 'hta' : 'html');
+        a.click();          // not added to the page, so the app's link router never sees it
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        impMsg('Downloaded <b>' + a.download + '</b> with ' + list.length + ' appointment' + (list.length === 1 ? '' : 's') +
+          '. Open it and follow the steps inside.' + (hta ? ' If your browser warns about the file, choose <b>Keep</b>, or click <b>Get .html instead</b>.' : ''));
+      }
+      $('vg-imp').addEventListener('click', () => doImport(isWin));
+      if ($('vg-imp-html')) $('vg-imp-html').addEventListener('click', () => doImport(false));
+
+      // ---------- "Solana just booked" toast ----------
+      const toast = document.createElement('div');
+      toast.className = 'fixed right-5 bottom-5 z-[80] w-[320px] rounded-2xl bg-black text-white p-4';
+      toast.style.cssText += ';opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .25s ease, transform .3s cubic-bezier(.16,1,.3,1);box-shadow:0 18px 50px rgba(0,0,0,.3)';
+      document.body.appendChild(toast);
+      let toastT = null;
+      function flash(id) {
+        const el = document.querySelector('.vg-ev[data-id="' + id + '"], .vg-row[data-id="' + id + '"]');
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        try { el.animate([{ boxShadow: '0 0 0 0 rgba(0,0,0,.55)' }, { boxShadow: '0 0 0 12px rgba(0,0,0,0)' }], { duration: 900, iterations: 3 }); } catch (e) {}
+      }
+      function newBooking(a) {
+        toast.innerHTML = '<div class="text-[11px] font-bold uppercase tracking-wider text-white/60">New booking from Solana</div>' +
+          '<div class="text-[15px] font-semibold mt-1 truncate">' + esc(a.title || 'Appointment') + (a.customerName ? ' · ' + esc(a.customerName) : '') + '</div>' +
+          '<div class="text-[13px] text-white/70 mt-0.5">' + a._s.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ', ' + t12(a._s) + '</div>' +
+          '<div class="flex gap-2 mt-3"><button data-t="show" class="px-3 py-1.5 rounded-lg bg-white text-black text-[12.5px] font-semibold">Show</button>' +
+          '<button data-t="x" class="px-3 py-1.5 rounded-lg text-white/70 hover:text-white text-[12.5px] font-semibold">Dismiss</button></div>';
+        toast.style.opacity = '1'; toast.style.transform = 'none'; toast.style.pointerEvents = 'auto';
+        clearTimeout(toastT); toastT = setTimeout(hideToast, 9000);
+        toast.onclick = (e) => {
+          const t = e.target.closest('[data-t]'); if (!t) return;
+          hideToast();
+          if (t.dataset.t === 'show') {
+            weekStart = startOfWeek(a._s);
+            if (view !== 'week') setView('week'); else render();
+            setTimeout(() => flash(a.id), 80);
+          }
+        };
+      }
+      function hideToast() { toast.style.opacity = '0'; toast.style.transform = 'translateY(12px)'; toast.style.pointerEvents = 'none'; }
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+
       $('vg-del').addEventListener('click', async () => {
         if (!editing || !confirm('Delete this appointment?')) return;
         try { await fs.deleteDoc(fs.doc(db, 'users', uid, 'appointments', editing.id)); closeModal(); }
@@ -8826,17 +9001,28 @@ _DP_GCAL_JS = """
             const d = s.exists() ? s.data() : {};
             hours = d.hours || null; slot = Number(d.appointmentLength) || 30; render();
           }, () => {});
-          let scrolled = false;
-          fs.onSnapshot(fs.collection(db, 'users', uid, 'appointments'), (s) => {
-            appts = s.docs.map(x => { const a = Object.assign({ id: x.id }, x.data()); a._s = toDate(a.start); a._e = toDate(a.end) || (a._s ? new Date(a._s.getTime() + slot * 60000) : null); return a; })
-              .filter(a => a._s && !isNaN(a._s));
-            render();
-            if (!scrolled) {            // start the view near the first working hour
-              scrolled = true;
-              const lo = +($('vg-grid').dataset.lo || 0);
-              $('vg-scroll').scrollTop = Math.max(0, (8 - lo) * H - 10);
-            }
-          }, () => {});
+          let scrolled = false, firstLoad = true, unsub = null;
+          const subscribe = () => {
+            if (unsub) { try { unsub(); } catch (e) {} }
+            unsub = fs.onSnapshot(fs.collection(db, 'users', uid, 'appointments'), (s) => {
+              appts = s.docs.map(x => { const a = Object.assign({ id: x.id }, x.data()); a._s = toDate(a.start); a._e = toDate(a.end) || (a._s ? new Date(a._s.getTime() + slot * 60000) : null); return a; })
+                .filter(a => a._s && !isNaN(a._s));
+              const fresh = (firstLoad || s.metadata.fromCache) ? [] : s.docChanges()
+                .filter(c => c.type === 'added' && !c.doc.metadata.hasPendingWrites)
+                .map(c => appts.find(a => a.id === c.doc.id))
+                .filter(a => a && a.source === 'ai' && (!a.createdAt || toDate(a.createdAt) > new Date(Date.now() - 180000)));
+              if (!s.metadata.fromCache) firstLoad = false;
+              render();
+              if (!scrolled) {            // start the view near the first working hour
+                scrolled = true;
+                const lo = +($('vg-grid').dataset.lo || 0);
+                $('vg-scroll').scrollTop = Math.max(0, (8 - lo) * H - 10);
+              }
+              if (fresh.length) newBooking(fresh[fresh.length - 1]);
+            }, (err) => { console.error('Calendar sync:', err); setTimeout(subscribe, 3000); });   // reconnect if the live link drops
+          };
+          subscribe();
+          window.addEventListener('online', subscribe);
         });
       } catch (e) { console.error('Calendar:', e); }
     }

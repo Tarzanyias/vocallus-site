@@ -1052,7 +1052,18 @@
 
       let ws = null, ctx = null, mic = null, micNode = null, srcNode = null, sink = null, outGain = null, anIn = null, anOut = null;
       let sources = [], nextTime = 0, muted = false, live = false, callState = 'idle', startedAt = 0, ticker = null, raf = null, connectTimer = null;
-      let capWho = '', capYou = '', capAgent = '', endReason = '';
+      let capWho = '', capYou = '', capAgent = '', endReason = '', switchingV = false;
+      // Voice picked during a live test call -> switch it live, smoothly
+      window.addEventListener('vc-voice', (e) => {
+        if (callState !== 'live' || !ws || ws.readyState !== 1 || !ctx || !outGain) return;
+        const d = e.detail || {};
+        if (d.agentName) { try { $('vd-name') && ($('vd-name').textContent = d.agentName); } catch (x) {} }
+        switchingV = true;
+        setStatus('Switching voice…');
+        outGain.gain.cancelScheduledValues(ctx.currentTime);
+        outGain.gain.setTargetAtTime(0, ctx.currentTime, 0.07);
+        ws.send(JSON.stringify({ type: 'voice', voice: d.voice, agentName: d.agentName }));
+      });
 
       function setStatus(t) { $('vd-status').textContent = t; }
       function showErr(t) { const e = $('vd-err'); e.textContent = t; e.classList.toggle('hidden', !t); }
@@ -1164,12 +1175,21 @@
               clearTimeout(connectTimer);
               live = true; startedAt = Date.now(); muted = false; $('vd-mute').textContent = 'Mute';
               setCallState('live'); setStatus('Live · 0:00');
-              ticker = setInterval(() => setStatus((muted ? 'Muted · ' : 'Live · ') + mmss(Math.round((Date.now() - startedAt) / 1000))), 1000);
+              ticker = setInterval(() => setStatus(switchingV ? 'Switching voice…' : (muted ? 'Muted · ' : 'Live · ') + mmss(Math.round((Date.now() - startedAt) / 1000))), 1000);
               animate();
             } else if (m.type === 'audio') {
               playChunk(m.data);
             } else if (m.type === 'clear') {
               clearAudio();
+            } else if (m.type === 'switched') {
+              switchingV = false;
+              clearAudio(); capAgent = ''; renderCaps();
+              if (ctx && outGain) {
+                outGain.gain.cancelScheduledValues(ctx.currentTime);
+                outGain.gain.setValueAtTime(0, ctx.currentTime);
+                outGain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.35);
+              }
+              if (m.failed) showErr("Couldn't switch the voice mid-call. It will be used on your next call.");
             } else if (m.type === 'caption') {
               if (m.who === 'you') { if (capWho !== 'you') capYou = ''; capYou += m.text; }
               else { if (capWho !== 'agent') capAgent = ''; capAgent += m.text; }
@@ -1573,6 +1593,8 @@
             if (pr && pr.value.trim()) upd.systemPrompt = pr.value.trim();
           }
         }
+        // live test call? switch the voice right away (VV_LIVE_SWITCH)
+        window.dispatchEvent(new CustomEvent('vc-voice', { detail: { voice: id, agentName: upd.agentName || (nameIn ? nameIn.value.trim() : '') } }));
         if (uid && fs) {
           try { await fs.updateDoc(fs.doc(db, 'users', uid), upd); $('vv-note').textContent = upd.agentName ? 'Saved. Your agent is now called ' + upd.agentName + '.' : 'Saved. Used on your next call.'; refreshStatus(300); }
           catch (err) { $('vv-note').textContent = 'Could not save: ' + err.message; }

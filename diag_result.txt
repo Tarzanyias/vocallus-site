@@ -1,0 +1,33 @@
+Vocallus Gemini diagnostic
+============================================================
+
+[server] https://vocallus-bridge-production.up.railway.app/health -> 200
+         ai: gemini key set | firebase: connected | model: gemini-2.5-flash-native-audio-preview-12-2025
+
+[key] type: AQ. (new AI Studio key), length 53, ends with ...gDUw
+
+[1] List models (simple request)
+    OK   key in URL (?key=)       200 
+    OK   x-goog-api-key header    200 
+    FAIL Authorization: Bearer    401 UNAUTHENTICATED Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other val...
+
+[2] Text answer (summaries / test chat)
+    FAIL gemini-2.5-flash       key in URL (?key=)       404 NOT_FOUND This model models/gemini-2.5-flash is no longer available to new users. Please update your code to u...
+    FAIL gemini-2.5-flash       x-goog-api-key header    404 NOT_FOUND This model models/gemini-2.5-flash is no longer available to new users. Please update your code to u...
+    FAIL gemini-2.5-flash       Authorization: Bearer    401 UNAUTHENTICATED Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or...
+    OK   gemini-3.8-flash       key in URL (?key=)       200 
+    OK   gemini-3.8-flash       x-goog-api-key header    200 
+    FAIL gemini-3.8-flash       Authorization: Bearer    401 UNAUTHENTICATED Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or...
+
+[3] Live voice connection (phone + web calls)
+    OK   gemini-2.5-flash-native-audio-preview-12-2025  key in URL (?key=)       connected (setupComplete)
+    OK   gemini-2.5-flash-native-audio-preview-12-2025  x-goog-api-key header    connected (setupComplete)
+    FAIL gemini-2.5-flash-native-audio-preview-12-2025  Authorization: Bearer    closed 1008 Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication c
+    OK   gemini-3.8-live                                key in URL (?key=)       connected (setupComplete)
+    OK   gemini-3.8-live                                x-goog-api-key header    connected (setupComplete)
+    FAIL gemini-3.8-live                                Authorization: Bearer    closed 1008 Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication c
+
+============================================================
+RESULT
+  Live calls WORK with: gemini-2.5-flash-native-audio-preview-12-2025 + key in URL (?key=)
+  Send me this file so I can set the server to use exactly that.
