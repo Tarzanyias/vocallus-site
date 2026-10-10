@@ -191,6 +191,41 @@
     };
   </script>
 
+
+  <style>
+    /* VF_PAGEFX */
+    /* Chrome/Edge: keep the old page on screen until the new one is ready (no white flash), sidebar never blinks */
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    nav:has(.app-tab) { view-transition-name: vc-sidebar; }
+    ::view-transition-group(vc-sidebar) { animation: none; }
+    /* page content eases in */
+    @keyframes vcPageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    body > main, main.flex-1 { animation: vcPageIn .38s cubic-bezier(.16,1,.3,1) both; }
+    html.vc-leaving main { opacity: 0; transform: translateY(-4px); transition: opacity .14s ease, transform .14s ease; }
+    @media (prefers-reduced-motion: reduce) { body > main, main.flex-1 { animation: none; } }
+  </style>
+  <script>
+    /* fade the content out before going to another app page (browsers without view transitions) */
+    (function () {
+      if ('onpagereveal' in window) return;
+      var pages = /(^|\/)(dashboard|solana|calendar|history)(\.html)?(\?|#|$)/;
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[href]');
+        if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || a.target === '_blank') return;
+        var href = a.getAttribute('href');
+        if (!pages.test(href) || href.charAt(0) === '#') return;
+        var here = location.pathname.split('/').pop().replace('.html', '');
+        var there = href.split(/[?#]/)[0].split('/').pop().replace('.html', '');
+        if (!there || there === here) return;
+        e.preventDefault();
+        document.documentElement.classList.add('vc-leaving');
+        setTimeout(function () { location.href = href; }, 130);
+      });
+      window.addEventListener('pageshow', function () { document.documentElement.classList.remove('vc-leaving'); });
+    })();
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
   <div id="demo-banner" class="hidden w-full bg-black text-white text-[13.5px] py-2.5 px-4 items-center justify-center gap-3 z-50">

@@ -191,6 +191,41 @@
     };
   </script>
 
+
+  <style>
+    /* VF_PAGEFX */
+    /* Chrome/Edge: keep the old page on screen until the new one is ready (no white flash), sidebar never blinks */
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    nav:has(.app-tab) { view-transition-name: vc-sidebar; }
+    ::view-transition-group(vc-sidebar) { animation: none; }
+    /* page content eases in */
+    @keyframes vcPageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    body > main, main.flex-1 { animation: vcPageIn .38s cubic-bezier(.16,1,.3,1) both; }
+    html.vc-leaving main { opacity: 0; transform: translateY(-4px); transition: opacity .14s ease, transform .14s ease; }
+    @media (prefers-reduced-motion: reduce) { body > main, main.flex-1 { animation: none; } }
+  </style>
+  <script>
+    /* fade the content out before going to another app page (browsers without view transitions) */
+    (function () {
+      if ('onpagereveal' in window) return;
+      var pages = /(^|\/)(dashboard|solana|calendar|history)(\.html)?(\?|#|$)/;
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[href]');
+        if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || a.target === '_blank') return;
+        var href = a.getAttribute('href');
+        if (!pages.test(href) || href.charAt(0) === '#') return;
+        var here = location.pathname.split('/').pop().replace('.html', '');
+        var there = href.split(/[?#]/)[0].split('/').pop().replace('.html', '');
+        if (!there || there === here) return;
+        e.preventDefault();
+        document.documentElement.classList.add('vc-leaving');
+        setTimeout(function () { location.href = href; }, 130);
+      });
+      window.addEventListener('pageshow', function () { document.documentElement.classList.remove('vc-leaving'); });
+    })();
+  </script>
+
 </head>
 <body class="font-inter flex h-screen overflow-hidden text-gray-800 bg-[#f2f2f2]">
   <div id="demo-banner" class="hidden w-full bg-black text-white text-[13.5px] py-2.5 px-4 items-center justify-center gap-3 z-50">
@@ -1139,7 +1174,7 @@
 
       async function startCall() {
         if (callState === 'connecting' || callState === 'live') return;
-        if (window.vcBusiness) { await window.vcBusiness.ensure('test'); }   // VO_ENSURE_TEST
+        if (window.vcBusiness && !(await window.vcBusiness.ensure('test'))) return;   // VO_ENSURE_TEST
         showErr(''); capYou = ''; capAgent = ''; renderCaps(); endReason = '';
         setCallState('connecting');
         try {
@@ -1789,8 +1824,11 @@
     const lenLabel = (m) => m < 60 ? m + ' min' : (m % 60 ? Math.floor(m / 60) + ' hr ' + (m % 60) + ' min' : (m / 60) + ' hr' + (m > 60 ? 's' : ''));
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
     const complete = (d) => !!(d && String(d.businessDescription || '').trim() && Array.isArray(d.services) && d.services.length);
+    const blank = (d) => !String((d && d.businessDescription) || '').trim() && !(d && Array.isArray(d.services) && d.services.length);
+    let mustFill = false;
     const REASONS = {
       test: 'Before your test call: tell Solana about your business so she answers like it’s yours.',
+      testRequired: 'Add your business info to start a test call. Solana needs to know what you do to answer like it’s yours.',
       number: 'Before you get a number: tell Solana about your business so she’s ready for real callers.'
     };
     const fld = 'w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-900 bg-white transition-colors';
@@ -1848,7 +1886,10 @@
     }
     $('vo-add').onclick = () => { const r = addRow('', Number(data.appointmentLength) || 30, true); setTimeout(() => r.querySelector('input').focus(), 60); };
 
-    function open(reason) {
+    function open(reason, required) {
+      mustFill = !!required;
+      $('vo-skip').textContent = mustFill ? 'Not now' : 'Skip for now';
+      if (mustFill) reason = 'testRequired';
       $('vo-name').value = data.company || '';
       $('vo-about').value = data.businessDescription || '';
       list.innerHTML = '';
@@ -1874,7 +1915,7 @@
       const r = resolver; resolver = null;
       if (r) r(result);
     }
-    $('vo-skip').onclick = () => { try { sessionStorage.setItem('vo_skip', '1'); } catch (e) {} close(false); };
+    $('vo-skip').onclick = () => { if (!mustFill) { try { sessionStorage.setItem('vo_skip', '1'); } catch (e) {} } close(false); };
     veil.addEventListener('mousedown', (e) => { if (e.target === veil) $('vo-skip').click(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && veil.style.pointerEvents === 'auto') $('vo-skip').click(); });
     $('vo-save').onclick = async () => {
@@ -1895,11 +1936,18 @@
       } catch (e) { btn.disabled = false; btn.textContent = 'Save'; err.textContent = 'Could not save: ' + e.message; err.classList.remove('hidden'); }
     };
 
-    const whenReady = () => gotData ? Promise.resolve() : new Promise((res) => { readyWaiters.push(res); setTimeout(res, 4000); });
+    const whenReady = () => gotData ? Promise.resolve() : new Promise((res) => { readyWaiters.push(res); setTimeout(res, 1200); });
     window.vcBusiness = {
       open: (reason) => open(reason),
       // Used before a test call / buying a number: pops up again until it's filled in (still skippable).
-      ensure: async (reason) => { await whenReady(); if (complete(data)) return true; await open(reason); return true; },
+      // A test call with no business info at all can't start until it's added (closing just cancels the call).
+      ensure: async (reason) => {
+        await whenReady();
+        if (complete(data)) return true;
+        const required = reason === 'test' && blank(data);
+        const saved = await open(reason, required);
+        return required ? !!saved : true;
+      },
       data: () => data
     };
 
@@ -1947,8 +1995,8 @@
         fs.onSnapshot(fs.doc(db, 'users', uid), (snap) => {
           data = snap.exists() ? snap.data() : {};
           renderChips();
+          if (!gotData && (snap.exists() || !snap.metadata.fromCache)) { gotData = true; readyWaiters.splice(0).forEach(f => f()); }
           if (snap.metadata.fromCache) return;
-          if (!gotData) { gotData = true; readyWaiters.splice(0).forEach(f => f()); }
           if (asked || !AUTO) return;
           asked = true;
           if (skipped || String(data.businessDescription || '').trim()) return done();

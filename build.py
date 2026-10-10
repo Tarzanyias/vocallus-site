@@ -6110,6 +6110,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -7889,7 +7892,7 @@ _DP_DEMO_JS = """
 
       async function startCall() {
         if (callState === 'connecting' || callState === 'live') return;
-        if (window.vcBusiness) { await window.vcBusiness.ensure('test'); }   // VO_ENSURE_TEST
+        if (window.vcBusiness && !(await window.vcBusiness.ensure('test'))) return;   // VO_ENSURE_TEST
         showErr(''); capYou = ''; capAgent = ''; renderCaps(); endReason = '';
         setCallState('connecting');
         try {
@@ -8436,8 +8439,11 @@ _DP_ONBOARD_JS = """
     const lenLabel = (m) => m < 60 ? m + ' min' : (m % 60 ? Math.floor(m / 60) + ' hr ' + (m % 60) + ' min' : (m / 60) + ' hr' + (m > 60 ? 's' : ''));
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
     const complete = (d) => !!(d && String(d.businessDescription || '').trim() && Array.isArray(d.services) && d.services.length);
+    const blank = (d) => !String((d && d.businessDescription) || '').trim() && !(d && Array.isArray(d.services) && d.services.length);
+    let mustFill = false;
     const REASONS = {
       test: 'Before your test call: tell Solana about your business so she answers like it’s yours.',
+      testRequired: 'Add your business info to start a test call. Solana needs to know what you do to answer like it’s yours.',
       number: 'Before you get a number: tell Solana about your business so she’s ready for real callers.'
     };
     const fld = 'w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-900 bg-white transition-colors';
@@ -8495,7 +8501,10 @@ _DP_ONBOARD_JS = """
     }
     $('vo-add').onclick = () => { const r = addRow('', Number(data.appointmentLength) || 30, true); setTimeout(() => r.querySelector('input').focus(), 60); };
 
-    function open(reason) {
+    function open(reason, required) {
+      mustFill = !!required;
+      $('vo-skip').textContent = mustFill ? 'Not now' : 'Skip for now';
+      if (mustFill) reason = 'testRequired';
       $('vo-name').value = data.company || '';
       $('vo-about').value = data.businessDescription || '';
       list.innerHTML = '';
@@ -8521,7 +8530,7 @@ _DP_ONBOARD_JS = """
       const r = resolver; resolver = null;
       if (r) r(result);
     }
-    $('vo-skip').onclick = () => { try { sessionStorage.setItem('vo_skip', '1'); } catch (e) {} close(false); };
+    $('vo-skip').onclick = () => { if (!mustFill) { try { sessionStorage.setItem('vo_skip', '1'); } catch (e) {} } close(false); };
     veil.addEventListener('mousedown', (e) => { if (e.target === veil) $('vo-skip').click(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && veil.style.pointerEvents === 'auto') $('vo-skip').click(); });
     $('vo-save').onclick = async () => {
@@ -8542,11 +8551,18 @@ _DP_ONBOARD_JS = """
       } catch (e) { btn.disabled = false; btn.textContent = 'Save'; err.textContent = 'Could not save: ' + e.message; err.classList.remove('hidden'); }
     };
 
-    const whenReady = () => gotData ? Promise.resolve() : new Promise((res) => { readyWaiters.push(res); setTimeout(res, 4000); });
+    const whenReady = () => gotData ? Promise.resolve() : new Promise((res) => { readyWaiters.push(res); setTimeout(res, 1200); });
     window.vcBusiness = {
       open: (reason) => open(reason),
       // Used before a test call / buying a number: pops up again until it's filled in (still skippable).
-      ensure: async (reason) => { await whenReady(); if (complete(data)) return true; await open(reason); return true; },
+      // A test call with no business info at all can't start until it's added (closing just cancels the call).
+      ensure: async (reason) => {
+        await whenReady();
+        if (complete(data)) return true;
+        const required = reason === 'test' && blank(data);
+        const saved = await open(reason, required);
+        return required ? !!saved : true;
+      },
       data: () => data
     };
 
@@ -8584,8 +8600,8 @@ _DP_ONBOARD_JS = """
         fs.onSnapshot(fs.doc(db, 'users', uid), (snap) => {
           data = snap.exists() ? snap.data() : {};
           renderChips();
+          if (!gotData && (snap.exists() || !snap.metadata.fromCache)) { gotData = true; readyWaiters.splice(0).forEach(f => f()); }
           if (snap.metadata.fromCache) return;
-          if (!gotData) { gotData = true; readyWaiters.splice(0).forEach(f => f()); }
           if (asked || !AUTO) return;
           asked = true;
           if (skipped || String(data.businessDescription || '').trim()) return done();
@@ -8751,7 +8767,7 @@ _DP_GCAL_JS = """
               '<button data-v="week" class="vg-v relative px-4 py-1.5 rounded-full text-[13.5px] font-semibold">Week</button>' +
               '<button data-v="list" class="vg-v relative px-4 py-1.5 rounded-full text-[13.5px] font-semibold">Upcoming</button>' +
             '</div>' +
-            '<button id="vg-ai" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 text-[13.5px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>AI Organize</button>' +
+            '<button id="vg-ai" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 text-[13.5px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>Organize</button>' +
             '<button id="vg-sel" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 text-[13.5px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors">' +
               '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/></svg><span id="vg-sel-t">Select</span></button>' +
             '<button id="vg-new" class="btn-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[13.5px] font-semibold">' +
@@ -9220,7 +9236,7 @@ _DP_GCAL_JS = """
       bv.addEventListener('mousedown', (e) => { if (e.target === bv) closeBulk(); });
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && bv.style.pointerEvents === 'auto') { e.stopPropagation(); closeBulk(); } }, true);
       const SPIN2 = '<svg class="w-4 h-4" style="animation:vgSpin .8s linear infinite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
-      if (!document.getElementById('vg-spin-css')) { const st = document.createElement('style'); st.id = 'vg-spin-css'; st.textContent = '@keyframes vgSpin{to{transform:rotate(360deg)}}'; document.head.appendChild(st); }
+      if (!document.getElementById('vg-spin-css')) { const st = document.createElement('style'); st.id = 'vg-spin-css'; st.textContent = '@keyframes vgSpin{to{transform:rotate(360deg)}} @keyframes voChip{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}'; document.head.appendChild(st); }
       const fld2 = 'w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] text-gray-900 focus:outline-none focus:border-gray-900 bg-white';
       const lab2 = 'block text-[12.5px] font-semibold text-gray-600 mb-1.5';
       const BTN_ROW = (goLabel, red) =>
@@ -9271,21 +9287,105 @@ _DP_GCAL_JS = """
       $('vg-sdel').addEventListener('click', () => openBulk('delete'));
       $('vg-sedit').addEventListener('click', () => openBulk('edit'));
 
-      // ---------- AI Organize (Max only for now) ----------
+      // ---------- Organize (Max): fix double bookings, out-of-hours and duplicates (VG_ORGANIZE) ----------
+      const SPARK_ICON = '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>';
+      const dayHours = (d) => {
+        const h = hours ? hours[DAYS[d.getDay()]] : { open: '09:00', close: '17:00' };
+        if (!h || h.closed) return null;
+        const [oh, om] = String(h.open).split(':').map(Number), [ch, cm] = String(h.close).split(':').map(Number);
+        return [oh * 60 + om, ch * 60 + cm];
+      };
+      const minsOf = (d) => d.getHours() * 60 + d.getMinutes();
+      const overlaps = (s, e, list) => list.some(b => s < b._e2 && e > b._s2);
+      // Next open time: later the same day first, then earlier that day, then the following days.
+      function findSlot(fromDay, dur, others, earliest) {
+        const step = Math.min(slot || 30, 30);
+        const tryDay = (d, from) => {
+          const hr = dayHours(d); if (!hr) return null;
+          for (let t = Math.max(hr[0], from); t + dur <= hr[1]; t += step) {
+            const s = new Date(d); s.setHours(0, 0, 0, 0); s.setMinutes(t);
+            if (s < earliest) continue;
+            if (!overlaps(s, new Date(s.getTime() + dur * 60000), others)) return s;
+          }
+          return null;
+        };
+        const day0 = new Date(fromDay);
+        const hr0 = dayHours(day0);
+        const after = hr0 ? Math.ceil((minsOf(day0) - hr0[0]) / step) * step + hr0[0] : 0;
+        let s = tryDay(day0, after) || tryDay(day0, 0);
+        for (let k = 1; !s && k < 14; k++) { const d = new Date(fromDay); d.setDate(d.getDate() + k); s = tryDay(d, 0); }
+        return s;
+      }
+      function planOrganize() {
+        const now = new Date(), earliest = new Date(now.getTime() + 30 * 60000), horizon = new Date(now.getTime() + 21 * 864e5);
+        const list = appts.filter(a => a._s >= now && a._s < horizon).sort((a, b) => a._s - b._s)
+          .map(a => Object.assign({}, a, { _s2: a._s, _e2: a._e }));
+        const kept = [], fixes = [];
+        list.forEach((a, i) => {
+          const dur = Math.max(5, Math.round((a._e - a._s) / 60000));
+          const dup = kept.find(k => +k._s2 === +a._s && (k.title || '') === (a.title || '') && (k.customerName || '') === (a.customerName || ''));
+          if (dup) { fixes.push({ kind: 'delete', a, why: 'Duplicate' }); return; }
+          const hr = dayHours(a._s);
+          const outside = !hr || minsOf(a._s) < hr[0] || minsOf(a._s) + dur > hr[1];
+          const clash = overlaps(a._s, a._e, kept);
+          if (!outside && !clash) { kept.push(a); return; }
+          const others = kept.concat(list.slice(i + 1).filter(x => !fixes.some(f => f.a.id === x.id)));
+          const s = findSlot(a._s, dur, others, earliest);
+          if (!s) { fixes.push({ kind: 'none', a, why: outside ? 'Outside your hours' : 'Double-booked' }); kept.push(a); return; }
+          const moved = Object.assign({}, a, { _s2: s, _e2: new Date(s.getTime() + dur * 60000) });
+          fixes.push({ kind: 'move', a, to: moved._s2, end: moved._e2, why: outside ? (hr ? 'Outside your hours' : 'Closed that day') : 'Double-booked' });
+          kept.push(moved);
+        });
+        return fixes;
+      }
+      const when = (d) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ', ' + t12(d);
       $('vg-ai').addEventListener('click', () => {
-        const isMax = plan === 'max';
-        bc.innerHTML =
-          '<div class="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center mb-4"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg></div>' +
-          '<div class="inline-flex items-center rounded-full bg-black text-white px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wider mb-2">Max</div>' +
-          '<h3 class="text-[20px] font-semibold text-gray-900">' + (isMax ? 'AI Organize is coming soon' : 'AI Organize is a Max feature') + '</h3>' +
-          '<p class="text-[14px] text-gray-500 mt-2 leading-[1.6]">' + (isMax
-            ? 'Solana will tidy your week for you: spot double bookings, fill gaps and suggest better times. It’s on its way to your Max plan.'
-            : 'Let Solana tidy your week for you: spot double bookings, fill gaps and suggest better times. Upgrade to Max to use it.') + '</p>' +
-          '<div class="flex items-center justify-end gap-2 mt-6">' +
-            '<button id="vg-bno" class="px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-800 hover:bg-gray-50 transition-colors">' + (isMax ? 'Got it' : 'Not now') + '</button>' +
-            (isMax ? '' : '<a href="pricing.html?back=calendar" class="btn-primary px-5 py-2.5 rounded-xl text-[14px] font-semibold">Upgrade to Max</a>') +
-          '</div>';
+        if (plan !== 'max') {
+          bc.innerHTML =
+            '<div class="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center mb-4">' + SPARK_ICON + '</div>' +
+            '<div class="inline-flex items-center rounded-full bg-black text-white px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wider mb-2">Max</div>' +
+            '<h3 class="text-[20px] font-semibold text-gray-900">Organize is a Max feature</h3>' +
+            '<p class="text-[14px] text-gray-500 mt-2 leading-[1.6]">Organize tidies your calendar in one click: it finds double bookings, appointments outside your hours and duplicates, and moves them to the next open time. Upgrade to Max to use it.</p>' +
+            '<div class="flex items-center justify-end gap-2 mt-6">' +
+              '<button id="vg-bno" class="px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-800 hover:bg-gray-50 transition-colors">Not now</button>' +
+              '<a href="pricing.html?back=calendar" class="btn-primary px-5 py-2.5 rounded-xl text-[14px] font-semibold">Upgrade to Max</a>' +
+            '</div>';
+          $('vg-bno').onclick = closeBulk;
+          return showBulk();
+        }
+        const fixes = planOrganize(), doable = fixes.filter(f => f.kind !== 'none');
+        const head = '<div class="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center mb-4">' + SPARK_ICON + '</div>';
+        if (!fixes.length) {
+          bc.innerHTML = head + '<h3 class="text-[20px] font-semibold text-gray-900">All organized</h3>' +
+            '<p class="text-[14px] text-gray-500 mt-2 leading-[1.6]">No double bookings, nothing outside your hours and no duplicates in the next 3 weeks.</p>' +
+            '<div class="flex justify-end mt-6"><button id="vg-bno" class="btn-primary px-5 py-2.5 rounded-xl text-[14px] font-semibold">Done</button></div>';
+          $('vg-bno').onclick = closeBulk;
+          return showBulk();
+        }
+        bc.innerHTML = head +
+          '<h3 class="text-[20px] font-semibold text-gray-900">Organize your calendar</h3>' +
+          '<p class="text-[14px] text-gray-500 mt-1.5">' + fixes.length + ' thing' + (fixes.length === 1 ? '' : 's') + ' to tidy in the next 3 weeks. Untick anything you want to keep.</p>' +
+          '<div class="mt-4 max-h-[46vh] overflow-y-auto rounded-2xl border border-gray-100 divide-y divide-gray-100">' +
+          fixes.map((f, i) =>
+            '<label class="flex items-start gap-3 px-4 py-3 ' + (f.kind === 'none' ? 'opacity-60' : 'cursor-pointer hover:bg-gray-50') + ' transition-colors" style="animation:voChip .25s ease both;animation-delay:' + (i * 35) + 'ms">' +
+              '<input type="checkbox" data-i="' + i + '" class="vg-ofix mt-1 w-4 h-4 accent-black"' + (f.kind === 'none' ? ' disabled' : ' checked') + '>' +
+              '<div class="min-w-0 flex-1"><div class="text-[14px] font-semibold text-gray-900 truncate">' + esc(f.a.title || 'Appointment') + (f.a.customerName ? ' · ' + esc(f.a.customerName) : '') + '</div>' +
+              '<div class="text-[13px] text-gray-500 mt-0.5">' +
+                (f.kind === 'move' ? when(f.a._s) + ' <span class="text-gray-400">→</span> <b class="text-gray-900">' + when(f.to) + '</b>'
+                  : f.kind === 'delete' ? 'Remove duplicate at ' + when(f.a._s) : when(f.a._s) + ' · no open time found, move it yourself') + '</div></div>' +
+              '<span class="text-[11px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 flex-shrink-0 ' + (f.kind === 'delete' ? 'bg-gray-100 text-gray-600' : 'bg-black text-white') + '">' + f.why + '</span>' +
+            '</label>').join('') +
+          '</div>' +
+          '<p class="text-[12.5px] text-gray-400 mt-3">Let customers know if their time changes.</p>' +
+          BTN_ROW(doable.length ? 'Apply' : 'Done', false);
         $('vg-bno').onclick = closeBulk;
+        $('vg-bgo').onclick = () => {
+          const picked = [...bc.querySelectorAll('.vg-ofix:checked')].map(x => fixes[+x.dataset.i]);
+          if (!picked.length) return closeBulk();
+          runBulk('Organizing…', () => Promise.all(picked.map(f => f.kind === 'delete'
+            ? fs.deleteDoc(fs.doc(db, 'users', uid, 'appointments', f.a.id))
+            : fs.updateDoc(fs.doc(db, 'users', uid, 'appointments', f.a.id), { start: fs.Timestamp.fromDate(f.to), end: fs.Timestamp.fromDate(f.end) }))));
+        };
         showBulk();
       });
 
@@ -9747,6 +9847,42 @@ _DP_ACCOUNT_JS = """
   </script>
 """
 
+_DP_PAGEFX_CSS = """
+  <style>
+    /* VF_PAGEFX */
+    /* Chrome/Edge: keep the old page on screen until the new one is ready (no white flash), sidebar never blinks */
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    nav:has(.app-tab) { view-transition-name: vc-sidebar; }
+    ::view-transition-group(vc-sidebar) { animation: none; }
+    /* page content eases in */
+    @keyframes vcPageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    body > main, main.flex-1 { animation: vcPageIn .38s cubic-bezier(.16,1,.3,1) both; }
+    html.vc-leaving main { opacity: 0; transform: translateY(-4px); transition: opacity .14s ease, transform .14s ease; }
+    @media (prefers-reduced-motion: reduce) { body > main, main.flex-1 { animation: none; } }
+  </style>
+  <script>
+    /* fade the content out before going to another app page (browsers without view transitions) */
+    (function () {
+      if ('onpagereveal' in window) return;
+      var pages = /(^|\\/)(dashboard|solana|calendar|history)(\\.html)?(\\?|#|$)/;
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[href]');
+        if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || a.target === '_blank') return;
+        var href = a.getAttribute('href');
+        if (!pages.test(href) || href.charAt(0) === '#') return;
+        var here = location.pathname.split('/').pop().replace('.html', '');
+        var there = href.split(/[?#]/)[0].split('/').pop().replace('.html', '');
+        if (!there || there === here) return;
+        e.preventDefault();
+        document.documentElement.classList.add('vc-leaving');
+        setTimeout(function () { location.href = href; }, 130);
+      });
+      window.addEventListener('pageshow', function () { document.documentElement.classList.remove('vc-leaving'); });
+    })();
+  </script>
+"""
+
 _APP_NAMES_AUTH = {"dashboard.html", "solana.html", "calendar.html", "history.html"}
 _prev_rp_authbtn = render_page
 
@@ -9824,6 +9960,7 @@ def render_page(path, builder):
             html = _re_auth.sub(r'\s*<button data-provider="claude".*?</button>', '', html, flags=_re_auth.S)
             html = html.replace('Gemini is required for phone calls.', 'Pick the AI behind your agent.')
         html = _dp_add(html, "VA_ALERTS_MARKER", "</body>", _DP_ALERTS_JS)
+        html = _dp_add(html, "VF_PAGEFX", "</head>", _DP_PAGEFX_CSS)
         # Person icon menu replaces the old Sign out button (old id kept hidden for the old scripts)
         if 'id="vu-acct"' not in html:
             html = _re_auth.sub(r'<button id="signout-btn"[^>]*>.*?</button>', lambda m: _ACCT_BTN_HTML, html, count=1, flags=_re_auth.S)
