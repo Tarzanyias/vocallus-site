@@ -104,7 +104,7 @@ _DP_FB = """
       const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
       const app = getApps().length ? getApps()[0] : initializeApp({
         apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-        authDomain: "vocallus-aa81e.firebaseapp.com",
+        authDomain: "vocallus.com",
         projectId: "vocallus-aa81e",
         storageBucket: "vocallus-aa81e.firebasestorage.app",
         messagingSenderId: "997486177218",
@@ -3281,6 +3281,8 @@ def render_page(path, builder):
     # Footer: drop the Contact column (placeholder email + phone)
     html = _re_auth.sub(r'\s*<div class="md:col-span-2">\s*<p[^>]*>Contact</p>\s*<ul[^>]*>.*?</ul>\s*</div>', '', html, flags=_re_auth.S)
     html = html.replace('Payments secured by Stripe', 'Secure payment')
+    # Google sign-in popup says "continue to vocallus.com" (Netlify proxies /__/auth to Firebase)
+    html = html.replace('"vocallus-aa81e.firebaseapp.com"', '"vocallus.com"').replace("'vocallus-aa81e.firebaseapp.com'", "'vocallus.com'")
     # Plan minutes: Pro 3,000 / Max 10,000
     html = html.replace('Up to 300 minutes / month', 'Up to 3,000 minutes / month')
     html = html.replace('Up to 1,500 minutes / month', 'Up to 10,000 minutes / month')
@@ -3297,6 +3299,7 @@ def render_page(path, builder):
         _fbs = globals().get("FIREBASE_SCRIPT", "")
         if _fbs and "<!-- Firebase v10 modular SDK" not in html:
             _fbs = _fbs.replace("10.12.0", "10.12.2")
+            _fbs = _fbs.replace('"vocallus-aa81e.firebaseapp.com"', '"vocallus.com"')
             _fbs = _fbs.replace("getFirestore, doc,",
                                 "getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc,", 1)
             _fbs = _fbs.replace("const db   = getFirestore(app);",
@@ -3411,6 +3414,15 @@ def main() -> int:
         if not (ROOT / f).exists() and not (ROOT / f.replace(".mp3", ".wav")).exists():
             print(f"[note] {f} not found yet" + (f" - run {how}" if how else " - add the picture"))
     (ROOT / "firebase-messaging-sw.js").write_text(SW_FILE, encoding="utf-8")
+    nt = ROOT / "netlify.toml"
+    toml = nt.read_text(encoding="utf-8") if nt.exists() else '[build]\n  publish = "."\n'
+    if "/__/auth/*" not in toml:
+        toml = toml.rstrip() + (
+            '\n\n# Google sign-in through vocallus.com (proxied to Firebase)\n'
+            '[[redirects]]\n  from = "/__/auth/*"\n  to = "https://vocallus-aa81e.firebaseapp.com/__/auth/:splat"\n  status = 200\n  force = true\n\n'
+            '[[redirects]]\n  from = "/__/firebase/*"\n  to = "https://vocallus-aa81e.firebaseapp.com/__/firebase/:splat"\n  status = 200\n  force = true\n')
+        nt.write_text(toml, encoding="utf-8")
+        print("[ok] netlify.toml: Google sign-in goes through vocallus.com")
     print("[ok] wrote firebase-messaging-sw.js (call alerts)")
 
     print("\nRunning build.py ...\n")

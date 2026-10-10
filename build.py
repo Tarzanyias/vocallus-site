@@ -6092,6 +6092,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6099,7 +6102,7 @@ _DP_FB = """
       const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
       const app = getApps().length ? getApps()[0] : initializeApp({
         apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
-        authDomain: "vocallus-aa81e.firebaseapp.com",
+        authDomain: "vocallus.com",
         projectId: "vocallus-aa81e",
         storageBucket: "vocallus-aa81e.firebasestorage.app",
         messagingSenderId: "997486177218",
@@ -9276,6 +9279,8 @@ def render_page(path, builder):
     # Footer: drop the Contact column (placeholder email + phone)
     html = _re_auth.sub(r'\s*<div class="md:col-span-2">\s*<p[^>]*>Contact</p>\s*<ul[^>]*>.*?</ul>\s*</div>', '', html, flags=_re_auth.S)
     html = html.replace('Payments secured by Stripe', 'Secure payment')
+    # Google sign-in popup says "continue to vocallus.com" (Netlify proxies /__/auth to Firebase)
+    html = html.replace('"vocallus-aa81e.firebaseapp.com"', '"vocallus.com"').replace("'vocallus-aa81e.firebaseapp.com'", "'vocallus.com'")
     # Plan minutes: Pro 3,000 / Max 10,000
     html = html.replace('Up to 300 minutes / month', 'Up to 3,000 minutes / month')
     html = html.replace('Up to 1,500 minutes / month', 'Up to 10,000 minutes / month')
@@ -9292,6 +9297,7 @@ def render_page(path, builder):
         _fbs = globals().get("FIREBASE_SCRIPT", "")
         if _fbs and "<!-- Firebase v10 modular SDK" not in html:
             _fbs = _fbs.replace("10.12.0", "10.12.2")
+            _fbs = _fbs.replace('"vocallus-aa81e.firebaseapp.com"', '"vocallus.com"')
             _fbs = _fbs.replace("getFirestore, doc,",
                                 "getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc,", 1)
             _fbs = _fbs.replace("const db   = getFirestore(app);",

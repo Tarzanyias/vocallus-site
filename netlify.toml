@@ -3,3 +3,16 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Google sign-in through vocallus.com (proxied to Firebase)
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://vocallus-aa81e.firebaseapp.com/__/auth/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/__/firebase/*"
+  to = "https://vocallus-aa81e.firebaseapp.com/__/firebase/:splat"
+  status = 200
+  force = true
