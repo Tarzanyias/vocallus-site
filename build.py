@@ -6104,6 +6104,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6352,6 +6355,59 @@ _DP_NUMBER_JS = """
 
         let lastKey = '';
 
+        // ---------- Delete number: confirm popup (VN_DELETE_MARKER) ----------
+        const dv = document.createElement('div');
+        dv.className = 'fixed inset-0 z-[95] bg-black/40 flex items-center justify-center p-4';
+        dv.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .2s ease';
+        dv.innerHTML =
+          '<div id="vn-dc" class="bg-white rounded-3xl w-full max-w-[440px] p-7" style="transform:translateY(10px) scale(.98);transition:transform .26s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.22)">' +
+            '<div class="w-11 h-11 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">' +
+              '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/><line x1="2" y1="2" x2="22" y2="22"/></svg></div>' +
+            '<h3 class="text-[20px] font-semibold text-gray-900">Delete this number?</h3>' +
+            '<p id="vn-dtext" class="text-[14px] text-gray-500 mt-2 leading-[1.6]"></p>' +
+            '<div id="vn-derr" class="hidden mt-3 text-[13px] text-red-600"></div>' +
+            '<div class="flex items-center justify-end gap-2 mt-6">' +
+              '<button id="vn-dcancel" class="px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-800 hover:bg-gray-50 transition-colors">Cancel</button>' +
+              '<button id="vn-dgo" class="min-w-[150px] px-5 py-2.5 rounded-xl text-[14px] font-semibold text-white transition-colors" style="background:#dc2626">Delete number</button>' +
+            '</div>' +
+          '</div>';
+        document.body.appendChild(dv);
+        const dcard = document.getElementById('vn-dc');
+        let dBusy = false;
+        function closeDelete() {
+          if (dBusy) return;
+          dv.style.opacity = '0'; dv.style.pointerEvents = 'none';
+          dcard.style.transform = 'translateY(10px) scale(.98)';
+        }
+        function askDelete(d) {
+          const n = '<b class="text-gray-900">' + fmt(d.phoneNumber) + '</b>';
+          document.getElementById('vn-dtext').innerHTML = d.numberSource === 'purchased'
+            ? 'Solana stops answering ' + n + ' right away and the number is released. You can’t get the same number back. Your calls and calendar stay.'
+            : n + ' will be disconnected from your account and Solana stops answering it. Your calls and calendar stay.';
+          document.getElementById('vn-derr').classList.add('hidden');
+          const go = document.getElementById('vn-dgo');
+          go.disabled = false; go.textContent = 'Delete number';
+          dv.style.opacity = '1'; dv.style.pointerEvents = 'auto';
+          requestAnimationFrame(() => { dcard.style.transform = 'none'; });
+          setTimeout(() => document.getElementById('vn-dcancel').focus(), 60);
+        }
+        document.getElementById('vn-dcancel').onclick = closeDelete;
+        dv.addEventListener('mousedown', (e) => { if (e.target === dv) closeDelete(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dv.style.pointerEvents === 'auto') closeDelete(); });
+        document.getElementById('vn-dgo').onclick = async () => {
+          const go = document.getElementById('vn-dgo'), err = document.getElementById('vn-derr');
+          if (dBusy) return;
+          dBusy = true; go.disabled = true; err.classList.add('hidden');
+          go.innerHTML = '<span class="inline-flex items-center gap-2"><svg class="w-4 h-4" style="animation:vcSpin .8s linear infinite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>Deleting…</span>';
+          try {
+            await api('/api/numbers/release', { method: 'POST', body: JSON.stringify({ confirm: 'DELETE' }) });
+            dBusy = false; closeDelete();          // the page fades to "Get a new number" by itself
+          } catch (e) {
+            dBusy = false; go.disabled = false; go.textContent = 'Delete number';
+            err.textContent = e.message; err.classList.remove('hidden');
+          }
+        };
+
         function renderHas(uid, d) {
           body.innerHTML =
             '<div class="' + card + ' mb-6">' +
@@ -6361,6 +6417,10 @@ _DP_NUMBER_JS = """
                 '<button id="vn-copy" class="px-3.5 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold hover:bg-gray-50">Copy</button>' +
               '</div>' +
               '<p class="text-[14px] text-gray-500 mt-3">Solana answers this number 24/7.</p>' +
+              '<div class="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">' +
+                '<span class="text-[13px] text-gray-500">No longer need this number?</span>' +
+                '<button id="vn-del" class="px-3.5 py-2 rounded-lg text-[13px] font-semibold text-red-600 hover:bg-red-50 transition-colors">Delete number</button>' +
+              '</div>' +
             '</div>' +
             '<div class="bg-[#f9fafb] rounded-3xl border border-gray-100 p-8">' +
               '<h2 class="text-[18px] font-semibold text-gray-900 mb-2">Keep your existing business number</h2>' +
@@ -6372,6 +6432,7 @@ _DP_NUMBER_JS = """
               '<p id="vn-forward-msg" class="text-[13px] font-semibold mt-3"></p>' +
             '</div>';
           document.getElementById('vn-number').textContent = fmt(d.phoneNumber);
+          document.getElementById('vn-del').onclick = () => askDelete(d);
           document.getElementById('vn-forward').value = d.forwardingFrom || '';
           document.getElementById('vn-copy').onclick = async (e) => {
             try { await navigator.clipboard.writeText(fmt(d.phoneNumber)); } catch (err) {}
