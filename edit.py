@@ -4207,15 +4207,20 @@ def write_seo_files():
         bb = src.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
         if bb:
             src = src.crop(bb)
-        side = int(max(src.size) * 1.06)
-        sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-        sq.paste(src, ((side - src.width) // 2, (side - src.height) // 2), src)
-        sq.resize((192, 192), Image.LANCZOS).save(ROOT / "Images" / "icon-192.png")
-        sq.resize((256, 256), Image.LANCZOS).save(ROOT / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
-        ap = Image.new("RGBA", (side, side), (255, 255, 255, 255))   # iPhone home screen needs a solid square
-        ap.alpha_composite(sq)
-        ap.convert("RGB").resize((180, 180), Image.LANCZOS).save(ROOT / "Images" / "apple-touch-icon.png")
-        print("[ok] made favicon.ico + Images/icon-192.png + Images/apple-touch-icon.png (transparent)")
+        # white rounded square with the logo inside: clear on dark tabs and in Google's dark mode
+        S = 1024
+        src.thumbnail((int(S * 0.76), int(S * 0.76)), Image.LANCZOS)
+        tile = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+        mask = Image.new("L", (S, S), 0)
+        _ID.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.24), fill=255)
+        tile.paste((255, 255, 255, 255), (0, 0), mask)
+        tile.alpha_composite(src, ((S - src.width) // 2, (S - src.height) // 2))
+        tile.resize((192, 192), Image.LANCZOS).save(ROOT / "Images" / "icon-192.png")
+        tile.resize((256, 256), Image.LANCZOS).save(ROOT / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+        ap = Image.new("RGB", (S, S), (255, 255, 255))                 # iPhone rounds it by itself
+        ap.paste(src, ((S - src.width) // 2, (S - src.height) // 2), src)
+        ap.resize((180, 180), Image.LANCZOS).save(ROOT / "Images" / "apple-touch-icon.png")
+        print("[ok] made favicon.ico + Images/icon-192.png + Images/apple-touch-icon.png (rounded)")
     W, H = 1200, 630
     im = Image.new("RGB", (W, H), (255, 255, 255))
     d = ImageDraw.Draw(im)
