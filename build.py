@@ -6083,6 +6083,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -8227,8 +8230,24 @@ _DP_VOICE_JS = """
         showUpgrade(false);
         if (id === voice) return;
         voice = id; render();
+        // Male voice -> "Solan", back to "Solana" for female/default (only if the name is still one of those two)
+        const MALE = ['male', 'mmale', 'rmale'];
+        const nameIn = $('agent-name');
+        const upd = { voice: id };
+        if (nameIn) {
+          const cur = nameIn.value.trim();
+          const want = MALE.includes(id) ? (cur === 'Solana' || cur === '' ? 'Solan' : null)
+                                         : (cur === 'Solan' ? 'Solana' : null);
+          if (want) {
+            nameIn.value = want;
+            nameIn.dispatchEvent(new Event('input', { bubbles: true }));   // updates the name shown + the default prompt
+            upd.agentName = want;
+            const pr = $('system-prompt');
+            if (pr && pr.value.trim()) upd.systemPrompt = pr.value.trim();
+          }
+        }
         if (uid && fs) {
-          try { await fs.updateDoc(fs.doc(db, 'users', uid), { voice: id }); $('vv-note').textContent = 'Saved. Used on your next call.'; refreshStatus(300); }
+          try { await fs.updateDoc(fs.doc(db, 'users', uid), upd); $('vv-note').textContent = upd.agentName ? 'Saved. Your agent is now called ' + upd.agentName + '.' : 'Saved. Used on your next call.'; refreshStatus(300); }
           catch (err) { $('vv-note').textContent = 'Could not save: ' + err.message; }
         }
       }
@@ -8756,6 +8775,267 @@ _DP_GCAL_JS = """
   </script>
 """
 
+# ======================= Checkout: reliable card form (waits for sign-in, shows errors) =======================
+
+_DP_CHECKOUT_JS = """
+  <style>
+    /* VX_CHECKOUT_CSS */
+    @keyframes vxPulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+    .vx-skel { background: #f1f1f1; border-radius: 12px; animation: vxPulse 1.4s ease-in-out infinite; }
+    @keyframes vxSpin { to { transform: rotate(360deg); } }
+    .vx-spin { animation: vxSpin .8s linear infinite; }
+  </style>
+  <script type="module">
+    /* VX_CHECKOUT_MARKER */
+    const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+    const $ = (id) => document.getElementById(id);
+    const plan = (new URLSearchParams(location.search).get('plan') || '').toLowerCase();
+    const wrap = $('pay-wrap'), host = $('payment-element'), oldBtn = $('pay-btn');
+    if ((plan === 'pro' || plan === 'max') && wrap && host && oldBtn) {
+      const PRICE = plan === 'pro' ? '$14.99/month' : '$99.99/month';
+      const NAME = plan === 'pro' ? 'Pro' : 'Max';
+      const pkMatch = [...document.scripts].map(s => s.textContent || '').join(' ').match(/Stripe\\(['"](pk_[A-Za-z0-9_]+)['"]\\)/);
+      const PK = pkMatch ? pkMatch[1] : '';
+      const SPIN = '<svg class="vx-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
+
+      const btn = oldBtn.cloneNode(true);            // drop any old click handlers
+      oldBtn.replaceWith(btn);
+      btn.textContent = 'Subscribe — ' + PRICE;
+      btn.disabled = true; btn.style.opacity = '.55'; btn.style.transition = 'opacity .2s ease';
+
+      const status = document.createElement('div');
+      status.className = 'hidden mb-5 rounded-xl border px-4 py-3 text-[14px] leading-[1.5]';
+      status.style.transition = 'opacity .2s ease';
+      wrap.insertBefore(status, wrap.firstChild);
+      function say(kind, html) {
+        status.className = 'mb-5 rounded-xl border px-4 py-3 text-[14px] leading-[1.5] ' +
+          (kind === 'err' ? 'border-red-200 bg-red-50 text-red-800' : kind === 'ok' ? 'border-green-200 bg-green-50 text-green-800' : 'border-gray-200 bg-gray-50 text-gray-700');
+        status.innerHTML = html;
+      }
+      function hideSay() { status.className = 'hidden'; }
+
+      const skeleton = '<div id="vx-skel" style="transition:opacity .2s ease">' +
+        '<div class="flex items-center gap-2 text-[13px] text-gray-500 mb-4">' + SPIN + 'Loading secure payment form…</div>' +
+        '<div class="vx-skel h-11 mb-3"></div><div class="grid grid-cols-2 gap-3 mb-3"><div class="vx-skel h-11"></div><div class="vx-skel h-11"></div></div>' +
+        '<div class="vx-skel h-11"></div></div>';
+
+      let stripe = null, elements = null, starting = false;
+
+      async function waitForStripe() {
+        for (let i = 0; i < 100 && !window.Stripe; i++) await new Promise(r => setTimeout(r, 100));
+        if (!window.Stripe) throw new Error("The payment form couldn't load. Turn off ad blockers for this page and refresh.");
+        if (!PK) throw new Error('Payments are not set up on this page yet.');
+        return window.Stripe(PK);
+      }
+
+      async function start(user) {
+        if (starting) return;
+        starting = true;
+        hideSay();
+        host.innerHTML = skeleton;
+        btn.disabled = true; btn.style.opacity = '.55'; btn.textContent = 'Subscribe — ' + PRICE;
+        try {
+          stripe = stripe || await waitForStripe();
+          const token = await user.getIdToken();
+          let r;
+          try {
+            r = await fetch(BRIDGE + '/api/billing/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+              body: JSON.stringify({ plan })
+            });
+          } catch (e) { throw new Error("Couldn't reach Vocallus. Check your connection and try again."); }
+          const data = await r.json().catch(() => ({}));
+          if (r.status === 409) {
+            host.innerHTML = '';
+            btn.style.display = 'none';
+            say('ok', '<div class="font-semibold">' + (data.error || "You're already on " + NAME + '.') + '</div><a href="dashboard.html" class="inline-block mt-2 font-semibold underline">Go to dashboard</a>');
+            return;
+          }
+          if (!r.ok) throw new Error(data.error || ('Checkout failed (' + r.status + ').'));
+          if (data.updated) return done('Your plan was changed to ' + NAME + '.');
+          if (!data.clientSecret) throw new Error('Checkout could not start. Please try again.');
+
+          elements = stripe.elements({
+            clientSecret: data.clientSecret,
+            appearance: {
+              theme: 'stripe',
+              variables: { colorPrimary: '#111111', colorText: '#111111', colorDanger: '#b91c1c', fontFamily: 'Plus Jakarta Sans, Inter, sans-serif', borderRadius: '12px', spacingUnit: '4px' }
+            },
+            fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600' }]
+          });
+          const pe = elements.create('payment', { layout: 'tabs' });
+          const mount = document.createElement('div');
+          mount.style.cssText = 'opacity:0;transition:opacity .25s ease;height:0;overflow:hidden';
+          host.appendChild(mount);
+          pe.on('ready', () => {
+            const sk = $('vx-skel'); if (sk) sk.remove();
+            mount.style.height = ''; mount.style.overflow = '';
+            requestAnimationFrame(() => { mount.style.opacity = '1'; });
+            btn.disabled = false; btn.style.opacity = '1';
+          });
+          pe.on('loaderror', (ev) => fail((ev && ev.error && ev.error.message) || "The payment form couldn't load.", user));
+          pe.mount(mount);
+        } catch (e) { fail(e.message, user); }
+        finally { starting = false; }
+      }
+
+      function fail(msg, user) {
+        host.innerHTML = '';
+        btn.disabled = true; btn.style.opacity = '.55';
+        say('err', '<div class="font-semibold">' + msg + '</div><button type="button" id="vx-retry" class="mt-2 font-semibold underline">Try again</button>');
+        const rb = $('vx-retry'); if (rb) rb.addEventListener('click', () => start(user));
+      }
+
+      function done(title) {
+        btn.style.display = 'none';
+        host.style.transition = 'opacity .2s ease'; host.style.opacity = '0';
+        setTimeout(() => {
+          host.innerHTML =
+            '<div class="text-center py-10">' +
+              '<div class="w-14 h-14 mx-auto rounded-full bg-black text-white flex items-center justify-center mb-4">' +
+                '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+              '<div class="text-[20px] font-semibold text-gray-900">' + title + '</div>' +
+              '<div class="text-[14px] text-gray-500 mt-1">Taking you to your dashboard…</div></div>';
+          host.style.opacity = '1';
+          hideSay();
+        }, 200);
+        setTimeout(() => { location.href = 'dashboard.html?paid=1'; }, 1600);
+      }
+
+      btn.addEventListener('click', async () => {
+        if (!stripe || !elements || btn.disabled) return;
+        hideSay();
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-flex items-center gap-2">' + SPIN + 'Processing…</span>';
+        const res = await stripe.confirmPayment({
+          elements, redirect: 'if_required',
+          confirmParams: { return_url: location.origin + '/Pages/dashboard.html?paid=1' }
+        });
+        if (res.error) {
+          say('err', res.error.message || 'Payment failed. Please try another card.');
+          btn.disabled = false; btn.textContent = 'Subscribe — ' + PRICE;
+        } else {
+          done("You're on " + NAME + '!');
+        }
+      });
+
+      host.innerHTML = skeleton;
+      try {
+""" + _DP_FB + """
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        let seen = false;
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (seen) return;
+          seen = true;
+          if (!user) {
+            host.innerHTML = '';
+            say('info', '<div class="font-semibold">Sign in to subscribe.</div><a href="login.html" class="inline-block mt-2 font-semibold underline">Sign in</a>');
+            return;
+          }
+          start(user);
+        });
+      } catch (e) { fail("Couldn't start checkout. Refresh the page.", null); }
+    }
+  </script>
+"""
+
+# ======================= Billing tab: Delete account =======================
+
+_DP_DELETE_JS = """
+  <script type="module">
+    /* VA_DELETE_MARKER */
+    const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+    const $ = (id) => document.getElementById(id);
+    const panel = $('panel-finances');
+    if (panel) {
+      const card = document.createElement('div');
+      card.className = 'mt-8 rounded-3xl border border-gray-200 bg-white p-7';
+      card.innerHTML =
+        '<h2 class="text-[17px] font-semibold text-gray-900">Delete account</h2>' +
+        '<p class="text-[14px] text-gray-500 mt-1.5 max-w-[620px]">Cancels your subscription, releases your Solana number, and permanently deletes your calls, calendar and settings. This can\\'t be undone.</p>' +
+        '<button id="vdl-open" class="mt-4 px-4 py-2.5 rounded-xl border border-gray-300 text-[14px] font-semibold text-gray-900 hover:bg-gray-50">Delete account…</button>';
+      panel.appendChild(card);
+
+      const veil = document.createElement('div');
+      veil.className = 'fixed inset-0 z-[95] bg-black/40 flex items-center justify-center p-4';
+      veil.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .18s ease';
+      veil.innerHTML =
+        '<div id="vdl-card" class="bg-white rounded-3xl w-full max-w-[460px] p-7" style="transform:translateY(8px) scale(.98);transition:transform .22s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.22)">' +
+          '<h3 class="text-[20px] font-semibold text-gray-900">Delete your account?</h3>' +
+          '<ul class="mt-3 space-y-1.5 text-[14px] text-gray-600 list-disc pl-5">' +
+            '<li>Your subscription is cancelled right away</li>' +
+            '<li>Your Solana phone number stops working</li>' +
+            '<li>All calls, appointments and settings are erased</li>' +
+          '</ul>' +
+          '<label class="block text-[13px] font-semibold text-gray-700 mt-5 mb-1.5">Type <span class="font-mono">DELETE</span> to confirm</label>' +
+          '<input id="vdl-in" autocomplete="off" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-900">' +
+          '<div id="vdl-err" class="hidden mt-3 text-[13px] text-red-600"></div>' +
+          '<div class="flex items-center justify-end gap-2 mt-6">' +
+            '<button id="vdl-cancel" class="px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-800 hover:bg-gray-50">Cancel</button>' +
+            '<button id="vdl-go" disabled class="btn-primary min-w-[140px] px-5 py-2.5 rounded-xl text-[14px] font-semibold" style="opacity:.45;transition:opacity .15s ease">Delete forever</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(veil);
+      const box = $('vdl-card'), input = $('vdl-in'), go = $('vdl-go'), err = $('vdl-err');
+      let busy = false, auth = null, signOutFn = null;
+
+      const open = () => {
+        input.value = ''; go.disabled = true; go.style.opacity = '.45'; err.classList.add('hidden');
+        veil.style.opacity = '1'; veil.style.pointerEvents = 'auto';
+        requestAnimationFrame(() => { box.style.transform = 'none'; });
+        setTimeout(() => input.focus(), 80);
+      };
+      const close = () => {
+        if (busy) return;
+        veil.style.opacity = '0'; veil.style.pointerEvents = 'none';
+        box.style.transform = 'translateY(8px) scale(.98)';
+      };
+      $('vdl-open').addEventListener('click', open);
+      $('vdl-cancel').addEventListener('click', close);
+      veil.addEventListener('mousedown', (e) => { if (e.target === veil) close(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && veil.style.pointerEvents === 'auto') close(); });
+      input.addEventListener('input', () => {
+        const ok = input.value.trim() === 'DELETE';
+        go.disabled = !ok; go.style.opacity = ok ? '1' : '.45';
+      });
+
+      go.addEventListener('click', async () => {
+        if (go.disabled || !auth || !auth.currentUser) return;
+        busy = true; go.disabled = true;
+        go.innerHTML = '<span class="inline-flex items-center gap-2"><svg class="vc-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>Deleting…</span>';
+        err.classList.add('hidden');
+        try {
+          const tok = await auth.currentUser.getIdToken();
+          const r = await fetch(BRIDGE + '/api/account/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+            body: JSON.stringify({ confirm: 'DELETE' })
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || ('Something went wrong (' + r.status + ').'));
+          try { await signOutFn(); } catch (e) {}
+          try { ['vocallus_user', 'vocallus_agent', 'va_token'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+          document.body.style.transition = 'opacity .25s ease'; document.body.style.opacity = '0';
+          setTimeout(() => { location.href = '../index.html'; }, 260);
+        } catch (e) {
+          busy = false;
+          err.textContent = e.message === 'Failed to fetch' ? "Couldn't reach Vocallus. Try again in a moment." : e.message;
+          err.classList.remove('hidden');
+          go.textContent = 'Delete forever'; go.disabled = false; go.style.opacity = '1';
+        }
+      });
+
+      try {
+""" + _DP_FB + """
+        const A = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        auth = A.getAuth(app);
+        signOutFn = () => A.signOut(auth);
+      } catch (e) {}
+    }
+  </script>
+"""
+
 _APP_NAMES_AUTH = {"dashboard.html", "solana.html", "calendar.html", "history.html"}
 _prev_rp_authbtn = render_page
 
@@ -8808,6 +9088,7 @@ def render_page(path, builder):
             html = _dp_add(html, "VN_NUMBER_MARKER", "</body>", _DP_NUMBER_JS)
             html = _dp_add(html, "VC_RECENT_MARKER", "</body>", _DP_RECENT_JS)
             html = _dp_add(html, "VB_BILLING_MARKER", "</body>", _DP_BILLING_JS)
+            html = _dp_add(html, "VA_DELETE_MARKER", "</body>", _DP_DELETE_JS)
             html = _dp_add(html, "VR_ROUTER_MARKER", "</body>", _DP_ROUTER_JS)
             html = _dp_add(html, "VO_ONBOARD_MARKER", "</body>", _DP_ONBOARD_JS)
         if name == "solana.html":
@@ -8854,6 +9135,12 @@ def render_page(path, builder):
         html = _dp_add(html, "SF_LOGIN_MARKER", "</body>", _DP_LOGIN_JS)
     if name == "pricing.html":
         html = _dp_add(html, "VB_BACK_MARKER", "</body>", _DP_PRICING_BACK_JS)
+    if name == "checkout.html":
+        # The old checkout script gave up if sign-in wasn't ready yet (nothing showed). Switch it off;
+        # VX_CHECKOUT takes over and waits for sign-in properly.
+        html = _re_auth.sub(r'window\.whenFirebase && window\.whenFirebase\(async function \(fb\) \{(\s*)var user = fb\.auth\.currentUser;',
+                            r'false && window.whenFirebase(async function (fb) {\1var user = fb.auth.currentUser;', html)
+        html = _dp_add(html, "VX_CHECKOUT_MARKER", "</body>", _DP_CHECKOUT_JS)
     return html
 
 # --- end deepseek_python.py ---

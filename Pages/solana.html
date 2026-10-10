@@ -1562,8 +1562,24 @@
         showUpgrade(false);
         if (id === voice) return;
         voice = id; render();
+        // Male voice -> "Solan", back to "Solana" for female/default (only if the name is still one of those two)
+        const MALE = ['male', 'mmale', 'rmale'];
+        const nameIn = $('agent-name');
+        const upd = { voice: id };
+        if (nameIn) {
+          const cur = nameIn.value.trim();
+          const want = MALE.includes(id) ? (cur === 'Solana' || cur === '' ? 'Solan' : null)
+                                         : (cur === 'Solan' ? 'Solana' : null);
+          if (want) {
+            nameIn.value = want;
+            nameIn.dispatchEvent(new Event('input', { bubbles: true }));   // updates the name shown + the default prompt
+            upd.agentName = want;
+            const pr = $('system-prompt');
+            if (pr && pr.value.trim()) upd.systemPrompt = pr.value.trim();
+          }
+        }
         if (uid && fs) {
-          try { await fs.updateDoc(fs.doc(db, 'users', uid), { voice: id }); $('vv-note').textContent = 'Saved. Used on your next call.'; refreshStatus(300); }
+          try { await fs.updateDoc(fs.doc(db, 'users', uid), upd); $('vv-note').textContent = upd.agentName ? 'Saved. Your agent is now called ' + upd.agentName + '.' : 'Saved. Used on your next call.'; refreshStatus(300); }
           catch (err) { $('vv-note').textContent = 'Could not save: ' + err.message; }
         }
       }

@@ -532,7 +532,7 @@
         el.innerHTML = html;
       }
 
-      window.whenFirebase && window.whenFirebase(async function (fb) {
+      false && window.whenFirebase(async function (fb) {
         var user = fb.auth.currentUser;
         if (!user) return;
         var token = await user.getIdToken();
@@ -639,6 +639,178 @@
       onAuthStateChanged(auth, apply);
     } catch (e) {
       apply(null);
+    }
+  </script>
+
+
+  <style>
+    /* VX_CHECKOUT_CSS */
+    @keyframes vxPulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+    .vx-skel { background: #f1f1f1; border-radius: 12px; animation: vxPulse 1.4s ease-in-out infinite; }
+    @keyframes vxSpin { to { transform: rotate(360deg); } }
+    .vx-spin { animation: vxSpin .8s linear infinite; }
+  </style>
+  <script type="module">
+    /* VX_CHECKOUT_MARKER */
+    const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+    const $ = (id) => document.getElementById(id);
+    const plan = (new URLSearchParams(location.search).get('plan') || '').toLowerCase();
+    const wrap = $('pay-wrap'), host = $('payment-element'), oldBtn = $('pay-btn');
+    if ((plan === 'pro' || plan === 'max') && wrap && host && oldBtn) {
+      const PRICE = plan === 'pro' ? '$14.99/month' : '$99.99/month';
+      const NAME = plan === 'pro' ? 'Pro' : 'Max';
+      const pkMatch = [...document.scripts].map(s => s.textContent || '').join(' ').match(/Stripe\(['"](pk_[A-Za-z0-9_]+)['"]\)/);
+      const PK = pkMatch ? pkMatch[1] : '';
+      const SPIN = '<svg class="vx-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
+
+      const btn = oldBtn.cloneNode(true);            // drop any old click handlers
+      oldBtn.replaceWith(btn);
+      btn.textContent = 'Subscribe — ' + PRICE;
+      btn.disabled = true; btn.style.opacity = '.55'; btn.style.transition = 'opacity .2s ease';
+
+      const status = document.createElement('div');
+      status.className = 'hidden mb-5 rounded-xl border px-4 py-3 text-[14px] leading-[1.5]';
+      status.style.transition = 'opacity .2s ease';
+      wrap.insertBefore(status, wrap.firstChild);
+      function say(kind, html) {
+        status.className = 'mb-5 rounded-xl border px-4 py-3 text-[14px] leading-[1.5] ' +
+          (kind === 'err' ? 'border-red-200 bg-red-50 text-red-800' : kind === 'ok' ? 'border-green-200 bg-green-50 text-green-800' : 'border-gray-200 bg-gray-50 text-gray-700');
+        status.innerHTML = html;
+      }
+      function hideSay() { status.className = 'hidden'; }
+
+      const skeleton = '<div id="vx-skel" style="transition:opacity .2s ease">' +
+        '<div class="flex items-center gap-2 text-[13px] text-gray-500 mb-4">' + SPIN + 'Loading secure payment form…</div>' +
+        '<div class="vx-skel h-11 mb-3"></div><div class="grid grid-cols-2 gap-3 mb-3"><div class="vx-skel h-11"></div><div class="vx-skel h-11"></div></div>' +
+        '<div class="vx-skel h-11"></div></div>';
+
+      let stripe = null, elements = null, starting = false;
+
+      async function waitForStripe() {
+        for (let i = 0; i < 100 && !window.Stripe; i++) await new Promise(r => setTimeout(r, 100));
+        if (!window.Stripe) throw new Error("The payment form couldn't load. Turn off ad blockers for this page and refresh.");
+        if (!PK) throw new Error('Payments are not set up on this page yet.');
+        return window.Stripe(PK);
+      }
+
+      async function start(user) {
+        if (starting) return;
+        starting = true;
+        hideSay();
+        host.innerHTML = skeleton;
+        btn.disabled = true; btn.style.opacity = '.55'; btn.textContent = 'Subscribe — ' + PRICE;
+        try {
+          stripe = stripe || await waitForStripe();
+          const token = await user.getIdToken();
+          let r;
+          try {
+            r = await fetch(BRIDGE + '/api/billing/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+              body: JSON.stringify({ plan })
+            });
+          } catch (e) { throw new Error("Couldn't reach Vocallus. Check your connection and try again."); }
+          const data = await r.json().catch(() => ({}));
+          if (r.status === 409) {
+            host.innerHTML = '';
+            btn.style.display = 'none';
+            say('ok', '<div class="font-semibold">' + (data.error || "You're already on " + NAME + '.') + '</div><a href="dashboard.html" class="inline-block mt-2 font-semibold underline">Go to dashboard</a>');
+            return;
+          }
+          if (!r.ok) throw new Error(data.error || ('Checkout failed (' + r.status + ').'));
+          if (data.updated) return done('Your plan was changed to ' + NAME + '.');
+          if (!data.clientSecret) throw new Error('Checkout could not start. Please try again.');
+
+          elements = stripe.elements({
+            clientSecret: data.clientSecret,
+            appearance: {
+              theme: 'stripe',
+              variables: { colorPrimary: '#111111', colorText: '#111111', colorDanger: '#b91c1c', fontFamily: 'Plus Jakarta Sans, Inter, sans-serif', borderRadius: '12px', spacingUnit: '4px' }
+            },
+            fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600' }]
+          });
+          const pe = elements.create('payment', { layout: 'tabs' });
+          const mount = document.createElement('div');
+          mount.style.cssText = 'opacity:0;transition:opacity .25s ease;height:0;overflow:hidden';
+          host.appendChild(mount);
+          pe.on('ready', () => {
+            const sk = $('vx-skel'); if (sk) sk.remove();
+            mount.style.height = ''; mount.style.overflow = '';
+            requestAnimationFrame(() => { mount.style.opacity = '1'; });
+            btn.disabled = false; btn.style.opacity = '1';
+          });
+          pe.on('loaderror', (ev) => fail((ev && ev.error && ev.error.message) || "The payment form couldn't load.", user));
+          pe.mount(mount);
+        } catch (e) { fail(e.message, user); }
+        finally { starting = false; }
+      }
+
+      function fail(msg, user) {
+        host.innerHTML = '';
+        btn.disabled = true; btn.style.opacity = '.55';
+        say('err', '<div class="font-semibold">' + msg + '</div><button type="button" id="vx-retry" class="mt-2 font-semibold underline">Try again</button>');
+        const rb = $('vx-retry'); if (rb) rb.addEventListener('click', () => start(user));
+      }
+
+      function done(title) {
+        btn.style.display = 'none';
+        host.style.transition = 'opacity .2s ease'; host.style.opacity = '0';
+        setTimeout(() => {
+          host.innerHTML =
+            '<div class="text-center py-10">' +
+              '<div class="w-14 h-14 mx-auto rounded-full bg-black text-white flex items-center justify-center mb-4">' +
+                '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+              '<div class="text-[20px] font-semibold text-gray-900">' + title + '</div>' +
+              '<div class="text-[14px] text-gray-500 mt-1">Taking you to your dashboard…</div></div>';
+          host.style.opacity = '1';
+          hideSay();
+        }, 200);
+        setTimeout(() => { location.href = 'dashboard.html?paid=1'; }, 1600);
+      }
+
+      btn.addEventListener('click', async () => {
+        if (!stripe || !elements || btn.disabled) return;
+        hideSay();
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-flex items-center gap-2">' + SPIN + 'Processing…</span>';
+        const res = await stripe.confirmPayment({
+          elements, redirect: 'if_required',
+          confirmParams: { return_url: location.origin + '/Pages/dashboard.html?paid=1' }
+        });
+        if (res.error) {
+          say('err', res.error.message || 'Payment failed. Please try another card.');
+          btn.disabled = false; btn.textContent = 'Subscribe — ' + PRICE;
+        } else {
+          done("You're on " + NAME + '!');
+        }
+      });
+
+      host.innerHTML = skeleton;
+      try {
+
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const app = getApps().length ? getApps()[0] : initializeApp({
+        apiKey: "AIzaSyBqMft1lyqV3C1iD8V_X941fnQhHJXOOfU",
+        authDomain: "vocallus-aa81e.firebaseapp.com",
+        projectId: "vocallus-aa81e",
+        storageBucket: "vocallus-aa81e.firebasestorage.app",
+        messagingSenderId: "997486177218",
+        appId: "1:997486177218:web:7c4741dbd450549140845b"
+      });
+
+        const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        let seen = false;
+        onAuthStateChanged(getAuth(app), (user) => {
+          if (seen) return;
+          seen = true;
+          if (!user) {
+            host.innerHTML = '';
+            say('info', '<div class="font-semibold">Sign in to subscribe.</div><a href="login.html" class="inline-block mt-2 font-semibold underline">Sign in</a>');
+            return;
+          }
+          start(user);
+        });
+      } catch (e) { fail("Couldn't start checkout. Refresh the page.", null); }
     }
   </script>
 
