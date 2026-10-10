@@ -6119,6 +6119,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -10176,6 +10179,13 @@ def render_page(path, builder):
              "text": "Pro is $14.99/month and Max is $99.99/month. You can try a free test call first."}}]}
     if data is not None:
         head.append('<script type="application/ld+json">' + _seo_json.dumps(data).replace("</", "<\\/") + "</script>")
+    # favicon set (Google search shows /favicon.ico or the 48px+ icon from the homepage)
+    if (ROOT / "favicon.ico").exists():
+        html = _re_auth.sub(r'<link rel="(?:shortcut )?icon"[^>]*>\s*', "", html)
+        html = _re_auth.sub(r'<link rel="apple-touch-icon"[^>]*>\s*', "", html)
+        head = ['<link rel="icon" href="/favicon.ico" sizes="48x48">',
+                '<link rel="icon" type="image/png" sizes="192x192" href="/Images/icon-192.png">',
+                '<link rel="apple-touch-icon" sizes="180x180" href="/Images/apple-touch-icon.png">'] + head
     html = html.replace("</head>", "  " + "\n  ".join(head) + "\n</head>", 1)
     # links to the industry pages (helps Google find them)
     if (name in ("index.html", "solutions.html") or name.startswith("ai-receptionist-for-")) and "<footer" in html:

@@ -4154,6 +4154,13 @@ def render_page(path, builder):
              "text": "Pro is $14.99/month and Max is $99.99/month. You can try a free test call first."}}]}
     if data is not None:
         head.append('<script type="application/ld+json">' + _seo_json.dumps(data).replace("</", "<\\/") + "</script>")
+    # favicon set (Google search shows /favicon.ico or the 48px+ icon from the homepage)
+    if (ROOT / "favicon.ico").exists():
+        html = _re_auth.sub(r'<link rel="(?:shortcut )?icon"[^>]*>\s*', "", html)
+        html = _re_auth.sub(r'<link rel="apple-touch-icon"[^>]*>\s*', "", html)
+        head = ['<link rel="icon" href="/favicon.ico" sizes="48x48">',
+                '<link rel="icon" type="image/png" sizes="192x192" href="/Images/icon-192.png">',
+                '<link rel="apple-touch-icon" sizes="180x180" href="/Images/apple-touch-icon.png">'] + head
     html = html.replace("</head>", "  " + "\n  ".join(head) + "\n</head>", 1)
     # links to the industry pages (helps Google find them)
     if (name in ("index.html", "solutions.html") or name.startswith("ai-receptionist-for-")) and "<footer" in html:
@@ -4187,6 +4194,19 @@ def write_seo_files():
     except ImportError:
         print("[note] share picture skipped (pip install pillow to make Images/og-image.png)")
         return
+    lg0 = ROOT / "Images" / "logo.png"
+    if lg0.exists():                                     # favicon set from logo.png, on a white square
+        src = Image.open(lg0).convert("RGBA")
+        bb = src.getbbox()
+        if bb:
+            src = src.crop(bb)
+        side = int(max(src.size) * 1.18)
+        sq = Image.new("RGBA", (side, side), (255, 255, 255, 255))
+        sq.paste(src, ((side - src.width) // 2, (side - src.height) // 2), src)
+        sq.resize((192, 192), Image.LANCZOS).save(ROOT / "Images" / "icon-192.png")
+        sq.convert("RGB").resize((180, 180), Image.LANCZOS).save(ROOT / "Images" / "apple-touch-icon.png")
+        sq.resize((256, 256), Image.LANCZOS).save(ROOT / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+        print("[ok] made favicon.ico + Images/icon-192.png + Images/apple-touch-icon.png")
     W, H = 1200, 630
     im = Image.new("RGB", (W, H), (255, 255, 255))
     d = ImageDraw.Draw(im)
