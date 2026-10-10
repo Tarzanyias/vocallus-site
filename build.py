@@ -6107,6 +6107,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6513,6 +6516,7 @@ _DP_NUMBER_JS = """
                 choose.className = 'vn-choose btn-primary px-4 py-2 rounded-lg font-semibold text-[13px]';
                 choose.textContent = 'Choose';
                 choose.onclick = async () => {
+                  if (window.vcBusiness) { await window.vcBusiness.ensure('number'); }   // VO_ENSURE_NUMBER
                   if (!confirm('Get ' + fmt(n.phoneNumber) + ' as your Solana number?')) return;
                   document.querySelectorAll('.vn-choose').forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
                   btn.disabled = true;
@@ -7885,6 +7889,7 @@ _DP_DEMO_JS = """
 
       async function startCall() {
         if (callState === 'connecting' || callState === 'live') return;
+        if (window.vcBusiness) { await window.vcBusiness.ensure('test'); }   // VO_ENSURE_TEST
         showErr(''); capYou = ''; capAgent = ''; renderCaps(); endReason = '';
         setCallState('connecting');
         try {
@@ -8410,67 +8415,181 @@ _DP_PRICING_BACK_JS = """
 # ======================= Dashboard: "What does your business do?" (asked once after sign-up) =======================
 
 _DP_ONBOARD_JS = """
+  <style>
+    /* VO_ONBOARD_CSS */
+    .vo-row { display: grid; grid-template-columns: minmax(0,1fr) 128px 36px; gap: 8px; align-items: center;
+      max-height: 64px; opacity: 1; overflow: hidden; transition: max-height .24s ease, opacity .2s ease, margin .24s ease; margin-bottom: 8px; }
+    .vo-row.vo-in { max-height: 0; opacity: 0; margin-bottom: 0; }
+    .vo-chip { animation: voChip .25s ease both; }
+    @keyframes voChip { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  </style>
   <script type="module">
     /* VO_ONBOARD_MARKER */
     const root = document.documentElement;
-    root.classList.add('vo-check');                    // the alerts prompt waits until this is answered
-    const done = () => { root.classList.remove('vo-check', 'vo-open'); };
+    const $ = (id) => document.getElementById(id);
+    const AUTO = !!$('panel-home');                      // dashboard: ask once by itself after sign-up
+    if (AUTO) root.classList.add('vo-check');           // the alerts prompt waits until this is answered
+    const done = () => root.classList.remove('vo-check', 'vo-open');
     let skipped = false;
     try { skipped = sessionStorage.getItem('vo_skip') === '1'; } catch (e) {}
+    const LENS = [10, 15, 20, 30, 45, 60, 75, 90, 120, 180, 240];
+    const lenLabel = (m) => m < 60 ? m + ' min' : (m % 60 ? Math.floor(m / 60) + ' hr ' + (m % 60) + ' min' : (m / 60) + ' hr' + (m > 60 ? 's' : ''));
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const complete = (d) => !!(d && String(d.businessDescription || '').trim() && Array.isArray(d.services) && d.services.length);
+    const REASONS = {
+      test: 'Before your test call: tell Solana about your business so she answers like it’s yours.',
+      number: 'Before you get a number: tell Solana about your business so she’s ready for real callers.'
+    };
+    const fld = 'w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-900 bg-white transition-colors';
+
+    // ---------- the popup ----------
+    const veil = document.createElement('div');
+    veil.className = 'fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4';
+    veil.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .22s ease';
+    veil.innerHTML =
+      '<div id="vo-card" class="bg-white rounded-3xl w-full max-w-[560px] max-h-[92vh] overflow-y-auto p-7" style="transform:translateY(12px) scale(.98);transition:transform .28s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.2)">' +
+        '<div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400">Quick setup</div>' +
+        '<h2 class="text-[22px] font-semibold text-gray-900 mt-1">Tell Solana about your business</h2>' +
+        '<p class="text-[14px] text-gray-500 mt-1.5">She uses this to answer questions and book the right amount of time. You can change it any time on the Solana page.</p>' +
+        '<div id="vo-reason" class="text-[13px] font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5" style="max-height:0;opacity:0;overflow:hidden;margin-top:0;padding-top:0;padding-bottom:0;transition:all .25s ease"></div>' +
+        '<label class="block text-[13px] font-semibold text-gray-700 mt-5 mb-1.5">Business name</label>' +
+        '<input id="vo-name" class="' + fld + '" placeholder="Acme Dental">' +
+        '<label class="block text-[13px] font-semibold text-gray-700 mt-4 mb-1.5">What you do</label>' +
+        '<textarea id="vo-about" rows="3" maxlength="1500" class="' + fld + ' leading-[1.5]" style="resize:vertical" ' +
+          'placeholder="Family dental clinic in Houston. Most insurance accepted."></textarea>' +
+        '<div class="flex items-end justify-between mt-5 mb-2">' +
+          '<div><div class="text-[13px] font-semibold text-gray-700">Appointment types</div>' +
+          '<div class="text-[12.5px] text-gray-500">What can people book, and how long does each take?</div></div>' +
+        '</div>' +
+        '<div id="vo-svcs"></div>' +
+        '<button id="vo-add" type="button" class="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">' +
+          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add appointment type</button>' +
+        '<div id="vo-err" class="hidden text-[13px] text-red-600 mt-2"></div>' +
+        '<div class="flex items-center justify-end gap-2 mt-6">' +
+          '<button id="vo-skip" class="px-4 py-2.5 rounded-xl text-[14px] font-semibold text-gray-600 hover:bg-gray-100 transition-colors">Skip for now</button>' +
+          '<button id="vo-save" class="btn-primary min-w-[110px] px-5 py-2.5 rounded-xl text-[14px] font-semibold">Save</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(veil);
+    const card = $('vo-card'), list = $('vo-svcs');
+    let data = {}, uid = null, fs = null, db = null, resolver = null, gotData = false;
+    const readyWaiters = [];
+
+    function addRow(name, minutes, animate) {
+      const row = document.createElement('div');
+      row.className = 'vo-row' + (animate ? ' vo-in' : '');
+      const sel = '<select class="vo-len ' + fld + '">' + LENS.map(m => '<option value="' + m + '"' + (m === minutes ? ' selected' : '') + '>' + lenLabel(m) + '</option>').join('') + '</select>';
+      row.innerHTML = '<input class="vo-sname ' + fld + '" maxlength="60" placeholder="e.g. Cleaning" value="' + esc(name) + '">' + sel +
+        '<button type="button" aria-label="Remove" class="vo-rm w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors">' +
+          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+      if (!LENS.includes(minutes) && minutes) {
+        row.querySelector('select').insertAdjacentHTML('beforeend', '<option value="' + minutes + '" selected>' + lenLabel(minutes) + '</option>');
+      }
+      row.querySelector('.vo-rm').onclick = () => {
+        row.classList.add('vo-in');
+        setTimeout(() => { row.remove(); if (!list.children.length) addRow('', 30, true); }, 240);
+      };
+      list.appendChild(row);
+      if (animate) requestAnimationFrame(() => requestAnimationFrame(() => row.classList.remove('vo-in')));
+      return row;
+    }
+    $('vo-add').onclick = () => { const r = addRow('', Number(data.appointmentLength) || 30, true); setTimeout(() => r.querySelector('input').focus(), 60); };
+
+    function open(reason) {
+      $('vo-name').value = data.company || '';
+      $('vo-about').value = data.businessDescription || '';
+      list.innerHTML = '';
+      const svcs = Array.isArray(data.services) ? data.services : [];
+      if (svcs.length) svcs.forEach(s => addRow(s.name, Number(s.minutes) || 30, false));
+      else addRow('', Number(data.appointmentLength) || 30, false);
+      const r = $('vo-reason');
+      if (reason && REASONS[reason]) {
+        r.textContent = REASONS[reason];
+        Object.assign(r.style, { maxHeight: '80px', opacity: '1', marginTop: '14px', paddingTop: '10px', paddingBottom: '10px' });
+      } else Object.assign(r.style, { maxHeight: '0', opacity: '0', marginTop: '0', paddingTop: '0', paddingBottom: '0' });
+      $('vo-err').classList.add('hidden');
+      const b = $('vo-save'); b.disabled = false; b.textContent = 'Save';
+      root.classList.add('vo-open');
+      veil.style.opacity = '1'; veil.style.pointerEvents = 'auto';
+      requestAnimationFrame(() => { card.style.transform = 'none'; });
+      return new Promise((res) => { resolver = res; });
+    }
+    function close(result) {
+      veil.style.opacity = '0'; veil.style.pointerEvents = 'none';
+      card.style.transform = 'translateY(12px) scale(.98)';
+      setTimeout(done, 220);
+      const r = resolver; resolver = null;
+      if (r) r(result);
+    }
+    $('vo-skip').onclick = () => { try { sessionStorage.setItem('vo_skip', '1'); } catch (e) {} close(false); };
+    veil.addEventListener('mousedown', (e) => { if (e.target === veil) $('vo-skip').click(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && veil.style.pointerEvents === 'auto') $('vo-skip').click(); });
+    $('vo-save').onclick = async () => {
+      const err = $('vo-err');
+      const about = $('vo-about').value.trim(), name = $('vo-name').value.trim();
+      const services = [...list.querySelectorAll('.vo-row')].map(r => ({
+        name: r.querySelector('.vo-sname').value.trim(), minutes: Number(r.querySelector('.vo-len').value) || 30
+      })).filter(s => s.name);
+      if (!about && !services.length) { err.textContent = 'Add what you do or at least one appointment type, or click Skip for now.'; err.classList.remove('hidden'); return; }
+      if (!uid || !fs) { err.textContent = 'Please sign in again.'; err.classList.remove('hidden'); return; }
+      const btn = $('vo-save'); btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        const upd = { businessDescription: about, services };
+        if (name) upd.company = name;
+        await fs.setDoc(fs.doc(db, 'users', uid), upd, { merge: true });
+        data = Object.assign({}, data, upd);
+        close(true);
+      } catch (e) { btn.disabled = false; btn.textContent = 'Save'; err.textContent = 'Could not save: ' + e.message; err.classList.remove('hidden'); }
+    };
+
+    const whenReady = () => gotData ? Promise.resolve() : new Promise((res) => { readyWaiters.push(res); setTimeout(res, 4000); });
+    window.vcBusiness = {
+      open: (reason) => open(reason),
+      // Used before a test call / buying a number: pops up again until it's filled in (still skippable).
+      ensure: async (reason) => { await whenReady(); if (complete(data)) return true; await open(reason); return true; },
+      data: () => data
+    };
+
+    // ---------- Solana page: show the list under "What your business does" ----------
+    function renderChips() {
+      const about = $('vz-about');
+      if (!about) return;
+      let box = $('vo-chipbox');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'vo-chipbox';
+        box.className = 'mt-4';
+        box.innerHTML = '<div class="flex items-center justify-between mb-1.5"><label class="text-[13px] font-semibold text-gray-700">Appointment types</label>' +
+          '<button id="vo-edit" type="button" class="text-[12.5px] font-semibold text-gray-600 hover:text-black underline underline-offset-2">Edit</button></div>' +
+          '<div id="vo-chips" class="flex flex-wrap gap-1.5"></div>';
+        (about.parentElement || about).appendChild(box);
+        $('vo-edit').onclick = () => open();
+      }
+      const svcs = Array.isArray(data.services) ? data.services : [];
+      $('vo-chips').innerHTML = svcs.length
+        ? svcs.map((s, i) => '<span class="vo-chip inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-[12.5px]" style="animation-delay:' + (i * 30) + 'ms">' +
+            '<span class="font-semibold text-gray-900">' + esc(s.name) + '</span><span class="text-gray-400">' + lenLabel(Number(s.minutes) || 30) + '</span></span>').join('')
+        : '<span class="text-[12.5px] text-gray-400">None yet. Add them so Solana books the right amount of time.</span>';
+    }
+
     try {
 """ + _DP_FB + """
       const { getAuth, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-      const fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-      const db = fs.getFirestore(app);
+      fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      db = fs.getFirestore(app);
       onAuthStateChanged(getAuth(app), (user) => {
         if (!user) return done();
+        uid = user.uid;
         let asked = false;
-        fs.onSnapshot(fs.doc(db, 'users', user.uid), (snap) => {
-          if (snap.metadata.fromCache || asked) return;
+        fs.onSnapshot(fs.doc(db, 'users', uid), (snap) => {
+          data = snap.exists() ? snap.data() : {};
+          renderChips();
+          if (snap.metadata.fromCache) return;
+          if (!gotData) { gotData = true; readyWaiters.splice(0).forEach(f => f()); }
+          if (asked || !AUTO) return;
           asked = true;
-          const d = snap.exists() ? snap.data() : {};
-          if (skipped || (d.businessDescription && String(d.businessDescription).trim())) return done();
-          root.classList.add('vo-open');
-          const veil = document.createElement('div');
-          veil.className = 'fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4';
-          veil.style.cssText += ';opacity:0;transition:opacity .2s ease';
-          veil.innerHTML =
-            '<div class="vo-card bg-white rounded-3xl w-full max-w-[520px] p-7" style="transform:translateY(8px) scale(.98);transition:transform .25s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.2)">' +
-              '<div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400">Quick setup</div>' +
-              '<h2 class="text-[22px] font-semibold text-gray-900 mt-1">What does your business do?</h2>' +
-              '<p class="text-[14px] text-gray-500 mt-1.5">Solana uses this to answer questions, and politely turns down anything unrelated.</p>' +
-              '<label class="block text-[13px] font-semibold text-gray-700 mt-5 mb-1.5">Business name</label>' +
-              '<input id="vo-name" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] focus:outline-none focus:border-gray-400" placeholder="Acme Dental">' +
-              '<label class="block text-[13px] font-semibold text-gray-700 mt-4 mb-1.5">What you do</label>' +
-              '<textarea id="vo-about" rows="4" maxlength="1500" class="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[14px] leading-[1.5] focus:outline-none focus:border-gray-400" ' +
-                'placeholder="Family dental clinic in Houston. Cleanings, fillings, whitening and check-ups. Most insurance accepted."></textarea>' +
-              '<div id="vo-err" class="hidden text-[13px] text-red-600 mt-2"></div>' +
-              '<div class="flex items-center justify-end gap-2 mt-6">' +
-                '<button id="vo-skip" class="px-4 py-2.5 rounded-xl text-[14px] font-semibold text-gray-600 hover:bg-gray-100">Skip for now</button>' +
-                '<button id="vo-save" class="btn-primary min-w-[110px] px-5 py-2.5 rounded-xl text-[14px] font-semibold">Save</button>' +
-              '</div>' +
-            '</div>';
-          document.body.appendChild(veil);
-          const card = veil.querySelector('.vo-card');
-          veil.querySelector('#vo-name').value = d.company || '';
-          requestAnimationFrame(() => { veil.style.opacity = '1'; card.style.transform = 'none'; });
-          const close = () => {
-            veil.style.opacity = '0'; card.style.transform = 'translateY(8px) scale(.98)';
-            setTimeout(() => { veil.remove(); done(); }, 220);
-          };
-          veil.querySelector('#vo-skip').addEventListener('click', () => { try { sessionStorage.setItem('vo_skip', '1'); } catch (e) {} close(); });
-          veil.querySelector('#vo-save').addEventListener('click', async () => {
-            const about = veil.querySelector('#vo-about').value.trim(), name = veil.querySelector('#vo-name').value.trim();
-            const err = veil.querySelector('#vo-err');
-            if (about.length < 10) { err.textContent = 'Add a sentence or two about what you do.'; err.classList.remove('hidden'); return; }
-            const btn = veil.querySelector('#vo-save'); btn.disabled = true; btn.textContent = 'Saving…';
-            try {
-              const data = { businessDescription: about };
-              if (name) data.company = name;
-              await fs.updateDoc(fs.doc(db, 'users', user.uid), data);
-              close();
-            } catch (e) { btn.disabled = false; btn.textContent = 'Save'; err.textContent = 'Could not save: ' + e.message; err.classList.remove('hidden'); }
-          });
+          if (skipped || String(data.businessDescription || '').trim()) return done();
+          open();
         }, () => done());
       });
     } catch (e) { done(); }
@@ -8632,6 +8751,9 @@ _DP_GCAL_JS = """
               '<button data-v="week" class="vg-v relative px-4 py-1.5 rounded-full text-[13.5px] font-semibold">Week</button>' +
               '<button data-v="list" class="vg-v relative px-4 py-1.5 rounded-full text-[13.5px] font-semibold">Upcoming</button>' +
             '</div>' +
+            '<button id="vg-ai" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 text-[13.5px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>AI Organize</button>' +
+            '<button id="vg-sel" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 text-[13.5px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors">' +
+              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/></svg><span id="vg-sel-t">Select</span></button>' +
             '<button id="vg-new" class="btn-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[13.5px] font-semibold">' +
               '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New</button>' +
           '</div>' +
@@ -8698,7 +8820,12 @@ _DP_GCAL_JS = """
       document.body.appendChild(veil);
       const form = $('vg-form');
 
-      let weekStart = startOfWeek(new Date()), view = 'week', appts = [], hours = null, slot = 30;
+      let weekStart = startOfWeek(new Date()), view = 'week', appts = [], hours = null, slot = 30, plan = 'none';
+      let selectMode = false; const sel = new Set();          // VG_SELECT
+      const CHK = (on, dark) => '<span class="absolute top-1 right-1 w-[18px] h-[18px] rounded-full flex items-center justify-center" style="' +
+        (on ? 'background:' + (dark ? '#fff' : '#111') + ';color:' + (dark ? '#111' : '#fff')
+            : 'border:2px solid ' + (dark ? 'rgba(255,255,255,.75)' : '#9ca3af') + ';background:transparent') + ';transition:all .15s ease">' +
+        (on ? '<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : '') + '</span>';
       let uid = null, fs = null, db = null, editing = null;
 
       // jump to a week from History ("Open in Calendar")
@@ -8767,8 +8894,9 @@ _DP_GCAL_JS = """
             const ai = a.source === 'ai';
             g += '<div class="vg-ev absolute rounded-lg px-2 py-1 overflow-hidden cursor-pointer ' +
                 (ai ? 'bg-black text-white' : 'bg-white text-gray-900 border border-gray-900') + '" data-id="' + a.id + '" ' +
-                'style="top:' + (top + 1) + 'px;height:' + ht + 'px;left:calc(' + (a._lane * w) + '% + 2px);width:calc(' + w + '% - 4px)">' +
-              '<div class="text-[12px] font-semibold leading-tight truncate">' + esc(a.title || 'Appointment') + '</div>' +
+                'style="' + (sel.has(a.id) ? 'box-shadow:0 0 0 2px #fff,0 0 0 4px #111;z-index:5;' : '') + 'top:' + (top + 1) + 'px;height:' + ht + 'px;left:calc(' + (a._lane * w) + '% + 2px);width:calc(' + w + '% - 4px)">' +
+              (selectMode ? CHK(sel.has(a.id), ai) : '') +
+              '<div class="text-[12px] font-semibold leading-tight truncate' + (selectMode ? ' pr-5' : '') + '">' + esc(a.title || 'Appointment') + '</div>' +
               (ht > 30 ? '<div class="text-[11px] leading-tight truncate ' + (ai ? 'text-white/70' : 'text-gray-500') + '">' + t12(a._s) + ' – ' + t12(a._e) + '</div>' : '') +
               (ht > 46 && a.customerName ? '<div class="text-[11px] leading-tight truncate ' + (ai ? 'text-white/70' : 'text-gray-500') + '">' + esc(a.customerName) + '</div>' : '') +
             '</div>';
@@ -8804,7 +8932,8 @@ _DP_GCAL_JS = """
             html += '<div class="px-5 pt-4 pb-2 text-[12px] font-semibold uppercase tracking-[.08em] text-gray-500 bg-[#fafafa]">' +
               a._s.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + '</div>';
           }
-          html += '<div class="vg-row flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors" data-id="' + a.id + '">' +
+          html += '<div class="vg-row flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors' + (sel.has(a.id) ? ' bg-gray-50' : '') + '" data-id="' + a.id + '">' +
+            (selectMode ? '<span class="relative w-[18px] h-[18px] flex-shrink-0">' + CHK(sel.has(a.id), false).replace('absolute top-1 right-1', 'absolute inset-0') + '</span>' : '') +
             '<div class="w-[110px] flex-shrink-0 text-[13.5px] font-semibold text-gray-900">' + t12(a._s) + '<div class="text-[12px] font-normal text-gray-400">' + t12(a._e) + '</div></div>' +
             '<div class="w-1 self-stretch rounded-full ' + (a.source === 'ai' ? 'bg-black' : 'bg-gray-300') + '"></div>' +
             '<div class="flex-1 min-w-0"><div class="text-[14.5px] font-semibold text-gray-900 truncate">' + esc(a.title || 'Appointment') + '</div>' +
@@ -8880,6 +9009,7 @@ _DP_GCAL_JS = """
       });
       $('vg-grid').addEventListener('click', (e) => {
         const ev = e.target.closest('.vg-ev');
+        if (selectMode) { if (ev) toggleSel(ev.dataset.id); return; }
         if (ev) { const a = appts.find(x => x.id === ev.dataset.id); if (a) openModal(a); return; }
         const col = e.target.closest('.vg-col');
         if (!col) return;
@@ -8891,6 +9021,7 @@ _DP_GCAL_JS = """
       });
       $('vg-list').addEventListener('click', (e) => {
         const row = e.target.closest('.vg-row'); if (!row) return;
+        if (selectMode) return toggleSel(row.dataset.id);
         const a = appts.find(x => x.id === row.dataset.id); if (a) openModal(a);
       });
 
@@ -9035,6 +9166,129 @@ _DP_GCAL_JS = """
       function hideToast() { toast.style.opacity = '0'; toast.style.transform = 'translateY(12px)'; toast.style.pointerEvents = 'none'; }
       document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
 
+      // ---------- Select many: bar + bulk delete / edit ----------
+      const bar = document.createElement('div');
+      bar.className = 'fixed left-1/2 bottom-6 z-[85] flex items-center gap-1 rounded-2xl bg-black text-white pl-5 pr-2 py-2';
+      bar.style.cssText += ';transform:translate(-50%,24px);opacity:0;pointer-events:none;transition:transform .28s cubic-bezier(.16,1,.3,1), opacity .2s ease;box-shadow:0 18px 50px rgba(0,0,0,.3)';
+      const BB = 'px-3.5 py-2 rounded-xl text-[13.5px] font-semibold transition-colors';
+      bar.innerHTML =
+        '<span id="vg-scount" class="text-[13.5px] font-semibold mr-3 whitespace-nowrap">0 selected</span>' +
+        '<button id="vg-sall" class="' + BB + ' text-white/80 hover:text-white hover:bg-white/10">Select all</button>' +
+        '<button id="vg-sedit" class="' + BB + ' text-white/80 hover:text-white hover:bg-white/10">Edit</button>' +
+        '<button id="vg-sdel" class="' + BB + ' text-red-300 hover:text-white hover:bg-red-600">Delete</button>' +
+        '<button id="vg-sdone" aria-label="Done" class="ml-1 w-9 h-9 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors">' +
+          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+      document.body.appendChild(bar);
+      function syncBar() {
+        $('vg-scount').textContent = sel.size + ' selected';
+        ['vg-sedit', 'vg-sdel'].forEach(id => { $(id).disabled = !sel.size; $(id).style.opacity = sel.size ? '1' : '.4'; });
+        bar.style.transform = selectMode ? 'translate(-50%,0)' : 'translate(-50%,24px)';
+        bar.style.opacity = selectMode ? '1' : '0'; bar.style.pointerEvents = selectMode ? 'auto' : 'none';
+        $('vg-sel-t').textContent = selectMode ? 'Done' : 'Select';
+        $('vg-sel').style.background = selectMode ? '#111' : ''; $('vg-sel').style.color = selectMode ? '#fff' : '';
+      }
+      function setSelect(on) { selectMode = on; if (!on) sel.clear(); syncBar(); render(); }
+      function toggleSel(id) { sel.has(id) ? sel.delete(id) : sel.add(id); syncBar(); render(); }
+      const inView = () => {
+        if (view === 'list') { const now = new Date(); return appts.filter(a => a._e >= now); }
+        const end = new Date(weekStart.getTime() + 7 * 864e5);
+        return appts.filter(a => a._s >= weekStart && a._s < end);
+      };
+      $('vg-sel').addEventListener('click', () => setSelect(!selectMode));
+      $('vg-sdone').addEventListener('click', () => setSelect(false));
+      $('vg-sall').addEventListener('click', () => {
+        const ids = inView().map(a => a.id), all = ids.length && ids.every(id => sel.has(id));
+        ids.forEach(id => all ? sel.delete(id) : sel.add(id)); syncBar(); render();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (!selectMode || veil.style.pointerEvents === 'auto' || bv.style.pointerEvents === 'auto') return;
+        if (/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) return;
+        if (e.key === 'Escape') setSelect(false);
+        if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) { e.preventDefault(); openBulk('delete'); }
+      });
+
+      // bulk popup (delete confirm / edit / AI organize)
+      const bv = document.createElement('div');
+      bv.className = 'fixed inset-0 z-[92] bg-black/40 flex items-center justify-center p-4';
+      bv.style.cssText += ';opacity:0;pointer-events:none;transition:opacity .2s ease';
+      bv.innerHTML = '<div id="vg-bc" class="bg-white rounded-3xl w-full max-w-[460px] p-7" style="transform:translateY(10px) scale(.98);transition:transform .26s cubic-bezier(.16,1,.3,1);box-shadow:0 24px 60px rgba(0,0,0,.22)"></div>';
+      document.body.appendChild(bv);
+      const bc = $('vg-bc');
+      let bBusy = false;
+      function showBulk() { bv.style.opacity = '1'; bv.style.pointerEvents = 'auto'; requestAnimationFrame(() => { bc.style.transform = 'none'; }); }
+      function closeBulk() { if (bBusy) return; try { document.activeElement && document.activeElement.blur(); } catch (e) {} bv.style.opacity = '0'; bv.style.pointerEvents = 'none'; bc.style.transform = 'translateY(10px) scale(.98)'; }
+      bv.addEventListener('mousedown', (e) => { if (e.target === bv) closeBulk(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && bv.style.pointerEvents === 'auto') { e.stopPropagation(); closeBulk(); } }, true);
+      const SPIN2 = '<svg class="w-4 h-4" style="animation:vgSpin .8s linear infinite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 1 1-9-9" stroke-linecap="round"/></svg>';
+      if (!document.getElementById('vg-spin-css')) { const st = document.createElement('style'); st.id = 'vg-spin-css'; st.textContent = '@keyframes vgSpin{to{transform:rotate(360deg)}}'; document.head.appendChild(st); }
+      const fld2 = 'w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] text-gray-900 focus:outline-none focus:border-gray-900 bg-white';
+      const lab2 = 'block text-[12.5px] font-semibold text-gray-600 mb-1.5';
+      const BTN_ROW = (goLabel, red) =>
+        '<div id="vg-berr" class="hidden mt-3 text-[13px] text-red-600"></div>' +
+        '<div class="flex items-center justify-end gap-2 mt-6">' +
+          '<button id="vg-bno" class="px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-800 hover:bg-gray-50 transition-colors">Cancel</button>' +
+          '<button id="vg-bgo" class="min-w-[130px] px-5 py-2.5 rounded-xl text-[14px] font-semibold text-white transition-colors" style="background:' + (red ? '#dc2626' : '#111') + '">' + goLabel + '</button></div>';
+      async function runBulk(label, work) {
+        const go = $('vg-bgo'), err = $('vg-berr');
+        if (bBusy) return;
+        bBusy = true; go.disabled = true; err.classList.add('hidden');
+        go.innerHTML = '<span class="inline-flex items-center gap-2">' + SPIN2 + label + '</span>';
+        try { await work(); bBusy = false; closeBulk(); setSelect(false); }
+        catch (ex) { bBusy = false; go.disabled = false; go.textContent = 'Try again'; err.textContent = 'Could not save: ' + ex.message; err.classList.remove('hidden'); }
+      }
+      function openBulk(kind) {
+        const ids = [...sel].filter(id => appts.some(a => a.id === id));
+        if (!ids.length) return;
+        const n = ids.length, word = n + ' appointment' + (n === 1 ? '' : 's');
+        if (kind === 'delete') {
+          bc.innerHTML = '<h3 class="text-[20px] font-semibold text-gray-900">Delete ' + word + '?</h3>' +
+            '<p class="text-[14px] text-gray-500 mt-2 leading-[1.6]">They are removed from your calendar and Solana can book those times again. This can’t be undone.</p>' + BTN_ROW('Delete', true);
+          $('vg-bgo').onclick = () => runBulk('Deleting…', () => Promise.all(ids.map(id => fs.deleteDoc(fs.doc(db, 'users', uid, 'appointments', id)))));
+        } else {
+          bc.innerHTML = '<h3 class="text-[20px] font-semibold text-gray-900">Edit ' + word + '</h3>' +
+            '<p class="text-[13.5px] text-gray-500 mt-1 mb-5">Only the fields you change are updated.</p>' +
+            '<label class="' + lab2 + '">Title</label><input id="vg-btitle" placeholder="Keep current titles" class="' + fld2 + ' mb-3">' +
+            '<div class="grid grid-cols-2 gap-2.5">' +
+              '<div><label class="' + lab2 + '">Length</label><select id="vg-blen" class="' + fld2 + '"><option value="">Keep</option>' +
+                [15, 30, 45, 60, 90, 120].map(m => '<option value="' + m + '">' + (m < 60 ? m + ' min' : (m / 60) + ' hr' + (m > 60 ? 's' : '')) + '</option>').join('') + '</select></div>' +
+              '<div><label class="' + lab2 + '">Move</label><select id="vg-bmove" class="' + fld2 + '"><option value="0">Keep</option>' +
+                '<option value="-10080">1 week earlier</option><option value="-1440">1 day earlier</option><option value="-60">1 hour earlier</option>' +
+                '<option value="60">1 hour later</option><option value="1440">1 day later</option><option value="10080">1 week later</option></select></div>' +
+            '</div>' + BTN_ROW('Save changes', false);
+          $('vg-bgo').onclick = () => runBulk('Saving…', () => Promise.all(ids.map(id => {
+            const a = appts.find(x => x.id === id);
+            const mv = (+$('vg-bmove').value || 0) * 60000, len = +$('vg-blen').value, title = $('vg-btitle').value.trim();
+            const s0 = new Date(a._s.getTime() + mv), e0 = len ? new Date(s0.getTime() + len * 60000) : new Date(a._e.getTime() + mv);
+            const upd = {};
+            if (title) upd.title = title;
+            if (mv || len) { upd.start = fs.Timestamp.fromDate(s0); upd.end = fs.Timestamp.fromDate(e0); }
+            return Object.keys(upd).length ? fs.updateDoc(fs.doc(db, 'users', uid, 'appointments', id), upd) : null;
+          })));
+        }
+        $('vg-bno').onclick = closeBulk;
+        showBulk();
+      }
+      $('vg-sdel').addEventListener('click', () => openBulk('delete'));
+      $('vg-sedit').addEventListener('click', () => openBulk('edit'));
+
+      // ---------- AI Organize (Max only for now) ----------
+      $('vg-ai').addEventListener('click', () => {
+        const isMax = plan === 'max';
+        bc.innerHTML =
+          '<div class="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center mb-4"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg></div>' +
+          '<div class="inline-flex items-center rounded-full bg-black text-white px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wider mb-2">Max</div>' +
+          '<h3 class="text-[20px] font-semibold text-gray-900">' + (isMax ? 'AI Organize is coming soon' : 'AI Organize is a Max feature') + '</h3>' +
+          '<p class="text-[14px] text-gray-500 mt-2 leading-[1.6]">' + (isMax
+            ? 'Solana will tidy your week for you: spot double bookings, fill gaps and suggest better times. It’s on its way to your Max plan.'
+            : 'Let Solana tidy your week for you: spot double bookings, fill gaps and suggest better times. Upgrade to Max to use it.') + '</p>' +
+          '<div class="flex items-center justify-end gap-2 mt-6">' +
+            '<button id="vg-bno" class="px-4 py-2.5 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-800 hover:bg-gray-50 transition-colors">' + (isMax ? 'Got it' : 'Not now') + '</button>' +
+            (isMax ? '' : '<a href="pricing.html?back=calendar" class="btn-primary px-5 py-2.5 rounded-xl text-[14px] font-semibold">Upgrade to Max</a>') +
+          '</div>';
+        $('vg-bno').onclick = closeBulk;
+        showBulk();
+      });
+
       $('vg-del').addEventListener('click', async () => {
         if (!editing || !confirm('Delete this appointment?')) return;
         try { await fs.deleteDoc(fs.doc(db, 'users', uid, 'appointments', editing.id)); closeModal(); }
@@ -9052,7 +9306,7 @@ _DP_GCAL_JS = """
           uid = user.uid;
           fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
             const d = s.exists() ? s.data() : {};
-            hours = d.hours || null; slot = Number(d.appointmentLength) || 30; render();
+            hours = d.hours || null; slot = Number(d.appointmentLength) || 30; plan = d.plan || 'none'; render();
           }, () => {});
           let scrolled = false, firstLoad = true, unsub = null;
           const subscribe = () => {
@@ -9562,6 +9816,7 @@ def render_page(path, builder):
             html = _dp_add(html, "VV_VOICE_MARKER", "</body>", _DP_VOICE_JS)
             html = _dp_add(html, "VZ_ABOUT_MARKER", "</body>", _DP_ABOUT_JS)
             html = _dp_add(html, "VQ_AUTOSAVE_MARKER", "</body>", _DP_AUTOSAVE_JS)
+            html = _dp_add(html, "VO_ONBOARD_MARKER", "</body>", _DP_ONBOARD_JS)
             # "AGENT NAME" / "SYSTEM PROMPT" -> "Agent name" / "System prompt"
             html = html.replace('block text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-2',
                                 'block text-[13px] font-semibold text-gray-700 mb-1.5')
