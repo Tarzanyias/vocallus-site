@@ -1317,7 +1317,7 @@
             try {
               const j = await api('/api/numbers/search?areaCode=' + ac);
               const list = j.numbers || [];
-              if (!list.length) { status.textContent = 'No numbers in that area code, try another.'; return; }
+              if (!list.length) { status.textContent = 'Twilio has no numbers left in ' + ac + ' right now. Try a nearby area code' + (['832', '281', '346', '713'].includes(ac) ? ' (Houston: 281, 346, 713 or 832).' : '.'); return; }
               status.textContent = list.length + ' number' + (list.length === 1 ? '' : 's') + ' available';
               list.forEach((n) => {
                 const row = document.createElement('div');

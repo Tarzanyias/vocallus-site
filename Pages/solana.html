@@ -1453,10 +1453,46 @@
           '</div>' +
         '</div>' +
         '<p class="text-[12px] text-gray-500 mt-2">More voices coming soon.</p>' +
-        '<p id="vv-note" class="text-[12px] text-gray-400 mt-1">Press play to hear a voice.</p>';
+        '<p id="vv-note" class="text-[12px] text-gray-400 mt-1">Press play to hear a voice.</p>' +
+        '<div id="vv-live" class="hidden mt-3 rounded-xl border px-3 py-2.5 text-[12.5px] leading-[1.45]"></div>';
       saveBtn.parentNode.insertBefore(wrap, saveBtn);
 
-      let voice = 'default', plan = 'none', uid = null, fs = null, db = null, audio = null, playing = null;
+      let voice = 'default', plan = 'none', uid = null, fs = null, db = null, audio = null, playing = null, authUser = null;
+      const BRIDGE = "https://vocallus-bridge-production.up.railway.app";
+      const fmtNum = (n) => { let d = String(n || '').replace(/[^0-9]/g, ''); if (d.length === 11 && d[0] === '1') d = d.slice(1);
+        return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : n; };
+      // What the server will really use on calls (number, AI, voice) + any problem.
+      let statusTimer = null;
+      function refreshStatus(delay) {
+        clearTimeout(statusTimer);
+        statusTimer = setTimeout(async () => {
+          const box = $('vv-live');
+          if (!authUser) return;
+          try {
+            const tok = await authUser.getIdToken();
+            const r = await fetch(BRIDGE + '/api/agent/status', { headers: { 'Authorization': 'Bearer ' + tok } });
+            if (!r.ok) throw new Error('status ' + r.status);
+            const st = await r.json();
+            const v = V.find(x => x.id === st.voice) || V[0];
+            const lines = [];
+            let bad = false;
+            if (st.phoneNumber) lines.push('Calls to <b>' + fmtNum(st.phoneNumber) + '</b> use the <b>' + v.label + '</b> voice.');
+            else lines.push('No phone number on this account yet, so you can only test here.');
+            if (!st.aiReady) { bad = true; lines.push('Add an API key in the AI provider card so calls can be answered.'); }
+            if (st.savedVoice !== st.voice) lines.push('Your plan uses the default voice.');
+            const P = {
+              'eleven-missing': "Max voices aren't switched on yet: the server needs ELEVENLABS_API_KEY in Railway. Calls use the default voice until then.",
+              'eleven-key': 'ElevenLabs rejected the server key (ELEVENLABS_API_KEY). Calls fall back to the default voice.',
+              'eleven-voice': "ElevenLabs can't find this voice in your account. Add it to My Voices in ElevenLabs or fix the voice ID in Railway.",
+              'eleven-unreachable': "Couldn't reach ElevenLabs right now."
+            };
+            if (st.problem && P[st.problem]) { bad = true; lines.push(P[st.problem]); }
+            box.innerHTML = lines.join('<br>');
+            box.className = 'mt-3 rounded-xl border px-3 py-2.5 text-[12.5px] leading-[1.45] ' +
+              (bad ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-white text-gray-600');
+          } catch (e) { box.classList.add('hidden'); }
+        }, delay || 0);
+      }
       const allowed = (v) => planRank(plan) >= RANK[v.tier];
 
       function render() {
@@ -1527,7 +1563,7 @@
         if (id === voice) return;
         voice = id; render();
         if (uid && fs) {
-          try { await fs.updateDoc(fs.doc(db, 'users', uid), { voice: id }); $('vv-note').textContent = 'Saved. Used on your next call.'; }
+          try { await fs.updateDoc(fs.doc(db, 'users', uid), { voice: id }); $('vv-note').textContent = 'Saved. Used on your next call.'; refreshStatus(300); }
           catch (err) { $('vv-note').textContent = 'Could not save: ' + err.message; }
         }
       }
@@ -1559,9 +1595,11 @@
         db = fs.getFirestore(app);
         onAuthStateChanged(getAuth(app), (user) => {
           if (!user) return;
-          uid = user.uid;
+          uid = user.uid; authUser = user;
+          refreshStatus(0);
           fs.onSnapshot(fs.doc(db, 'users', uid), (s) => {
             const d = s.exists() ? s.data() : {};
+            if (!s.metadata.fromCache) refreshStatus(400);
             plan = d.plan || 'none';
             const want = V.find(x => x.id === d.voice) || V[0];
             voice = allowed(want) ? want.id : 'default';
