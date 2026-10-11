@@ -633,7 +633,7 @@
       var uid = null, user = null, plan = 'none';
       var calls = [];
       var appts = [];
-      var PLAN_LIMITS = { none: 0, pro: 3000, max: 10000 };
+      var PLAN_LIMITS = { none: 0, pro: 1000, max: 1500 };
       var bridgeBase = "https://vocallus-bridge-production.up.railway.app";
 
       /* ---------- helpers ---------- */
@@ -741,7 +741,7 @@
         var monthCalls = calls.filter(function (c) {
           var t = asDate(c.startedAt); return t && t.getTime() >= monthStart;
         });
-        var monthSec = monthCalls.reduce(function (s, c) { return s + (c.durationSec || 0); }, 0);
+        var monthSec = monthCalls.reduce(function (s, c) { return s + Math.ceil((c.durationSec || 0) / 60) * 60; }, 0);
         var minutes = Math.round(monthSec / 60);
         $('stat-minutes').textContent = minutes;
         $('stat-limit').textContent = PLAN_LIMITS[plan] || 0;
@@ -1597,8 +1597,8 @@
     const panel = document.getElementById('panel-finances');
     const PLANS = {
       none: { name: 'Demo', price: 'Free', limit: 0 },
-      pro:  { name: 'Pro',  price: '$14.99 / month', limit: 3000 },
-      max:  { name: 'Max',  price: '$99.99 / month', limit: 10000 }
+      pro:  { name: 'Pro',  price: '$14.99 / month', limit: 1000 },
+      max:  { name: 'Max',  price: '$99.99 / month', limit: 1500 }
     };
     if (panel) {
       const legacy = ['fin-plan', 'fin-minutes', 'fin-limit'].map(id => '<span id="' + id + '"></span>').join('');
@@ -1701,7 +1701,7 @@
             s.forEach(d => {
               const c = d.data();
               const t = (c.startedAt && c.startedAt.toMillis) ? c.startedAt.toMillis() : 0;
-              if (t >= start.getTime()) sec += c.durationSec || 0;
+              if (t >= start.getTime()) sec += Math.ceil((c.durationSec || 0) / 60) * 60;
             });
             minutes = Math.round(sec / 60);
             paint();

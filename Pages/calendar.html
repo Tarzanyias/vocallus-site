@@ -1283,6 +1283,11 @@
             '</div>' +
           '</div>' +
         '</div>' +
+        '<div class="mt-6 pt-5 border-t border-gray-100">' +
+          '<div class="text-[13px] font-semibold text-gray-900">Backup number <span class="text-gray-400 font-normal">(optional)</span></div>' +
+          '<p class="text-[12.5px] text-gray-500 mt-0.5 mb-2">When you have used all your plan minutes for the month, new calls ring this number instead, so you never miss a customer.</p>' +
+          '<input id="vk-bk" type="tel" placeholder="(555) 123-4567" class="w-full sm:w-72 rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400">' +
+        '</div>' +
         '<div class="flex items-center gap-3 mt-5">' +
           '<button id="vk-save" type="button" class="btn-primary min-w-[124px] inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>' +
           '<span id="vk-status" class="text-[13px]"></span>' +
@@ -1424,6 +1429,7 @@
           if (![...$('vk-len').options].some(o => o.selected)) $('vk-len').value = '30';
           $('vk-fwd').value = d.afterHoursForward ? fmtPhone(d.afterHoursForward) : '';
           $('vk-msg').value = d.afterHoursMessage || '';
+          $('vk-bk').value = d.backupNumber ? fmtPhone(d.backupNumber) : '';
           renderTz(); renderDays(); renderModes(); renderNow();
           requestAnimationFrame(() => { card.style.opacity = '1'; });
         });
@@ -1438,6 +1444,12 @@
             if (!fwd) { status.className = 'text-[13px] text-red-600'; status.textContent = 'Enter a 10-digit US phone number to forward to.'; return; }
             if (fwd === myNumber) { status.className = 'text-[13px] text-red-600'; status.textContent = "That's your Solana number. Use your own cell or office number."; return; }
           }
+          let bk = '';
+          if ($('vk-bk').value.trim()) {
+            bk = e164($('vk-bk').value);
+            if (!bk) { status.className = 'text-[13px] text-red-600'; status.textContent = 'Backup number: enter a 10-digit US phone number.'; return; }
+            if (bk === myNumber) { status.className = 'text-[13px] text-red-600'; status.textContent = "Backup number can't be your Solana number. Use your own cell or office number."; return; }
+          }
           const btn = $('vk-save');
           status.textContent = '';
           btn.disabled = true;
@@ -1450,6 +1462,7 @@
               appointmentLength: Number($('vk-len').value) || 30,
               afterHours: mode,
               afterHoursForward: fwd,
+              backupNumber: bk,
               afterHoursMessage: $('vk-msg').value.trim().slice(0, 400)
             };
             try {

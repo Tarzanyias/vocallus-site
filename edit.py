@@ -906,8 +906,8 @@ _DP_BILLING_JS = """
     const panel = document.getElementById('panel-finances');
     const PLANS = {
       none: { name: 'Demo', price: 'Free', limit: 0 },
-      pro:  { name: 'Pro',  price: '$14.99 / month', limit: 3000 },
-      max:  { name: 'Max',  price: '$99.99 / month', limit: 10000 }
+      pro:  { name: 'Pro',  price: '$14.99 / month', limit: 1000 },
+      max:  { name: 'Max',  price: '$99.99 / month', limit: 1500 }
     };
     if (panel) {
       const legacy = ['fin-plan', 'fin-minutes', 'fin-limit'].map(id => '<span id="' + id + '"></span>').join('');
@@ -1000,7 +1000,7 @@ _DP_BILLING_JS = """
             s.forEach(d => {
               const c = d.data();
               const t = (c.startedAt && c.startedAt.toMillis) ? c.startedAt.toMillis() : 0;
-              if (t >= start.getTime()) sec += c.durationSec || 0;
+              if (t >= start.getTime()) sec += Math.ceil((c.durationSec || 0) / 60) * 60;
             });
             minutes = Math.round(sec / 60);
             paint();
@@ -1222,6 +1222,11 @@ _DP_HOURS_JS = """
             '</div>' +
           '</div>' +
         '</div>' +
+        '<div class="mt-6 pt-5 border-t border-gray-100">' +
+          '<div class="text-[13px] font-semibold text-gray-900">Backup number <span class="text-gray-400 font-normal">(optional)</span></div>' +
+          '<p class="text-[12.5px] text-gray-500 mt-0.5 mb-2">When you have used all your plan minutes for the month, new calls ring this number instead, so you never miss a customer.</p>' +
+          '<input id="vk-bk" type="tel" placeholder="(555) 123-4567" class="w-full sm:w-72 rounded-xl border border-gray-200 px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-gray-400">' +
+        '</div>' +
         '<div class="flex items-center gap-3 mt-5">' +
           '<button id="vk-save" type="button" class="btn-primary min-w-[124px] inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-[13.5px]">Save hours</button>' +
           '<span id="vk-status" class="text-[13px]"></span>' +
@@ -1353,6 +1358,7 @@ _DP_HOURS_JS = """
           if (![...$('vk-len').options].some(o => o.selected)) $('vk-len').value = '30';
           $('vk-fwd').value = d.afterHoursForward ? fmtPhone(d.afterHoursForward) : '';
           $('vk-msg').value = d.afterHoursMessage || '';
+          $('vk-bk').value = d.backupNumber ? fmtPhone(d.backupNumber) : '';
           renderTz(); renderDays(); renderModes(); renderNow();
           requestAnimationFrame(() => { card.style.opacity = '1'; });
         });
@@ -1367,6 +1373,12 @@ _DP_HOURS_JS = """
             if (!fwd) { status.className = 'text-[13px] text-red-600'; status.textContent = 'Enter a 10-digit US phone number to forward to.'; return; }
             if (fwd === myNumber) { status.className = 'text-[13px] text-red-600'; status.textContent = "That's your Solana number. Use your own cell or office number."; return; }
           }
+          let bk = '';
+          if ($('vk-bk').value.trim()) {
+            bk = e164($('vk-bk').value);
+            if (!bk) { status.className = 'text-[13px] text-red-600'; status.textContent = 'Backup number: enter a 10-digit US phone number.'; return; }
+            if (bk === myNumber) { status.className = 'text-[13px] text-red-600'; status.textContent = "Backup number can't be your Solana number. Use your own cell or office number."; return; }
+          }
           const btn = $('vk-save');
           status.textContent = '';
           btn.disabled = true;
@@ -1379,6 +1391,7 @@ _DP_HOURS_JS = """
               appointmentLength: Number($('vk-len').value) || 30,
               afterHours: mode,
               afterHoursForward: fwd,
+              backupNumber: bk,
               afterHoursMessage: $('vk-msg').value.trim().slice(0, 400)
             };
             try {
@@ -3887,10 +3900,14 @@ def render_page(path, builder):
     html = html.replace('Payments secured by Stripe', 'Secure payment')
     # Google sign-in popup says "continue to vocallus.com" (Netlify proxies /__/auth to Firebase)
     html = html.replace('"vocallus-aa81e.firebaseapp.com"', '"vocallus.com"').replace("'vocallus-aa81e.firebaseapp.com'", "'vocallus.com'")
-    # Plan minutes: Pro 3,000 / Max 10,000
-    html = html.replace('Up to 300 minutes / month', 'Up to 3,000 minutes / month')
-    html = html.replace('Up to 1,500 minutes / month', 'Up to 10,000 minutes / month')
-    html = html.replace('{ none: 0, pro: 300, max: 1500 }', '{ none: 0, pro: 3000, max: 10000 }')
+    # Plan minutes: Pro 1,000 / Max 1,500 (each call counts in whole minutes, like the phone bill)
+    html = html.replace('Up to 300 minutes / month', 'Up to 1,000 minutes / month')
+    html = html.replace('Up to 3,000 minutes / month', 'Up to 1,000 minutes / month')
+    html = html.replace('Up to 10,000 minutes / month', 'Up to 1,500 minutes / month')
+    html = html.replace('{ none: 0, pro: 300, max: 1500 }', '{ none: 0, pro: 1000, max: 1500 }')
+    html = html.replace('{ none: 0, pro: 3000, max: 10000 }', '{ none: 0, pro: 1000, max: 1500 }')
+    html = html.replace('var monthSec = monthCalls.reduce(function (s, c) { return s + (c.durationSec || 0); }, 0);',
+                        'var monthSec = monthCalls.reduce(function (s, c) { return s + Math.ceil((c.durationSec || 0) / 60) * 60; }, 0);')
     html = html.replace('Bring your own Gemini API key', _GOOGLE_KEY_LINK)
 
     # ---------- app pages ----------
