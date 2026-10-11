@@ -6137,6 +6137,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -6379,7 +6382,7 @@ _DP_NUMBER_JS = """
             });
           } catch (e) { throw new Error("Couldn't reach the server. Try again in a moment."); }
           const j = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(j.error || ('Request failed (' + res.status + ')'));
+          if (!res.ok) { const er = new Error(j.error || ('Request failed (' + res.status + ')')); er.data = j; er.status = res.status; throw er; }
           return j;
         }
 
@@ -6412,7 +6415,7 @@ _DP_NUMBER_JS = """
         function askDelete(d) {
           const n = '<b class="text-gray-900">' + fmt(d.phoneNumber) + '</b>';
           document.getElementById('vn-dtext').innerHTML = d.numberSource === 'purchased'
-            ? 'Solana stops answering ' + n + ' right away and the number is released. You can’t get the same number back. Your calls and calendar stay.'
+            ? 'Solana stops answering ' + n + ' right away and the number is released. You can’t get the same number back, and a new number is a one-time $5. Your calls and calendar stay.'
             : n + ' will be disconnected from your account and Solana stops answering it. Your calls and calendar stay.';
           document.getElementById('vn-derr').classList.add('hidden');
           const go = document.getElementById('vn-dgo');
@@ -6549,8 +6552,23 @@ _DP_NUMBER_JS = """
                   btn.disabled = true;
                   status.textContent = 'Setting up your number…';
                   try {
-                    await api('/api/numbers/buy', { method: 'POST', body: JSON.stringify({ phoneNumber: n.phoneNumber }) });
-                    status.textContent = 'Done! Your number is ready.';
+                    /* VN_NUMBER_FEE */
+                    let r, fee = '';
+                    try {
+                      r = await api('/api/numbers/buy', { method: 'POST', body: JSON.stringify({ phoneNumber: n.phoneNumber }) });
+                    } catch (e1) {
+                      if (!(e1.data && e1.data.needsFee)) throw e1;
+                      fee = '$' + (e1.data.fee / 100).toFixed(2);
+                      if (!confirm(e1.data.error + '\\n\\nCharge ' + fee + ' to your card on file and get ' + fmt(n.phoneNumber) + '?')) {
+                        status.textContent = '';
+                        document.querySelectorAll('.vn-choose').forEach(b => { b.disabled = false; b.style.opacity = ''; });
+                        btn.disabled = false;
+                        return;
+                      }
+                      status.textContent = 'Charging ' + fee + ' and setting up your number…';
+                      r = await api('/api/numbers/buy', { method: 'POST', body: JSON.stringify({ phoneNumber: n.phoneNumber, confirmFee: true }) });
+                    }
+                    status.textContent = (r && r.charged) ? 'Done! Your number is ready. ' + fee + ' was charged to your card.' : 'Done! Your number is ready.';
                   } catch (err) {
                     status.className = 'text-[13px] text-red-600 min-h-[20px]';
                     status.textContent = err.message;
