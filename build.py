@@ -6134,6 +6134,9 @@ PAGES = [
 
 
 
+
+
+
 # --- deepseek_python.py: header/hero auth buttons ---
 import re as _re_auth
 
@@ -10064,6 +10067,41 @@ INDUSTRIES = [
       ("Caller", "Thursday at 1."), ("Booked", "Thu 1:00 PM \u00b7 Consultation")],
      "Sounds warm and professional on every call",
      "Yes. You write what Solana should say about your treatments, and she politely turns down anything unrelated."),
+    ("chiropractors", "Chiropractors", "chiropractic offices", ["Adjustments", "New-patient exams", "Massage", "Follow-ups"],
+     [("Caller", "My back is killing me. Anything today?"), ("Solana", "Today at 4:15 is open. Want it?"),
+      ("Caller", "Yes, please."), ("Booked", "Today 4:15 PM \u00b7 Adjustment")],
+     "Books new and returning patients into the right visit length",
+     "Yes. Solana asks if they are a new or returning patient, books the right kind of visit, and takes their name and number."),
+    ("law-firms", "Law Firms", "law firms", ["Consultations", "Case reviews", "Call-backs", "Document drop-offs"],
+     [("Caller", "I was in a car accident and need to talk to a lawyer."), ("Solana", "I'm sorry to hear that. I can book a consultation Tuesday at 10:00."),
+      ("Caller", "That works."), ("Booked", "Tue 10:00 AM \u00b7 Consultation")],
+     "Takes careful intake notes and never gives legal advice",
+     "Yes. Solana gets the caller's name, number and what the matter is about, then books a consultation or takes a message. She does not give legal advice."),
+    ("auto-repair", "Auto Repair Shops", "auto repair shops", ["Diagnostics", "Oil changes", "Brake jobs", "Tire service"],
+     [("Caller", "My check engine light is on. When can you look at it?"), ("Solana", "We can do a diagnostic tomorrow at 8:30."),
+      ("Caller", "Perfect."), ("Booked", "Tomorrow 8:30 AM \u00b7 Diagnostic")],
+     "Answers while your techs are under a car, so the phone never pulls them off a job",
+     "Yes. Solana books the drop-off time, notes the car and the problem, and sends you a summary."),
+    ("cleaning-services", "Cleaning Services", "cleaning companies", ["Home cleanings", "Deep cleans", "Move-out cleans", "Office cleanings"],
+     [("Caller", "How soon can I get a deep clean?"), ("Solana", "Saturday at 9:00 or Monday at 1:00."),
+      ("Caller", "Saturday, please."), ("Booked", "Sat 9:00 AM \u00b7 Deep clean")],
+     "Gets the address and job details so you can quote fast",
+     "Yes. Solana books the visit, gets the address and what needs cleaning, and you get the details right away."),
+    ("real-estate", "Real Estate Agents", "real estate agents", ["Showings", "Listing appointments", "Buyer consultations", "Home valuations"],
+     [("Caller", "I saw the house on Maple Street. Can I see it this weekend?"), ("Solana", "Saturday at 11:00 or 2:00 is open."),
+      ("Caller", "2:00, please."), ("Booked", "Sat 2:00 PM \u00b7 Showing")],
+     "Catches every lead from sign calls and listings, even while you are at a showing",
+     "Yes. Solana gets the caller's name, number and what they are looking for, and books a showing or a call-back."),
+    ("veterinarians", "Veterinary Clinics", "veterinary clinics", ["Check-ups", "Vaccines", "Sick visits", "Dental cleanings"],
+     [("Caller", "My dog needs his shots. Anything this week?"), ("Solana", "Wednesday at 3:00 is open."),
+      ("Caller", "Great, book it."), ("Booked", "Wed 3:00 PM \u00b7 Vaccines")],
+     "Notes the pet's name and the reason for the visit, and says what you choose about emergencies",
+     "Yes. Solana books the visit, notes the pet's name and what is wrong, and you decide what she tells callers about emergencies."),
+    ("roofers", "Roofing Companies", "roofing companies", ["Inspections", "Estimates", "Repairs", "Storm damage checks"],
+     [("Caller", "A storm took some shingles off. Can someone take a look?"), ("Solana", "I can book an inspection Thursday at 10:00."),
+      ("Caller", "Yes, please."), ("Booked", "Thu 10:00 AM \u00b7 Inspection")],
+     "Picks up every call during storm season, when the phone rings nonstop",
+     "Yes. Solana books the inspection or estimate, gets the address and what happened, and sends you a summary."),
 ]
 
 _SEO = {
@@ -10221,6 +10259,393 @@ def render_page(path, builder):
         prefix = "" if path == "index.html" else "../"
         i = html.rfind("<footer")
         html = html[:i] + _industry_links(prefix) + html[i:]
+    return html
+
+
+
+# ======================= SEO pages: comparisons, guides, FAQ (VS_PAGES_MARKER) =======================
+
+_SEO["Pages/solutions.html"] = (
+    "AI Answering Service for Every Business | Vocallus",
+    "See how dental offices, salons, law firms, contractors, clinics and more use Vocallus to answer every call and book more appointments.")
+
+_ART_DATE = "2026-10-11"
+_PRICE_NOTE = ("Competitor prices are the starting prices listed publicly in October 2026 and can change. "
+               "Check each company's website for current pricing.")
+
+# Each article: path, kind, SEO title, SEO description, H1, lead, blocks, FAQ list
+# Blocks: ("h2", text) ("p", html) ("ul", [html, ...]) ("table", [header...], [[cell...], ...]) ("note", html)
+ARTICLES = [
+    # ---------------------------------------------------------------- comparisons
+    ("Pages/vocallus-vs-smith-ai.html", "compare",
+     "Vocallus vs Smith.ai: AI Receptionist Comparison (2026) | Vocallus",
+     "Comparing Vocallus and Smith.ai for small businesses: pricing, how each is billed, who answers your calls, and which one fits your business.",
+     "Vocallus vs Smith.ai",
+     "Both answer your business calls. Smith.ai offers AI and live human receptionists billed per call. "
+     "Vocallus is an AI receptionist with flat monthly plans from $14.99. Here is how they compare.",
+     [("h2", "The short answer"),
+      ("p", "Choose <strong>Smith.ai</strong> if you want the option of live human receptionists, or you need them to work inside a CRM. "
+            "Choose <strong>Vocallus</strong> if you run an appointment-based small business and want every call answered and booked "
+            "for a flat monthly price."),
+      ("h2", "Side by side"),
+      ("table", ["", "Vocallus", "Smith.ai"],
+       [["Starting price", "$14.99/month (Pro)", "About $95/month (AI receptionist)"],
+        ["How you are billed", "Flat monthly plan with a minute allowance", "Per call, with overage per extra call"],
+        ["Who answers", "Solana, an AI receptionist", "AI, or live human receptionists on their human plans"],
+        ["Human receptionist plans", "No", "Yes, from about $292.50/month for 30 calls"],
+        ["Books appointments", "Yes, into your Vocallus calendar", "Yes"],
+        ["Call summaries and transcripts", "Yes, for every call", "Yes"],
+        ["Try before you pay", "Free test call on the website", "See their website"]]),
+      ("note", _PRICE_NOTE),
+      ("h2", "Pricing: per call vs flat monthly"),
+      ("p", "Smith.ai bills by the call, so your bill grows with every caller, including short ones. "
+            "Vocallus charges one flat monthly price that includes up to 1,000 minutes on Pro and 1,500 on Max. "
+            "Most small businesses use far less than that, so the price stays the same month to month."),
+      ("p", "On Pro ($14.99/month) you connect your own Google AI key, and Google bills you a few cents a minute for the AI. "
+            "On Max ($99.99/month) the AI is included."),
+      ("h2", "Where Smith.ai is stronger"),
+      ("ul", ["Live human receptionists are available if you want a person on every call.",
+              "A long track record and a wide list of integrations with other business software.",
+              "Good fit for firms that need detailed, scripted intake handled by people."]),
+      ("h2", "Where Vocallus is stronger"),
+      ("ul", ["Much lower starting price, with no per-call charges.",
+              "Built for booking: Solana knows your services, how long each takes, and only offers times that fit.",
+              "Your hours, after-hours rules and a backup number are set up in minutes from your dashboard.",
+              "You can hear Solana on a free test call before you pay anything."]),
+      ("h2", "Which should you pick?"),
+      ("p", "If most of your calls are people booking, rescheduling or asking simple questions, Vocallus covers that for a fraction of the cost. "
+            "If you need live people, or complex intake inside your CRM, Smith.ai is worth a look.")],
+     [("Is Vocallus cheaper than Smith.ai?", "For most small businesses, yes. Vocallus starts at $14.99/month with a flat price, while Smith.ai's AI receptionist starts at about $95/month and bills per call."),
+      ("Does Vocallus have human receptionists?", "No. Vocallus is an AI receptionist. If you want live people answering, Smith.ai or Ruby offer that."),
+      ("Can I keep my phone number?", "Yes. Forward your existing number to your Vocallus number, and callers keep dialing the number they know.")]),
+
+    ("Pages/vocallus-vs-ruby.html", "compare",
+     "Vocallus vs Ruby Receptionists: Cost and Features (2026) | Vocallus",
+     "Ruby uses live human receptionists billed by the minute. Vocallus is an AI receptionist from $14.99/month. Compare price, coverage and fit.",
+     "Vocallus vs Ruby",
+     "Ruby is a well-known live receptionist service: real people answer your calls, billed by the receptionist minute. "
+     "Vocallus is an AI receptionist with flat monthly plans. Here is how to choose.",
+     [("h2", "The short answer"),
+      ("p", "Choose <strong>Ruby</strong> if you want a real person on every call and the budget fits. "
+            "Choose <strong>Vocallus</strong> if you want every call answered and booked around the clock for a small, flat monthly price."),
+      ("h2", "Side by side"),
+      ("table", ["", "Vocallus", "Ruby"],
+       [["Starting price", "$14.99/month (Pro)", "About $250/month for 50 receptionist minutes"],
+        ["How you are billed", "Flat monthly plan with a minute allowance", "Per receptionist minute, with overage per extra minute"],
+        ["Who answers", "Solana, an AI receptionist", "Live human receptionists"],
+        ["Minutes included", "Up to 1,000 (Pro) or 1,500 (Max)", "50 to 500, depending on plan"],
+        ["Books appointments", "Yes, into your Vocallus calendar", "Yes"],
+        ["Try before you pay", "Free test call on the website", "See their website"]]),
+      ("note", _PRICE_NOTE),
+      ("h2", "Cost for a typical small business"),
+      ("p", "Say you get 100 calls a month that average 2 minutes. That is about 200 minutes. "
+            "On Ruby that is above the 100-minute plan (about $395/month), so you would need the 200-minute plan at about $720/month. "
+            "On Vocallus it fits inside Pro ($14.99/month, plus a few dollars of Google AI usage) or Max ($99.99/month, AI included)."),
+      ("h2", "Where Ruby is stronger"),
+      ("ul", ["A real person answers, which some callers and industries prefer.",
+              "Humans handle unusual or emotional calls with judgment.",
+              "A long-established, trusted brand."]),
+      ("h2", "Where Vocallus is stronger"),
+      ("ul", ["A fraction of the price, with no per-minute billing.",
+              "Answers every call at the same time, so callers never wait in a queue.",
+              "Books straight into your calendar using your services and how long each one takes.",
+              "Same price whether calls come at 2 PM or 2 AM."]),
+      ("h2", "Which should you pick?"),
+      ("p", "If a human voice is essential to your business, Ruby is a strong choice. If you mostly need calls answered, "
+            "appointments booked and messages taken, Vocallus does that for much less.")],
+     [("Is Vocallus a Ruby alternative?", "Yes, for businesses that want calls answered and booked without paying for live receptionist minutes."),
+      ("Does Ruby use AI?", "Ruby is known for live human receptionists. Check their website for their current services."),
+      ("How do I switch from Ruby to Vocallus?", "Sign up, set your hours and services, then forward your business number to your Vocallus number. You can test Solana with a free test call first.")]),
+
+    ("Pages/vocallus-vs-goodcall.html", "compare",
+     "Vocallus vs Goodcall: AI Receptionist Comparison (2026) | Vocallus",
+     "Goodcall and Vocallus are both AI receptionists. Compare starting price, how each is billed, and which fits a small appointment-based business.",
+     "Vocallus vs Goodcall",
+     "Goodcall and Vocallus are both AI receptionists for small businesses. The biggest differences are price and how you are billed.",
+     [("h2", "The short answer"),
+      ("p", "Choose <strong>Goodcall</strong> if you want unlimited minutes and more custom call flows, and your caller count fits their plans. "
+            "Choose <strong>Vocallus</strong> if you want the lowest monthly price and simple setup focused on booking appointments."),
+      ("h2", "Side by side"),
+      ("table", ["", "Vocallus", "Goodcall"],
+       [["Starting price", "$14.99/month (Pro)", "About $79/month (Starter)"],
+        ["How you are billed", "Flat monthly plan with a minute allowance", "By unique callers per month, with a fee per extra caller"],
+        ["Minutes", "Up to 1,000 (Pro) or 1,500 (Max)", "Unlimited"],
+        ["Who answers", "Solana, an AI receptionist", "An AI agent"],
+        ["Books appointments", "Yes, into your Vocallus calendar", "Yes"],
+        ["Try before you pay", "Free test call on the website", "Free trial (see their website)"]]),
+      ("note", _PRICE_NOTE),
+      ("h2", "Billing: minutes vs unique callers"),
+      ("p", "Goodcall's plans are sized by how many different people call you each month. Vocallus plans are sized by minutes. "
+            "If you get many short calls from different people, a minute-based plan usually costs less."),
+      ("h2", "Where Goodcall is stronger"),
+      ("ul", ["Unlimited minutes on every plan.",
+              "More custom call flows on higher plans.",
+              "Built-in options for teams with several staff."]),
+      ("h2", "Where Vocallus is stronger"),
+      ("ul", ["Starts at $14.99/month, about a fifth of Goodcall's starting price.",
+              "Knows each service and how long it takes, so bookings always fit your schedule.",
+              "Clear after-hours choices: take a message, book for later, forward to your phone, or play a closed message.",
+              "Free test call before you pay."]),
+      ("h2", "Which should you pick?"),
+      ("p", "Both are solid AI receptionists. If price matters and your calls are mostly bookings and questions, start with Vocallus. "
+            "If you need complex call flows for a larger team, compare Goodcall's higher plans.")],
+     [("Is Vocallus cheaper than Goodcall?", "Yes. Vocallus starts at $14.99/month; Goodcall's Starter plan is listed at about $79/month."),
+      ("Do both answer 24/7?", "Yes. Both are AI receptionists that can answer at any hour."),
+      ("Can I try Vocallus first?", "Yes. You can make a free test call to Solana on the website before choosing a plan.")]),
+
+    # ---------------------------------------------------------------- guides
+    ("Pages/receptionist-cost-vs-ai.html", "guide",
+     "How Much Does a Receptionist Cost vs an AI Receptionist? (2026) | Vocallus",
+     "A full-time receptionist costs about $38,000 a year in pay alone. Compare the real cost of a receptionist, an answering service and an AI receptionist.",
+     "How much does a receptionist cost vs AI?",
+     "Answering the phone is essential, but the way you do it can cost anywhere from $15 to $4,000+ a month. "
+     "Here is what each option really costs a small business.",
+     [("h2", "Option 1: an in-house receptionist"),
+      ("p", "In the US, receptionists earned a median of <strong>$18.27 an hour, about $38,010 a year</strong>, in May 2025, according to the "
+            "<a class=\"underline\" href=\"https://www.bls.gov/ooh/office-and-administrative-support/receptionists.htm\" rel=\"noopener\" target=\"_blank\">U.S. Bureau of Labor Statistics</a>. "
+            "That is pay only. Payroll taxes, benefits, training and time off add more on top."),
+      ("p", "A full-time receptionist also covers about 40 hours of a 168-hour week. Calls at lunch, after hours, on weekends and "
+            "while they are on another line still go to voicemail."),
+      ("h2", "Option 2: a live answering service"),
+      ("p", "Services with human receptionists usually charge by the minute or by the call. Public starting prices in 2026 include about "
+            "$250/month for 50 receptionist minutes (Ruby) and about $292.50/month for 30 calls (Smith.ai's human plans). "
+            "A busy month can cost several hundred to a few thousand dollars."),
+      ("h2", "Option 3: an AI receptionist"),
+      ("p", "AI receptionists answer every call instantly, day and night, and can book appointments and take messages. "
+            "Prices range from about $15 to a few hundred dollars a month. Vocallus starts at $14.99/month."),
+      ("h2", "Side by side"),
+      ("table", ["", "In-house receptionist", "Live answering service", "AI receptionist"],
+       [["Typical monthly cost", "About $3,200+ in pay alone", "About $250 to $1,000+", "About $15 to $300"],
+        ["Hours covered", "Working hours", "Depends on plan", "24/7"],
+        ["Calls at the same time", "One at a time", "Several", "All of them"],
+        ["Books appointments", "Yes", "Usually", "Yes"],
+        ["Handles unusual calls", "Best", "Good", "Good for routine calls; takes a message for the rest"]]),
+      ("note", "Monthly in-house cost is the BLS median annual pay divided by 12, before taxes and benefits."),
+      ("h2", "Which is right for you?"),
+      ("ul", ["<strong>Mostly booking and simple questions?</strong> An AI receptionist covers it for the least money.",
+              "<strong>Need a person in the office anyway?</strong> Keep your receptionist and use AI for lunch, after hours and overflow.",
+              "<strong>Complex, sensitive calls all day?</strong> A human receptionist or live service is worth the cost."]),
+      ("p", "Many businesses do both: staff answer during the day, and an AI receptionist picks up everything they miss.")],
+     [("How much does a receptionist cost per year?", "The median US receptionist pay was about $38,010 a year in May 2025 (BLS), before taxes and benefits."),
+      ("Is an AI receptionist cheaper than an answering service?", "Usually, yes. AI receptionists start around $15/month, while live answering services usually start around $250/month."),
+      ("Can an AI receptionist replace a front desk?", "For answering, booking and messages, often yes. For in-person tasks like checking people in, you still need a person.")]),
+
+    ("Pages/stop-missing-calls.html", "guide",
+     "How to Stop Missing Calls as a Small Business (7 Ways) | Vocallus",
+     "Every missed call can be a missed customer. Seven practical ways a small business can answer more calls, from call forwarding to an AI receptionist.",
+     "How to stop missing calls as a small business",
+     "When you are with a customer, under a car or on a roof, the phone keeps ringing. Many callers who reach voicemail simply call the "
+     "next business on the list. Here are seven ways to catch more of those calls.",
+     [("h2", "1. Find out how many calls you miss"),
+      ("p", "Check your phone or carrier's call log for a normal week. Count missed calls, and note when they happen. "
+            "Most businesses find clusters: lunch, early morning, after closing and busy afternoons."),
+      ("h2", "2. Put your real hours everywhere"),
+      ("p", "Make sure your hours are correct on Google, your website and social pages, so people call when someone can answer."),
+      ("h2", "3. Forward calls when you are busy"),
+      ("p", "Most phone companies offer \"forward when busy\" and \"forward when unanswered.\" Send those calls to a cell phone, a coworker or an answering service."),
+      ("h2", "4. Make voicemail work harder"),
+      ("p", "Keep the greeting short, say when you will call back, and ask for a name, number and reason. Then call back the same day."),
+      ("h2", "5. Text back missed callers"),
+      ("p", "A quick text like \"Sorry we missed you, how can we help?\" keeps the conversation going when you cannot pick up."),
+      ("h2", "6. Let callers book without you"),
+      ("p", "Many calls are just people trying to book. Online booking, or a receptionist who can book for you, removes those calls from your plate."),
+      ("h2", "7. Use an AI receptionist for overflow and after hours"),
+      ("p", "An AI receptionist like Vocallus answers every call on the first ring, 24/7. It can book appointments into your calendar, "
+            "answer common questions and take messages, then send you a summary. You can use it for every call, "
+            "or only after hours and when you are busy."),
+      ("h2", "Putting it together"),
+      ("ul", ["Measure missed calls for one week.",
+              "Fix your listed hours.",
+              "Turn on forwarding for busy and unanswered calls.",
+              "Let an AI receptionist catch the rest, especially after hours."])],
+     [("Why do customers hang up instead of leaving a voicemail?", "Many people would rather call another business than wait for a call back, especially for urgent jobs or quick bookings."),
+      ("What is the cheapest way to answer every call?", "An AI receptionist is usually the cheapest way to answer 24/7. Vocallus starts at $14.99/month."),
+      ("Can I keep my business number?", "Yes. Forward your existing number to an AI receptionist; callers keep dialing the number they know.")]),
+
+    ("Pages/best-ai-receptionist-for-dental-offices.html", "guide",
+     "Best AI Receptionist for Dental Offices (2026 Guide) | Vocallus",
+     "What to look for in an AI receptionist for a dental office, and how Vocallus, Smith.ai, Goodcall and Ruby compare on price and fit.",
+     "Best AI receptionist for dental offices (2026)",
+     "Dental front desks juggle check-ins, insurance questions and a phone that never stops. An AI receptionist can answer the overflow "
+     "and book patients 24/7. Here is what to look for. (We make Vocallus, so we have tried to keep this fair.)",
+     [("h2", "What a dental office needs from an AI receptionist"),
+      ("ul", ["<strong>Books the right appointment.</strong> A cleaning and a crown take different amounts of time.",
+              "<strong>Answers after hours.</strong> Many patients call in the evening or on weekends.",
+              "<strong>Handles common questions.</strong> Hours, location, parking and which insurance you take.",
+              "<strong>Takes clear messages.</strong> Name, number and reason, so staff can call back fast.",
+              "<strong>Fits your privacy needs.</strong> If you need a signed BAA for HIPAA, ask every vendor before you share patient health details on calls."]),
+      ("h2", "How the options compare"),
+      ("table", ["", "Starting price", "Who answers", "Best for"],
+       [["Vocallus", "$14.99/month", "AI (Solana)", "Small practices that want booking and after-hours coverage at a low flat price"],
+        ["Smith.ai", "About $95/month (AI)", "AI or live humans", "Practices that want the option of live receptionists"],
+        ["Goodcall", "About $79/month", "AI", "Practices that want unlimited minutes"],
+        ["Ruby", "About $250/month", "Live humans", "Practices that want a person on every call"]]),
+      ("note", _PRICE_NOTE),
+      ("h2", "Why dental offices use Vocallus"),
+      ("ul", ["Add your services (cleanings, exams, whitening, emergencies) and how long each takes. Solana only offers times that fit.",
+              "Set your hours and choose what happens after hours: book for later, take a message, forward or play a closed message.",
+              "Get a summary and transcript of every call.",
+              "Keep your number by forwarding it to Solana."]),
+      ("p", "Vocallus is built for scheduling and messages. It does not connect to practice management software like Dentrix or Open Dental, "
+            "so if you need that, ask vendors who offer those integrations."),
+      ("h2", "How to choose"),
+      ("p", "Make a test call to each one you are considering, ask it to book a cleaning, and listen. The one that sounds natural and gets the "
+            "booking right is usually the one your patients will like too.")],
+     [("Can an AI receptionist book dental appointments?", "Yes. Vocallus books into open times on your calendar and uses the length you set for each service."),
+      ("Is an AI receptionist HIPAA compliant?", "It depends on the vendor. If you need a signed BAA, ask before you start, and avoid collecting health details on calls until you have one."),
+      ("How much does an AI receptionist cost for a dental office?", "From about $15 to a few hundred dollars a month. Vocallus starts at $14.99/month.")]),
+
+    # ---------------------------------------------------------------- FAQ
+    ("Pages/faq.html", "faq",
+     "Vocallus FAQ: Questions About Our AI Receptionist | Vocallus",
+     "Answers to common questions about Vocallus: how Solana answers calls, pricing, minutes, keeping your number, after hours, booking and more.",
+     "Frequently asked questions",
+     "Everything you need to know about Vocallus and Solana, your AI receptionist.",
+     [],
+     [("What is Vocallus?", "Vocallus gives your business Solana, an AI receptionist that answers your phone 24/7, books appointments into your calendar, answers common questions and takes messages."),
+      ("How does Solana answer my calls?", "You either forward your existing business number to your Solana number, or use a new local number from Vocallus. Solana picks up on the first ring."),
+      ("Can I keep my current phone number?", "Yes. Turn on call forwarding with your phone company and send calls to your Solana number. Callers keep dialing the number they know."),
+      ("Does it sound like a robot?", "Solana speaks in a natural voice and keeps replies short, like a real receptionist. You can hear her yourself with a free test call on the website."),
+      ("How much does it cost?", "Pro is $14.99/month and you connect your own Google AI key (Google bills you a few cents a minute for the AI). Max is $99.99/month with the AI included and more voices."),
+      ("How many minutes do I get?", "Pro includes up to 1,000 call minutes a month and Max includes up to 1,500. Each call counts in whole minutes, like a phone bill."),
+      ("What happens if I run out of minutes?", "New calls ring your backup number instead, so you never miss a customer. Your minutes reset at the start of each month."),
+      ("Can Solana book appointments?", "Yes. She checks your open times and books callers straight into your calendar. Add your services and how long each takes, and she only offers times that fit."),
+      ("What happens after hours?", "You choose: Solana takes a message, books the caller for later, forwards the call to your phone, or plays a closed message and hangs up."),
+      ("Will I know what happened on each call?", "Yes. Every call is saved with a summary and a transcript in your dashboard, and you can get a notification after each call."),
+      ("Can I change what Solana says?", "Yes. You describe your business, services and anything she should know, and you can change her name and voice."),
+      ("Does Solana give legal or medical advice?", "No. She answers questions about your business, books appointments and takes messages. Anything else, she offers to have someone call back."),
+      ("Can I try it before paying?", "Yes. Make a free test call to Solana on the website and hear how she handles your business."),
+      ("Is there a setup fee?", "No. Plans are monthly with no setup fee.")]),
+]
+
+for _a in ARTICLES:
+    _SEO[_a[0]] = (_a[2], _a[3])
+
+
+def _art_blocks(blocks):
+    out = []
+    for b in blocks:
+        k = b[0]
+        if k == "h2":
+            out.append('<h2 class="mt-12 first:mt-0 text-[26px] sm:text-[30px] font-bold leading-[1.2] tracking-[-0.02em] text-[#111111]">' + b[1] + '</h2>')
+        elif k == "p":
+            out.append('<p class="mt-4 text-[16.5px] leading-[1.75] text-[#3d3e44]">' + b[1] + '</p>')
+        elif k == "note":
+            out.append('<p class="mt-3 text-[13px] leading-[1.6] text-[#8a8b91]">' + b[1] + '</p>')
+        elif k == "ul":
+            out.append('<ul class="mt-4 space-y-3">' + "".join(
+                '<li class="flex items-start gap-3"><span class="mt-[10px] w-1.5 h-1.5 rounded-full bg-[#111111] shrink-0"></span>'
+                '<span class="text-[16.5px] leading-[1.7] text-[#3d3e44]">' + i + '</span></li>' for i in b[1]) + '</ul>')
+        elif k == "table":
+            head, rows = b[1], b[2]
+            th = "".join('<th class="text-left font-semibold text-[#111111] px-4 py-3 ' + ('w-[30%]' if n == 0 else '') + '">' + h + '</th>'
+                         for n, h in enumerate(head))
+            trs = "".join('<tr class="border-t border-neutral-100">' + "".join(
+                '<td class="px-4 py-3 align-top ' + ('font-semibold text-[#111111]' if n == 0 else 'text-[#3d3e44]') + '">' + c + '</td>'
+                for n, c in enumerate(r)) + '</tr>' for r in rows)
+            out.append('<div class="mt-6 overflow-x-auto rounded-2xl border border-neutral-200">'
+                       '<table class="w-full min-w-[560px] text-[14.5px] leading-[1.5]"><thead class="bg-neutral-50">'
+                       '<tr>' + th + '</tr></thead><tbody>' + trs + '</tbody></table></div>')
+    return "\n".join(out)
+
+
+def _art_faq(faq, open_first=False):
+    items = "".join(
+        '<details class="group border-b border-neutral-200 py-5"' + (' open' if (open_first and n == 0) else '') + '>'
+        '<summary class="flex items-center justify-between gap-4 cursor-pointer list-none text-[17px] font-semibold text-[#111111]">'
+        + q + '<span class="shrink-0 w-7 h-7 rounded-full border border-neutral-200 flex items-center justify-center text-[18px] leading-none '
+        'transition group-open:rotate-45">+</span></summary>'
+        '<p class="mt-3 text-[16px] leading-[1.7] text-[#3d3e44]">' + a + '</p></details>'
+        for n, (q, a) in enumerate(faq))
+    return '<div class="border-t border-neutral-200">' + items + '</div>'
+
+
+def _art_related(ctx, path):
+    picks = [a for a in ARTICLES if a[0] != path and a[0] != "Pages/faq.html"][:5]
+    links = "".join(
+        '<a href="' + ctx.u(a[0])[:-5] + '" class="block rounded-2xl border border-neutral-200 p-5 hover:bg-neutral-50 transition">'
+        '<div class="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#8a8b91]">' + ("Comparison" if a[1] == "compare" else "Guide") + '</div>'
+        '<div class="mt-1.5 text-[16px] font-semibold text-[#111111] leading-[1.35]">' + a[4] + '</div></a>' for a in picks)
+    return ('<div class="max-w-[1100px] mx-auto"><h2 class="text-[24px] font-bold tracking-[-0.02em] text-[#111111]">Keep reading</h2>'
+            '<div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">' + links + '</div></div>')
+
+
+def _art_cta(ctx):
+    return (
+        '<div class="max-w-[760px] mx-auto text-center">'
+        '<h2 class="text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.12] tracking-[-0.03em] text-[#111111]">Never miss another call</h2>'
+        '<p class="mt-5 text-[17px] leading-[1.6] text-[#55565B]">Set up Solana for your business in minutes. Try a free test call first.</p>'
+        '<div class="mt-8 flex items-center justify-center gap-3 flex-wrap">'
+        '<a href="' + ctx.u("Pages/signup.html") + '" class="btn-primary inline-flex items-center justify-center px-6 py-3.5 rounded-xl font-semibold text-[15px]">Try it free</a>'
+        '<a href="' + ctx.u("Pages/pricing.html") + '" class="inline-flex items-center justify-center px-6 py-3.5 rounded-xl border border-neutral-300 font-semibold text-[15px] text-[#111111] hover:bg-neutral-50 transition">See pricing</a>'
+        '</div></div>')
+
+
+def _article_page(art):
+    path, kind, seo_t, seo_d, h1, lead, blocks, faq = art
+
+    def build(ctx):
+        body = page_hero(h1, lead)
+        if kind == "faq":
+            inner = '<div class="max-w-[820px]">' + _art_faq(faq, True) + '</div>'
+            body += section_wrap("faq", inner)
+        else:
+            meta = ('<p class="text-[13px] text-[#8a8b91]">Updated October 2026 · By the Vocallus team</p>')
+            inner = ('<article class="max-w-[760px]">' + meta + '<div class="mt-8">' + _art_blocks(blocks) + '</div>'
+                     + ('<h2 class="mt-14 text-[26px] sm:text-[30px] font-bold tracking-[-0.02em] text-[#111111]">Questions</h2>'
+                        '<div class="mt-4">' + _art_faq(faq) + '</div>' if faq else '') + '</article>')
+            body += ('\n<section id="article" class="bg-white"><div class="max-w-[1400px] mx-auto px-6 lg:px-12 pb-16 lg:pb-24">'
+                     + inner + '</div></section>\n')
+            body += section_wrap("more", _art_related(ctx, path))
+        body += section_wrap("start", _art_cta(ctx), "bg-neutral-50")
+        return seo_t.split(" | ")[0], seo_d, body, ""
+    return build
+
+
+for _a in ARTICLES:
+    if not any(p == _a[0] for p, _ in PAGES):
+        PAGES.append((_a[0], _article_page(_a)))
+
+
+def _guide_links(prefix):
+    links = "".join(
+        '<a href="' + prefix + a[0][:-5] + '" class="px-4 py-2 rounded-full border border-neutral-200 '
+        'text-[14px] font-semibold text-[#111111] hover:bg-neutral-50 transition">' + a[4] + '</a>' for a in ARTICLES)
+    return ('\n<section id="vs-guides" class="bg-white"><div class="max-w-[1400px] mx-auto px-6 lg:px-12 pb-12 text-center">'
+            '<p class="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#55565B]">Guides and comparisons</p>'
+            '<div class="mt-4 flex flex-wrap justify-center gap-2">' + links + '</div></div></section>\n')
+
+
+_prev_rp_pages = render_page
+
+
+def render_page(path, builder):
+    html = _prev_rp_pages(path, builder)
+    if "VS_PAGES_MARKER" in html:
+        return html
+    name = Path(path).name
+    art = next((a for a in ARTICLES if a[0] == path), None)
+    data = []
+    if art:
+        if art[1] != "faq":
+            data.append({"@context": "https://schema.org", "@type": "Article", "headline": art[4],
+                         "description": art[3], "datePublished": _ART_DATE, "dateModified": _ART_DATE,
+                         "mainEntityOfPage": _seo_url(path),
+                         "author": {"@type": "Organization", "name": "Vocallus", "url": SEO_SITE + "/"},
+                         "publisher": {"@type": "Organization", "name": "Vocallus",
+                                       "logo": {"@type": "ImageObject", "url": SEO_SITE + "/Images/logo.png"}}})
+        if art[7]:
+            data.append({"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+                {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in art[7]]})
+    tag = "<!-- VS_PAGES_MARKER -->"
+    if data:
+        tag += '\n  <script type="application/ld+json">' + _seo_json.dumps(data if len(data) > 1 else data[0]).replace("</", "<\\/") + "</script>"
+    html = html.replace("</head>", "  " + tag + "\n</head>", 1)
+    # guides + comparisons links (helps Google find them)
+    if (name in ("index.html", "resources.html", "solutions.html") or name.startswith("ai-receptionist-for-") or art) and "<footer" in html:
+        prefix = "" if path == "index.html" else "../"
+        i = html.rfind("<footer")
+        html = html[:i] + _guide_links(prefix) + html[i:]
     return html
 
 
